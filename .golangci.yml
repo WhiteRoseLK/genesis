@@ -22,6 +22,15 @@ linters:
               desc: "le SDK ne dépend jamais de internal/ (docs/03-contrat-module.md, .claude/rules/sdk.md)"
             - pkg: "genesis/cmd"
               desc: "le SDK ne dépend jamais de cmd/ (docs/03-contrat-module.md)"
+        modules-must-not-import-core:
+          files:
+            - "**/modules/**"
+            - "**/test/modules/**"
+          deny:
+            - pkg: "genesis/internal"
+              desc: "un module n'importe que sdk/ et des bibliothèques tierces, jamais internal/ (docs/03-contrat-module.md, .claude/rules/modules.md)"
+            - pkg: "genesis/cmd"
+              desc: "un module n'importe que sdk/ et des bibliothèques tierces, jamais cmd/ (docs/03-contrat-module.md)"
 
 run:
   go: "1.27"

@@ -1,8 +1,10 @@
 .PHONY: build test lint proto e2e
 
-# Modules Go du monorepo (chacun a son propre go.mod). modules/* et
-# test/modules/* s'ajouteront à mesure qu'ils sont créés (docs/02-architecture.md).
-GO_MODULES := . sdk
+# Modules Go du monorepo, un par go.mod (cœur, sdk, modules/*, test/modules/*).
+# Découverts automatiquement : ajouter un module ne doit nécessiter aucune
+# modification hors de son répertoire (docs/02-architecture.md), donc pas de
+# liste codée en dur ici — voir genesis modules scaffold (docs/10).
+GO_MODULES := $(shell find . -name go.mod -not -path './.git/*' -exec dirname {} \; | sed 's|^\./||' | sort)
 
 build:
 	go build ./...
@@ -19,11 +21,10 @@ lint:
 		(cd $$m && golangci-lint run ./...); \
 	done
 
-# Le protocole module/v1 (sdk/proto) arrive au jalon J3 (docs/08-jalons.md).
-# En attendant, ce target ne fait rien si aucun .proto n'existe encore.
+# Le protocole module/v1 (sdk/proto) existe depuis le jalon J3 (docs/08-jalons.md).
 proto:
 	@if [ -z "$$(find sdk/proto -name '*.proto' 2>/dev/null)" ]; then \
-		echo "aucun fichier .proto pour le moment (protocole module/v1 prévu au jalon J3)"; \
+		echo "aucun fichier .proto pour le moment"; \
 	else \
 		cd sdk/proto && buf generate; \
 	fi
