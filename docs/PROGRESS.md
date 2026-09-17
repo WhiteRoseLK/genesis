@@ -5,7 +5,7 @@
 | J0 — Squelette | fait | |
 | J1 — Spec et validation | fait | |
 | J2 — Secrets et état | fait | |
-| J3 — SDK et hôte de modules | à faire | |
+| J3 — SDK et hôte de modules | fait | |
 | J4 — Résolveur, broker, planificateur, moteur | à faire | |
 | J5 — proxmox, base-os | à faire | |
 | J6 — chrony, coredns, powerdns | à faire | |
@@ -75,6 +75,32 @@
 - Aucune nouvelle. Générateur de certificat (`pki.issuer`) différé à J7 comme prévu, la fonction n'existe pas avant.
 
 **Prochaine étape** : J3 — SDK et hôte de modules (doc 03).
+
+### 2026-09-17 — J3 SDK et hôte de modules
+**Fait**
+- `sdk/proto/module/v1/module.proto` : service `Module` (11 RPC du doc 03), `config`/`state` en `google.protobuf.Struct` (JSON opaque natif). Package `module.v1` (sans préfixe `genesis.`) pour que le répertoire corresponde à la convention buf. Trois règles STANDARD exceptées dans `buf.yaml` (`SERVICE_SUFFIX`, `RPC_REQUEST_RESPONSE_UNIQUE`, `RPC_REQUEST/RESPONSE_STANDARD_NAME`) : le doc fixe délibérément un service `Module` (pas `ModuleService`) et `StepRequest`/`StepResult` partagés par tout le cycle de vie. `make proto` génère réellement du code désormais.
+- `sdk/go` : `Serve(modulev1.ModuleServer)` (go-plugin, handshake partagé `sdk.Handshake`/`sdk.ClientPlugins()`), `LoadManifest`/`ParseManifest`/`ManifestFile.ToProto()` (parsing `module.yaml`, formes courte/longue de `requires`).
+- `sdk/go/moduletest` : `RunConformance` — squelette (Describe cohérent avec le manifest, Validate ne plante pas). Suite sémantique complète (idempotence rejouée, secrets absents des sorties, `UpsertRecord`→`ListRecords`) différée à J4 (a besoin du broker).
+- `internal/modulehost` : `Discover` (répertoires de recherche, layout `<nom>/<version>/{module.yaml, module-<os>-<arch>, assets/}`), `Fingerprint` (SHA-256), `Launch`/`Client` (go-plugin, logger en Warn) avec `WrapModuleError` pour transformer un crash de module en erreur propre.
+- `internal/modulelock` : `genesis.lock` (nom → {version, sha256}), `Verify` refuse une empreinte divergente.
+- `internal/scaffold` : `Generate` écrit `modules/<nom>/` complet (go.mod, main.go avec stubs de chaque RPC, module.yaml, schema.json, test de conformité), `go work use`, valide par `go build` — **sans** `go mod tidy` (voir décision ci-dessous).
+- CLI : `genesis modules list/install/verify/scaffold` implémentées (plus stubs).
+- `test/modules/panicking` : module de test dont `Check` panique, utilisé pour le test de supervision et pour la chaîne scaffold→install→Discover→Launch→Describe de bout en bout.
+- Correction du Makefile (J0) : `GO_MODULES` découvert via `find . -name go.mod` au lieu d'une liste codée en dur — sinon chaque module ajouté aurait demandé une édition du Makefile, violation de la règle non négociable « ajouter un module ne doit nécessiter aucune modification hors de son répertoire ».
+- Nouvelle règle `depguard` `modules-must-not-import-core` (voir décision ci-dessous).
+- `internal/atomicfile` extrait de `internal/secrets`/`internal/state` (règle des trois : `internal/modulelock` en avait besoin aussi).
+
+**Décisions**
+- **Pas de `require genesis/sdk` explicite dans le go.mod d'un module, pas de `go mod tidy` automatique.** Sous `go.work`, un `require <module-du-monorepo-sans-domaine-réel> vX` pousse `go build`/`go mod tidy` à tenter une résolution réseau (« malformed module path » ou tentative de fetch DNS) plutôt que d'utiliser la substitution d'espace de travail — vérifié empiriquement (voir historique de session). Sans cette ligne, l'import d'un paquet appartenant à un autre module `use`'d se résout localement sans réseau ni `go.sum`, comportement documenté de `go.work`. `scaffold`/`install` valident donc par `go build` uniquement.
+- `genesis/sdk` reste nommé sans domaine réel (cf. décision J0) ; le point ci-dessus est la conséquence concrète de ce choix, maintenant bien comprise.
+- `modules-must-not-import-core` (depguard) : très largement redondante avec les règles natives de Go (un paquet sous `internal/` est inimportable hors de l'arborescence du module qui le possède ; `cmd/genesis` est `package main`, jamais importable) — vérifié empiriquement dans les deux cas, l'erreur remontée est `typecheck`, pas `depguard`. Gardée quand même comme documentation/filet de sécurité si un futur paquet du cœur sortait un jour d'`internal/`.
+- `genesis modules install` compile le module depuis son répertoire source (`go build`) plutôt que d'attendre un binaire déjà construit — correspond à l'exemple du doc 10 (`genesis modules install ./modules/<nom>`).
+- `--lock-file` (défaut `genesis.lock`) ajouté aux commandes `modules install`/`verify` : `genesis.lock` vit « à côté de la spec » (doc 02) mais aucune commande n'a encore de notion de répertoire de travail de spec avant J4.
+
+**Dette**
+- Aucune nouvelle latente : le générateur de certificat et la suite de conformité sémantique complète étaient déjà notés comme différés (J7/J4) dans les jalons précédents.
+
+**Prochaine étape** : J4 — Résolveur, broker, planificateur, moteur (docs 02, 05).
 
 ## Dette technique connue
 - Clé maîtresse en fichier local (ADR-007)
