@@ -17,6 +17,11 @@ func Execute() {
 	}
 }
 
+// defaultStateDir est le répertoire d'état par défaut (docs/04-spec.md,
+// docs/06-secrets-etat.md), utilisé tant qu'aucune spec n'a été chargée
+// (ex. `genesis init`, avant que seed.state_dir ne soit connu).
+const defaultStateDir = "/var/lib/genesis"
+
 // NewRootCmd construit la commande racine `genesis` et tous ses enfants.
 func NewRootCmd() *cobra.Command {
 	root := &cobra.Command{
@@ -25,6 +30,7 @@ func NewRootCmd() *cobra.Command {
 		SilenceUsage:  true,
 		SilenceErrors: false,
 	}
+	root.PersistentFlags().String("state-dir", defaultStateDir, "répertoire d'état de la graine (docs/06-secrets-etat.md)")
 
 	root.AddCommand(
 		newInitCmd(),

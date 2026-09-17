@@ -32,18 +32,17 @@ func TestHelpListsDocumentedCommands(t *testing.T) {
 	}
 }
 
-// TestUnimplementedCommandsFail vérifie que les commandes stub renvoient une
-// erreur explicite plutôt qu'un succès silencieux.
-func TestUnimplementedCommandsFail(t *testing.T) {
+// TestStubCommandsFail vérifie que les commandes encore au stade de stub
+// (jalons ultérieurs) renvoient une erreur explicite plutôt qu'un succès
+// silencieux. `init`, `validate` et `secrets` sont réellement implémentées
+// (J1/J2) et testées ailleurs.
+func TestStubCommandsFail(t *testing.T) {
 	cases := [][]string{
-		{"init"},
 		{"modules", "list"},
 		{"modules", "verify"},
-		{"validate", "-f", "env.yaml"},
 		{"plan", "-f", "env.yaml"},
 		{"apply", "-f", "env.yaml"},
 		{"status"},
-		{"secrets", "list"},
 		{"seed", "retire"},
 		{"destroy", "-f", "env.yaml"},
 	}
