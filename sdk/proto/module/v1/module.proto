@@ -1,0 +1,132 @@
+syntax = "proto3";
+
+// Protocole de cycle de vie module <-> cœur (docs/03-contrat-module.md).
+// Nommage : package "module.v1" (sans préfixe "genesis.") pour que le
+// répertoire sdk/proto/module/v1/ corresponde au paquet (convention buf).
+package module.v1;
+
+import "google/protobuf/struct.proto";
+
+option go_package = "genesis/sdk/go/gen/module/v1;modulev1";
+
+service Module {
+  rpc Describe(Empty) returns (Manifest);
+  rpc Validate(ValidateRequest) returns (Diagnostics);
+  rpc Check(StepRequest) returns (CheckResult);
+  rpc SeedUp(StepRequest) returns (StepResult);
+  rpc SeedDown(StepRequest) returns (StepResult);
+  rpc Provision(StepRequest) returns (StepResult);
+  rpc Configure(StepRequest) returns (StepResult);
+  rpc Verify(StepRequest) returns (StepResult);
+  rpc Handover(StepRequest) returns (StepResult);
+  rpc Repoint(RepointRequest) returns (StepResult);
+  rpc Destroy(StepRequest) returns (StepResult);
+}
+
+message Empty {}
+
+// FunctionRef identifie une fonction fournie, avec les phases où elle l'est.
+message FunctionRef {
+  string function = 1; // ex. "pki.issuer/v1"
+  repeated string phases = 2; // "seed" | "target"
+}
+
+// RequireEntry est une fonction requise par le module pour une phase donnée.
+message RequireEntry {
+  string function = 1; // ex. "compute.vm/v1", peut porter le suffixe "@seed"/"@target"
+  bool optional = 2; // docs/10-ajouter-un-module.md : dépendances optionnelles
+}
+
+message RequireList {
+  repeated RequireEntry entries = 1;
+}
+
+message SecretDecl {
+  string name = 1;
+  string kind = 2; // password | token | private-key | certificate | ssh-key
+  string rotation = 3; // never | on-handover | 90d …
+  bool recovery = 4;
+}
+
+message ResourceDecl {
+  string role = 1;
+  int32 count = 2;
+  string size = 3;
+}
+
+// Manifest reflète module.yaml (docs/03-contrat-module.md §1).
+message Manifest {
+  string api_version = 1;
+  string name = 2;
+  string version = 3;
+  string description = 4;
+  string layer = 5;
+  string core = 6; // contrainte semver sur le cœur
+  int32 protocol = 7; // version du protocole gRPC module <-> cœur
+  repeated string capabilities = 8;
+  repeated FunctionRef provides = 9;
+  map<string, RequireList> requires = 10; // clé : "seed" | "target"
+  string config_schema = 11; // chemin du JSON Schema, relatif au module
+  repeated SecretDecl secrets = 12;
+  repeated ResourceDecl resources = 13;
+  map<string, bool> defaults = 14;
+}
+
+message ValidateRequest {
+  google.protobuf.Struct config = 1; // section de spec résolue pour ce module
+}
+
+message Diagnostic {
+  string path = 1; // chemin YAML concerné, si applicable
+  string message = 2;
+  string severity = 3; // error | warning
+}
+
+message Diagnostics {
+  repeated Diagnostic diagnostics = 1;
+}
+
+// StepRequest porte tout ce dont un module a besoin pour exécuter une étape
+// (docs/03-contrat-module.md §2) : le cœur ne laisse rien d'autre y accéder.
+message StepRequest {
+  string run_id = 1;
+  google.protobuf.Struct config = 2; // configuration résolue du module
+  google.protobuf.Struct state = 3; // extrait d'état propre au module, opaque pour le cœur
+  string broker_token = 4; // jeton d'accès broker, limité aux fonctions déclarées (J4)
+}
+
+message RepointRequest {
+  StepRequest step = 1;
+  string function = 2; // fonction dont le fournisseur vient de changer
+}
+
+message Endpoint {
+  string address = 1;
+  int32 port = 2;
+  map<string, string> extra = 3;
+}
+
+message CheckResult {
+  enum Status {
+    STATUS_UNSPECIFIED = 0;
+    STATUS_CONFORME = 1;
+    STATUS_A_FAIRE = 2;
+    STATUS_DERIVE = 3;
+  }
+  Status status = 1;
+  string detail = 2;
+}
+
+// StepResult : le module ne persiste rien lui-même, state est à
+// persister par le cœur, opaque (docs/03-contrat-module.md §2).
+message StepResult {
+  enum Status {
+    STATUS_UNSPECIFIED = 0;
+    STATUS_OK = 1;
+    STATUS_FAILED = 2;
+  }
+  Status status = 1;
+  google.protobuf.Struct state = 2;
+  repeated Endpoint endpoints = 3;
+  repeated Diagnostic diagnostics = 4;
+}

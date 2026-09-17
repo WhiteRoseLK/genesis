@@ -4,6 +4,14 @@ modules:
 lint:
   use:
     - STANDARD
+  except:
+    # docs/03-contrat-module.md fixe délibérément ce contrat : un service
+    # "Module" (pas "ModuleService"), et StepRequest/StepResult partagés par
+    # toutes les étapes du cycle de vie plutôt qu'un message par RPC.
+    - SERVICE_SUFFIX
+    - RPC_REQUEST_RESPONSE_UNIQUE
+    - RPC_REQUEST_STANDARD_NAME
+    - RPC_RESPONSE_STANDARD_NAME
 breaking:
   use:
     - FILE
