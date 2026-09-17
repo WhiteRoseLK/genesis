@@ -1,0 +1,12 @@
+# Binaires
+/genesis
+/bin/
+
+# Artefacts de build Go
+*.test
+*.out
+
+# IDE / éditeurs
+.vscode/
+.idea/
+*.swp
