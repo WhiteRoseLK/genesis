@@ -4,7 +4,7 @@
 |---|---|---|
 | J0 — Squelette | fait | |
 | J1 — Spec et validation | fait | |
-| J2 — Secrets et état | à faire | |
+| J2 — Secrets et état | fait | |
 | J3 — SDK et hôte de modules | à faire | |
 | J4 — Résolveur, broker, planificateur, moteur | à faire | |
 | J5 — proxmox, base-os | à faire | |
@@ -57,6 +57,24 @@
 - Aucune nouvelle. La validation `config_schema` par module et la résolution capacité→module restent hors périmètre J1, comme prévu par le doc 08.
 
 **Prochaine étape** : J2 — Secrets et état (doc 06).
+
+### 2026-09-17 — J2 Secrets et état
+**Fait**
+- `internal/secrets` : `Secret` (redaction `String`/`MarshalJSON`/`LogValue`), `Ref` (validation anti-traversal), interface `Store` (doc 06), générateurs (mot de passe 32 car., token 256 bits, clé ECDSA P-384, clé Ed25519, paire SSH Ed25519 — générateur de certificat différé, `pki.issuer` n'existe pas avant J7), `MasterKeyProvider` (ADR-007) + implémentation `file` (identité X25519 `filippo.io/age` dans `state_dir/master.key`, générée une fois par `init`), `FileStore` (secret chiffré age + métadonnées en clair séparées, écritures atomiques, permissions `0700`/`0600`).
+- `RedactingHandler` : enveloppe n'importe quel `slog.Handler`, redacte les valeurs `Secret` et les motifs connus (tokens Vault, blocs PEM) dans le message et les attributs, y compris imbriqués.
+- `internal/state` : `State{SchemaVersion, SecretsBackend}` — volontairement minimal, le reste (VM, statuts de module, endpoints...) arrivera avec les jalons qui le produisent. `Load/Save` atomiques ; `Lock` via `flock` non bloquant sur `state_dir/state.lock`.
+- CLI : flag persistant `--state-dir` (défaut `/var/lib/genesis`) ; `genesis init` génère/charge la clé maîtresse (affichée une seule fois), idempotent ; `genesis secrets list` (métadonnées seulement) et `genesis secrets get <ref>` (révèle la valeur — c'est le but de la commande) branchés sur le backend `file`.
+- Tests : `Ensure` idempotent (secrets) ; deux `Lock` concurrents sur le même `state_dir` → le second échoue immédiatement (deux descripteurs distincts, simule fidèlement deux process) ; test de redaction (token Vault, bloc PEM, valeur `Secret`, y compris via `logger.With` et message formaté) — rien ne fuite, tout vert.
+
+**Décisions**
+- `--state-dir` en flag persistant sur la racine (absent du tableau CLI du doc 02, mais nécessaire : `init` doit savoir où travailler avant qu'une spec existe) — même défaut que `seed.state_dir` en J1.
+- `secrets get` révèle la valeur en clair sur la sortie standard : c'est la fonction même de la commande (récupération déclarée par l'opérateur), à distinguer de la règle « aucun secret en clair » qui vise les fuites non désirées (logs, état, erreurs, `secrets list`).
+- Verrou d'état implémenté avec `syscall.Flock` (stdlib, cible Linux uniquement per doc 01) plutôt qu'une dépendance externe.
+
+**Dette**
+- Aucune nouvelle. Générateur de certificat (`pki.issuer`) différé à J7 comme prévu, la fonction n'existe pas avant.
+
+**Prochaine étape** : J3 — SDK et hôte de modules (doc 03).
 
 ## Dette technique connue
 - Clé maîtresse en fichier local (ADR-007)
