@@ -1,0 +1,27 @@
+version: "2"
+
+linters:
+  default: standard
+  enable:
+    - depguard
+  settings:
+    depguard:
+      rules:
+        core-must-not-import-modules:
+          files:
+            - "**/internal/**"
+            - "**/cmd/**"
+          deny:
+            - pkg: "genesis/modules"
+              desc: "le cœur (internal/, cmd/) ne doit jamais importer modules/ (docs/02-architecture.md)"
+        sdk-must-not-import-core:
+          files:
+            - "**/sdk/**"
+          deny:
+            - pkg: "genesis/internal"
+              desc: "le SDK ne dépend jamais de internal/ (docs/03-contrat-module.md, .claude/rules/sdk.md)"
+            - pkg: "genesis/cmd"
+              desc: "le SDK ne dépend jamais de cmd/ (docs/03-contrat-module.md)"
+
+run:
+  go: "1.27"
