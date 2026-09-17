@@ -1,6 +1,12 @@
 # Binaires
 /genesis
 /bin/
+# Binaires de modules compilés localement (`go build ./...` dans modules/*
+# ou test/modules/*, où le binaire de sortie prend le nom du module Go).
+genesis-module-*
+genesis-test-module-*
+module-linux-*
+module-darwin-*
 
 # Artefacts de build Go
 *.test
