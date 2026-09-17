@@ -8,6 +8,8 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+
+	"genesis/internal/atomicfile"
 )
 
 // ErrNotInitialized signale l'absence de state_dir/state.json : `genesis
@@ -44,7 +46,7 @@ func Save(stateDir string, s *State) error {
 	if err != nil {
 		return fmt.Errorf("encodage de l'état : %w", err)
 	}
-	if err := writeAtomic(statePath(stateDir), raw, 0o600); err != nil {
+	if err := atomicfile.Write(statePath(stateDir), raw, 0o600); err != nil {
 		return fmt.Errorf("écriture de %s : %w", statePath(stateDir), err)
 	}
 	return nil

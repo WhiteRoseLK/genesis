@@ -1,6 +1,9 @@
 // SPDX-License-Identifier: Apache-2.0
 
-package secrets
+// Package atomicfile écrit des fichiers sans jamais laisser un état
+// partiellement écrit visible (docs/06-secrets-etat.md : "écritures atomiques"),
+// utilisé par internal/secrets, internal/state et internal/modulelock.
+package atomicfile
 
 import (
 	"fmt"
@@ -8,10 +11,8 @@ import (
 	"path/filepath"
 )
 
-// writeAtomic écrit data dans path via un fichier temporaire suivi d'un
-// rename, pour ne jamais laisser un fichier partiellement écrit
-// (docs/06-secrets-etat.md : "Écritures atomiques").
-func writeAtomic(path string, data []byte, perm os.FileMode) error {
+// Write écrit data dans path via un fichier temporaire suivi d'un rename.
+func Write(path string, data []byte, perm os.FileMode) error {
 	dir := filepath.Dir(path)
 	tmp, err := os.CreateTemp(dir, ".tmp-*")
 	if err != nil {

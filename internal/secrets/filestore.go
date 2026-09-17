@@ -14,6 +14,8 @@ import (
 	"time"
 
 	"filippo.io/age"
+
+	"genesis/internal/atomicfile"
 )
 
 // FileStore est le backend `file` de l'itération 1 (docs/06-secrets-etat.md) :
@@ -77,7 +79,7 @@ func (s *FileStore) Put(_ context.Context, ref Ref, value Secret, meta Meta) err
 	if err != nil {
 		return fmt.Errorf("chiffrement de %s : %w", ref, err)
 	}
-	if err := writeAtomic(s.secretPath(ref), ciphertext, 0o600); err != nil {
+	if err := atomicfile.Write(s.secretPath(ref), ciphertext, 0o600); err != nil {
 		return fmt.Errorf("écriture de %s : %w", ref, err)
 	}
 
@@ -88,7 +90,7 @@ func (s *FileStore) Put(_ context.Context, ref Ref, value Secret, meta Meta) err
 	if err != nil {
 		return fmt.Errorf("encodage des métadonnées de %s : %w", ref, err)
 	}
-	if err := writeAtomic(s.metaPath(ref), metaJSON, 0o600); err != nil {
+	if err := atomicfile.Write(s.metaPath(ref), metaJSON, 0o600); err != nil {
 		return fmt.Errorf("écriture des métadonnées de %s : %w", ref, err)
 	}
 	return nil

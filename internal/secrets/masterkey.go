@@ -9,6 +9,8 @@ import (
 	"path/filepath"
 
 	"filippo.io/age"
+
+	"genesis/internal/atomicfile"
 )
 
 // MasterKeyProvider fournit la clé maîtresse qui chiffre le backend `file`
@@ -50,7 +52,7 @@ func (p FileMasterKeyProvider) Ensure(_ context.Context) (*age.X25519Identity, b
 		return nil, false, fmt.Errorf("génération de la clé maîtresse : %w", err)
 	}
 
-	if err := writeAtomic(p.path(), []byte(identity.String()+"\n"), 0o600); err != nil {
+	if err := atomicfile.Write(p.path(), []byte(identity.String()+"\n"), 0o600); err != nil {
 		return nil, false, fmt.Errorf("écriture de la clé maîtresse : %w", err)
 	}
 
