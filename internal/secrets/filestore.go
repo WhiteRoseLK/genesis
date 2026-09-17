@@ -114,6 +114,24 @@ func (s *FileStore) Get(_ context.Context, ref Ref) (Secret, error) {
 	return NewSecret(plaintext), nil
 }
 
+func (s *FileStore) GetMeta(_ context.Context, ref Ref) (Meta, error) {
+	if err := ref.Validate(); err != nil {
+		return Meta{}, err
+	}
+	raw, err := os.ReadFile(s.metaPath(ref))
+	if os.IsNotExist(err) {
+		return Meta{}, fmt.Errorf("secret %s : introuvable", ref)
+	}
+	if err != nil {
+		return Meta{}, fmt.Errorf("lecture des métadonnées de %s : %w", ref, err)
+	}
+	var meta Meta
+	if err := json.Unmarshal(raw, &meta); err != nil {
+		return Meta{}, fmt.Errorf("métadonnées invalides pour %s : %w", ref, err)
+	}
+	return meta, nil
+}
+
 func (s *FileStore) List(_ context.Context, prefix string) ([]Entry, error) {
 	root := s.secretsDir()
 	searchRoot := root

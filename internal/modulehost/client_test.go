@@ -40,7 +40,7 @@ func buildPanickingModule(t *testing.T) string {
 func TestModuleCrashProducesCleanError(t *testing.T) {
 	binaryPath := buildPanickingModule(t)
 
-	client, err := Launch(binaryPath)
+	client, err := Launch(binaryPath, nil)
 	if err != nil {
 		t.Fatalf("Launch : %v", err)
 	}

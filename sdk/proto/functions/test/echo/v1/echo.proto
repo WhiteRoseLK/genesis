@@ -1,0 +1,22 @@
+syntax = "proto3";
+
+// Fonction de test générique, réutilisée sous des noms différents
+// (test.a/v1, test.b/v1...) par test/modules/test-* pour exercer le
+// résolveur/planificateur/broker sans logique métier (docs/08-jalons.md, J4).
+package functions.test.echo.v1;
+
+option go_package = "genesis/sdk/go/gen/functions/test/echo/v1;echov1";
+
+service Echo {
+  rpc Call(CallRequest) returns (CallResponse);
+}
+
+message CallRequest {
+  string message = 1;
+}
+
+message CallResponse {
+  string message = 1;
+  string from = 2;   // nom du module qui répond
+  string phase = 3;  // "seed" | "target", pour vérifier le Handover
+}

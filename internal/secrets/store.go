@@ -33,6 +33,10 @@ type Store interface {
 	// existe déjà (idempotent, critère d'acceptation J2).
 	Ensure(ctx context.Context, ref Ref, gen Generator, meta Meta) error
 	Get(ctx context.Context, ref Ref) (Secret, error)
+	// GetMeta lit les métadonnées d'un secret sans sa valeur — utilisé pour
+	// le contrôle d'accès (owner/consumers) avant de servir Get à un module
+	// via la fonction core.secrets/v1 (internal/broker).
+	GetMeta(ctx context.Context, ref Ref) (Meta, error)
 	Put(ctx context.Context, ref Ref, s Secret, meta Meta) error
 	List(ctx context.Context, prefix string) ([]Entry, error)
 	Backend() string

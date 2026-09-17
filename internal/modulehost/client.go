@@ -9,6 +9,7 @@ import (
 
 	"github.com/hashicorp/go-hclog"
 	goplugin "github.com/hashicorp/go-plugin"
+	"google.golang.org/grpc"
 
 	sdk "genesis/sdk/go"
 	modulev1 "genesis/sdk/go/gen/module/v1"
@@ -16,16 +17,26 @@ import (
 
 // Client est une connexion vivante à un module lancé en process séparé.
 type Client struct {
-	plugin *goplugin.Client
-	module modulev1.ModuleClient
+	plugin    *goplugin.Client
+	rpcClient goplugin.ClientProtocol
+	module    modulev1.ModuleClient
+	broker    *goplugin.GRPCBroker
 }
 
 // Launch démarre le binaire du module et établit la connexion gRPC
-// (docs/02-architecture.md : hôte de modules, go-plugin).
-func Launch(binaryPath string) (*Client, error) {
+// (docs/02-architecture.md : hôte de modules, go-plugin). manifest peut être
+// nil si les fonctions fournies par le module n'ont pas encore besoin d'être
+// dispensées (ex. simple Describe() de découverte) ; il doit être fourni dès
+// qu'une fonction fournie sera routée par le broker.
+func Launch(binaryPath string, manifest *sdk.ManifestFile) (*Client, error) {
+	plugins := sdk.ClientPlugins()
+	if manifest != nil {
+		plugins = sdk.ClientPluginsFor(manifest)
+	}
+
 	pc := goplugin.NewClient(&goplugin.ClientConfig{
 		HandshakeConfig:  sdk.Handshake,
-		Plugins:          sdk.ClientPlugins(),
+		Plugins:          plugins,
 		Cmd:              exec.Command(binaryPath),
 		AllowedProtocols: []goplugin.Protocol{goplugin.ProtocolGRPC},
 		// Par défaut go-plugin journalise en DEBUG/TRACE sur stderr ; Warn
@@ -43,12 +54,12 @@ func Launch(binaryPath string) (*Client, error) {
 		pc.Kill()
 		return nil, fmt.Errorf("connexion au module %s : %w", binaryPath, err)
 	}
-	moduleClient, ok := raw.(modulev1.ModuleClient)
+	conn, ok := raw.(*sdk.ModuleConnection)
 	if !ok {
 		pc.Kill()
 		return nil, fmt.Errorf("module %s : type de client inattendu (%T)", binaryPath, raw)
 	}
-	return &Client{plugin: pc, module: moduleClient}, nil
+	return &Client{plugin: pc, rpcClient: rpcClient, module: conn.Client, broker: conn.Broker}, nil
 }
 
 // Close arrête le process du module. Un module qui a déjà planté n'entraîne
@@ -61,6 +72,28 @@ func (c *Client) Close() {
 // étape du cycle de vie (docs/03-contrat-module.md §2).
 func (c *Client) Module() modulev1.ModuleClient {
 	return c.module
+}
+
+// Broker donne accès au canal bidirectionnel go-plugin de cette connexion,
+// pour ouvrir une session de broker avant d'invoquer une étape
+// (internal/broker, docs/02-architecture.md).
+func (c *Client) Broker() *goplugin.GRPCBroker {
+	return c.broker
+}
+
+// DispenseFunction ouvre la connexion brute vers une fonction fournie par ce
+// module (déclarée dans son manifest.Provides), à typer par l'appelant
+// (internal/broker, qui seul connaît le type concret de la fonction).
+func (c *Client) DispenseFunction(name string) (*grpc.ClientConn, error) {
+	raw, err := c.rpcClient.Dispense(sdk.FunctionPluginKey(name))
+	if err != nil {
+		return nil, fmt.Errorf("connexion à la fonction %q : %w", name, err)
+	}
+	conn, ok := raw.(*grpc.ClientConn)
+	if !ok {
+		return nil, fmt.Errorf("fonction %q : type de connexion inattendu (%T)", name, raw)
+	}
+	return conn, nil
 }
 
 // Describe interroge le manifest publié par le module en cours d'exécution.

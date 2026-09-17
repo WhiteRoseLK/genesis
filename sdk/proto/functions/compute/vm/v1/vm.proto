@@ -1,0 +1,53 @@
+syntax = "proto3";
+
+// Fonction compute.vm/v1 (docs/03-contrat-module.md) : fournisseurs MVP
+// proxmox (J5) et fake-compute (J4, registre mémoire).
+package functions.compute.vm.v1;
+
+import "google/protobuf/timestamp.proto";
+
+option go_package = "genesis/sdk/go/gen/functions/compute/vm/v1;computevmv1";
+
+service ComputeVM {
+  rpc EnsureImage(EnsureImageRequest) returns (EnsureImageResponse);
+  rpc EnsureVM(EnsureVMRequest) returns (VM);
+  rpc GetVM(GetVMRequest) returns (VM);
+  rpc DeleteVM(DeleteVMRequest) returns (DeleteVMResponse);
+  rpc Now(NowRequest) returns (NowResponse);
+}
+
+message EnsureImageRequest {
+  string image = 1;
+}
+
+message EnsureImageResponse {}
+
+message EnsureVMRequest {
+  string name = 1;
+  string env = 2; // tag genesis-env=<nom>, clé d'idempotence (docs/07)
+  string size = 3;
+  map<string, string> extra = 4;
+}
+
+message VM {
+  string id = 1;
+  string name = 2;
+  string ip = 3;
+  string status = 4;
+}
+
+message GetVMRequest {
+  string name = 1;
+}
+
+message DeleteVMRequest {
+  string name = 1;
+}
+
+message DeleteVMResponse {}
+
+message NowRequest {}
+
+message NowResponse {
+  google.protobuf.Timestamp time = 1;
+}

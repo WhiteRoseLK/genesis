@@ -69,7 +69,7 @@ func TestScaffoldInstallDiscoverDescribe(t *testing.T) {
 	}
 
 	// Describe via le vrai protocole gRPC/go-plugin, pas un appel Go direct.
-	client, err := modulehost.Launch(installed.BinaryPath)
+	client, err := modulehost.Launch(installed.BinaryPath, installed.Manifest)
 	if err != nil {
 		t.Fatalf("Launch : %v", err)
 	}

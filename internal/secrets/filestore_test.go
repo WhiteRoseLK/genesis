@@ -71,6 +71,14 @@ func TestPutGetRoundTrip(t *testing.T) {
 	if got.ExposeSecret() != "s3cr3t-value" {
 		t.Errorf("valeur = %q, attendu %q", got.ExposeSecret(), "s3cr3t-value")
 	}
+
+	meta, err := store.GetMeta(ctx, ref)
+	if err != nil {
+		t.Fatalf("GetMeta : %v", err)
+	}
+	if meta.Owner != "secrets" || meta.Kind != "token" || !meta.Recovery {
+		t.Errorf("GetMeta = %+v, attendu owner=secrets kind=token recovery=true", meta)
+	}
 }
 
 func TestGetMissingRef(t *testing.T) {
