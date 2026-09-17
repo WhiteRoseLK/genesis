@@ -1,0 +1,6 @@
+kind: Environment
+metadata: { name: lab }
+network: { cidr: 10.10.0.0/24, gateway: 10.10.0.1, pool: 10.10.0.50-10.10.0.99, domain: lab.internal }
+seed: { address: 10.10.0.10 }
+capabilities:
+  compute: { module: proxmox }

@@ -1,0 +1,75 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://genesis.invalid/schema/environment.json",
+  "type": "object",
+  "required": ["apiVersion", "kind", "metadata", "network", "seed", "capabilities"],
+  "additionalProperties": false,
+  "properties": {
+    "apiVersion": { "const": "genesis/v1alpha1" },
+    "kind": { "const": "Environment" },
+    "metadata": {
+      "type": "object",
+      "required": ["name"],
+      "additionalProperties": false,
+      "properties": {
+        "name": { "type": "string", "minLength": 1 }
+      }
+    },
+    "network": {
+      "type": "object",
+      "required": ["cidr", "gateway", "pool", "domain"],
+      "additionalProperties": false,
+      "properties": {
+        "cidr": { "type": "string", "minLength": 1 },
+        "gateway": { "type": "string", "minLength": 1 },
+        "pool": { "type": "string", "minLength": 1 },
+        "domain": { "type": "string", "minLength": 1 },
+        "upstream_dns": { "type": "array", "items": { "type": "string", "minLength": 1 } },
+        "upstream_ntp": { "type": "array", "items": { "type": "string", "minLength": 1 } }
+      }
+    },
+    "seed": {
+      "type": "object",
+      "required": ["address"],
+      "additionalProperties": false,
+      "properties": {
+        "address": { "type": "string", "minLength": 1 },
+        "state_dir": { "type": "string", "minLength": 1 },
+        "container_runtime": { "type": "string", "minLength": 1 }
+      }
+    },
+    "profile": { "type": "string", "enum": ["connected"] },
+    "sizes": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "object",
+        "required": ["cpu", "memory_mb", "disk_gb"],
+        "additionalProperties": false,
+        "properties": {
+          "cpu": { "type": "integer", "minimum": 1 },
+          "memory_mb": { "type": "integer", "minimum": 1 },
+          "disk_gb": { "type": "integer", "minimum": 1 }
+        }
+      }
+    },
+    "capabilities": {
+      "type": "object",
+      "minProperties": 1,
+      "additionalProperties": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "module": { "type": "string", "minLength": 1 },
+          "config": { "type": "object" }
+        }
+      }
+    },
+    "placement": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "array",
+        "items": { "type": "string", "minLength": 1 }
+      }
+    }
+  }
+}

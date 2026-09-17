@@ -1,0 +1,6 @@
+apiVersion: genesis/v1alpha1
+kind: Environment
+metadata: { name: lab }
+seed: { address: 10.10.0.10 }
+capabilities:
+  compute: { module: proxmox }

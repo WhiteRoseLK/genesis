@@ -1,0 +1,10 @@
+apiVersion: genesis/v1alpha1
+kind: Environment
+metadata: { name: lab }
+network: { cidr: 10.10.0.0/24, gateway: 10.10.0.1, pool: 10.10.0.50-10.10.0.99, domain: lab.internal }
+seed: { address: 10.10.0.10 }
+capabilities:
+  compute:
+    module: proxmox
+    config: { endpoint: https://pve01.home.arpa:8006, node: pve01, credentials: { token_id_ref: env://PVE_TOKEN_ID, token_secret_ref: env://PVE_TOKEN_SECRET } }
+  bastion: {}
