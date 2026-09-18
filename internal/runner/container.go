@@ -124,6 +124,25 @@ func (r *ContainerRuntime) Stop(ctx context.Context, containerID string) error {
 	return nil
 }
 
+// InspectIP retourne l'adresse IP du conteneur sur son réseau (le premier
+// réseau trouvé — suffisant tant qu'un conteneur n'est attaché qu'à un seul
+// réseau, ce qui est le cas de tout ce que le cœur démarre aujourd'hui).
+func (r *ContainerRuntime) InspectIP(ctx context.Context, containerID string) (string, error) {
+	cmd := exec.CommandContext(ctx, r.binary, "inspect", "-f",
+		"{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}", containerID)
+	var stdout, stderr bytes.Buffer
+	cmd.Stdout = &stdout
+	cmd.Stderr = &stderr
+	if err := cmd.Run(); err != nil {
+		return "", fmt.Errorf("%s inspect %s : %w\n%s", r.binary, containerID, err, stderr.String())
+	}
+	ip := strings.TrimSpace(stdout.String())
+	if ip == "" {
+		return "", fmt.Errorf("aucune adresse IP trouvée pour %s", containerID)
+	}
+	return ip, nil
+}
+
 // Status inspecte l'état d'un conteneur.
 func (r *ContainerRuntime) Status(ctx context.Context, containerID string) (state string, exitCode int, err error) {
 	cmd := exec.CommandContext(ctx, r.binary, "inspect", "--format", "{{.State.Status}} {{.State.ExitCode}}", containerID)
