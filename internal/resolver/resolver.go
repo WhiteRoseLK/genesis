@@ -196,7 +196,7 @@ func closeRequirements(r *Resolved, byName map[string]modulehost.Installed) erro
 			m := r.Modules[name]
 			for _, phaseEntries := range orderedRequires(m.Manifest.Requires) {
 				for _, entry := range phaseEntries.entries {
-					function, phase := splitFunctionPhase(entry.Function)
+					function, phase := SplitFunctionPhase(entry.Function)
 					if _, ok := r.ProviderFor(function, phase); ok {
 						continue
 					}
@@ -292,9 +292,9 @@ func pickCandidate(function string, candidates []modulehost.Installed) (*moduleh
 	}
 }
 
-// splitFunctionPhase sépare le suffixe @seed/@target d'un nom de fonction
-// requise (docs/03-contrat-module.md §1).
-func splitFunctionPhase(function string) (name, phase string) {
+// SplitFunctionPhase sépare le suffixe @seed/@target d'un nom de fonction
+// requise (docs/03-contrat-module.md §1) ; réutilisée par internal/planner.
+func SplitFunctionPhase(function string) (name, phase string) {
 	if i := strings.IndexByte(function, '@'); i >= 0 {
 		return function[:i], function[i+1:]
 	}
