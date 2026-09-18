@@ -1,0 +1,26 @@
+apiVersion: genesis/module/v1
+name: step-ca
+version: 0.1.0
+description: "PKI graine (docs/07-modules-mvp.md) : pki.issuer/v1 en phase seed, CA racine (recovery) + intermediaire seed, conteneur smallstep/step-ca sur la graine"
+layer: foundation
+core: ">=0.1.0 <0.2.0"
+protocol: 1
+
+capabilities: []
+
+provides:
+  - function: pki.issuer/v1
+    phases: [seed]
+
+requires:
+  seed:
+    - function: core.container/v1
+    - function: core.secrets/v1
+
+config_schema: schema.json
+
+secrets: []
+
+resources: []
+
+defaults: {}

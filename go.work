@@ -8,6 +8,7 @@ use (
 	./modules/fake-compute
 	./modules/powerdns
 	./modules/proxmox
+	./modules/step-ca
 	./sdk
 	./test/modules/panicking
 	./test/modules/test-a

@@ -1,0 +1,58 @@
+syntax = "proto3";
+
+// Fonction pki.issuer/v1 (docs/03-contrat-module.md) : fournisseurs MVP
+// step-ca (J7, seed) et vault (J7, target).
+package functions.pki.issuer.v1;
+
+option go_package = "genesis/sdk/go/gen/functions/pki/issuer/v1;pkiissuerv1";
+
+service PkiIssuer {
+  rpc IssueCert(IssueCertRequest) returns (Certificate);
+  rpc SignCSR(SignCSRRequest) returns (Certificate);
+  rpc SignSSH(SignSSHRequest) returns (SSHCertificate);
+  rpc CAChain(Empty) returns (CAChainResponse);
+}
+
+message Empty {}
+
+message IssueCertRequest {
+  string common_name = 1;
+  repeated string sans = 2;
+  int64 ttl_seconds = 3; // 0 : durée par défaut du fournisseur
+  map<string, string> extra = 4;
+}
+
+message SignCSRRequest {
+  string csr_pem = 1;
+  int64 ttl_seconds = 2; // 0 : durée par défaut du fournisseur
+  map<string, string> extra = 3;
+}
+
+// Certificate : private_key_pem n'est renseigné que par IssueCert (le
+// fournisseur a généré la paire) — SignCSR renvoie une clé vide, la clé
+// privée du CSR reste chez l'appelant (docs/03 §4 règle 5 : un module ne
+// génère/stocke de secret que via core.secrets/v1, jamais en dehors ; la
+// clé privée d'un IssueCert doit donc être remise à l'appelant, qui la
+// range lui-même via core.secrets/v1 s'il doit la conserver).
+message Certificate {
+  string cert_pem = 1;
+  string chain_pem = 2; // cert + intermédiaire(s), sans la racine
+  string private_key_pem = 3;
+}
+
+message SignSSHRequest {
+  string public_key_openssh = 1;
+  string key_id = 2;
+  repeated string principals = 3;
+  bool host_cert = 4; // certificat host si vrai, utilisateur sinon
+  int64 ttl_seconds = 5;
+  map<string, string> extra = 6;
+}
+
+message SSHCertificate {
+  string certificate_openssh = 1;
+}
+
+message CAChainResponse {
+  string chain_pem = 1; // intermédiaire + racine, PEM
+}
