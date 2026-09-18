@@ -6,6 +6,7 @@ use (
 	./modules/chrony
 	./modules/coredns
 	./modules/fake-compute
+	./modules/powerdns
 	./modules/proxmox
 	./sdk
 	./test/modules/panicking

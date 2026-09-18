@@ -1,0 +1,91 @@
+---
+# Configure (functions/dns/zone/v1 + dns/resolver/v1, module powerdns) :
+# installe et configure PowerDNS Authoritative (SQLite, API) + Recursor
+# (docs/07-modules-mvp.md) — image cloud Debian (docs/01-vision-perimetre.md).
+- hosts: target
+  gather_facts: false
+  become: true
+  vars:
+    pdns_db: /var/lib/powerdns/pdns.sqlite3
+  tasks:
+    - name: installer PowerDNS (authoritative, backend SQLite, recursor)
+      ansible.builtin.apt:
+        name:
+          - pdns-server
+          - pdns-backend-sqlite3
+          - pdns-recursor
+          - sqlite3
+        state: present
+        update_cache: true
+
+    - name: arrêter pdns-server le temps de préparer la base
+      ansible.builtin.systemd:
+        name: pdns
+        state: stopped
+      failed_when: false
+
+    - name: créer le schéma SQLite de la base authoritative
+      ansible.builtin.command: >
+        sqlite3 {{ pdns_db }}
+        -init /usr/share/pdns-backend-sqlite3/schema/schema.sqlite3.sql
+        -batch .quit
+      args:
+        creates: "{{ pdns_db }}"
+      changed_when: true
+
+    - name: définir le propriétaire de la base
+      ansible.builtin.file:
+        path: "{{ pdns_db }}"
+        owner: pdns
+        group: pdns
+        mode: "0640"
+
+    - name: configurer pdns.conf (authoritative)
+      ansible.builtin.copy:
+        content: |
+          launch=gsqlite3
+          gsqlite3-database={{ pdns_db }}
+          api=yes
+          api-key={{ api_key }}
+          webserver=yes
+          webserver-address=0.0.0.0
+          webserver-port=8081
+          webserver-allow-from=0.0.0.0/0
+          local-address=0.0.0.0
+          local-port=5300
+          disable-axfr=yes
+        dest: /etc/powerdns/pdns.conf
+        mode: "0640"
+        owner: pdns
+        group: pdns
+      register: pdns_conf
+
+    - name: configurer pdns-recursor.conf
+      ansible.builtin.copy:
+        content: |
+          local-address=0.0.0.0
+          local-port=53
+          forward-zones={{ domain }}=127.0.0.1:5300
+          forward-zones-recurse=.={{ upstream_resolvers | join(';') }}
+          allow-from=0.0.0.0/0
+        dest: /etc/powerdns/recursor.conf
+        mode: "0644"
+      register: recursor_conf
+
+    - name: activer et démarrer pdns (authoritative)
+      ansible.builtin.systemd:
+        name: pdns
+        enabled: true
+        state: restarted
+
+    - name: activer et démarrer pdns-recursor
+      ansible.builtin.systemd:
+        name: pdns-recursor
+        enabled: true
+        state: restarted
+      when: recursor_conf.changed or pdns_conf.changed
+
+    - name: s'assurer que pdns-recursor tourne
+      ansible.builtin.systemd:
+        name: pdns-recursor
+        state: started
