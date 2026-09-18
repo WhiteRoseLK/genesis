@@ -7,7 +7,7 @@
 | J2 — Secrets et état | fait | |
 | J3 — SDK et hôte de modules | fait | |
 | J4 — Résolveur, broker, planificateur, moteur | fait | |
-| J5 — proxmox, base-os | à faire | |
+| J5 — proxmox, base-os | fait (partiel, voir notes) | Harden (durcissement pur) différé à une itération future, décision utilisateur |
 | J6 — chrony, coredns, powerdns | à faire | |
 | J7 — step-ca, vault | à faire | |
 | J8 — openssh-bastion, retrait graine | à faire | |
@@ -130,10 +130,41 @@ Le jalon le plus complexe à ce jour. Détail complet des décisions dans les me
 
 **Prochaine étape** : J5 — Modules `proxmox` et `base-os` (doc 07).
 
+### 2026-09-18 — J5 Modules `proxmox` et `base-os`
+Premier jalon touchant du terrain non vérifiable dans cet environnement (pas de vrai cluster Proxmox — confirmé avec l'utilisateur avant de commencer) et premier à exercer du contenu Ansible réel (Docker disponible sur cette machine, utilisé pour de vrai).
+
+**Décision de portée (utilisateur)** : `os.base/v1` sépare la configuration fonctionnelle (ce qui est nécessaire au fonctionnement de la VM — CA, résolveur, NTP) du durcissement pur (SSH, nftables — sécurité). Seule la première moitié est construite à ce jalon ; `Harden` est un stub explicite (`Unimplemented`, message clair), pas une fonctionnalité à moitié écrite. Citation : *« le hardening pur tu oublie pour le moment ce sera une feature plus tard [...] tu peux tester tout ce qui est nécessaire au fonctionnement de la vm (dns, ntp, CA, etc.) »*. Par construction, le critère littéral du doc 08 « VM... durcie » n'est donc satisfait que pour son volet fonctionnel, pas sécurité — décision assumée, pas un oubli.
+
+**Fait**
+- `internal/runner.ContainerRuntime` : pilote docker/podman en CLI (`seed.container_runtime`), pas de SDK Docker tiers. Testé pour de vrai contre Docker sur cette machine (run bloquant + code de sortie, run détaché + stop + status, montage host).
+- `core.container/v1` et `core.ansible/v1` (natives) : `internal/broker/container.go`, `ansible.go`. `RunPlaybook` écrit playbook/inventaire/vars dans un répertoire partagé monté dans un conteneur `willhallonline/ansible`.
+- **Bug réel trouvé et corrigé** : le répertoire de travail partagé doit être lisible par tous (`0755`, pas le `0700` par défaut de `MkdirTemp`) — le conteneur ansible tourne sous son propre UID interne, distinct de celui de l'appelant (confirmé ici via un décalage d'espace de noms utilisateur, mais le problème est général, pas spécifique à cet environnement).
+- **Test d'intégration réel** (`internal/broker/ansible_test.go`) : conteneur SSH jetable (`linuxserver/openssh-server`) comme cible, playbook exécuté pour de vrai, vérifié via `docker exec` (pas la parole d'ansible). Deux limites d'environnement documentées dans le test : le réseau pont docker0 n'est pas joignable directement depuis le process de test ici (seulement depuis un autre conteneur, ou via le daemon) — vérification via `docker exec`, pas dial direct ; l'image cible n'a pas Python — playbook de test en `ansible.builtin.raw` (les vraies VM cibles, image cloud Debian, en ont un).
+- `modules/base-os` : `TrustCA`/`SetResolver`/`SetNTP` réels (playbooks Ansible embarqués), `Harden` stub. **Bug réel #2** : `broker.Dial(token)` ne réussit qu'une fois par jeton de session (les infos de connexion transitent par un canal à usage unique côté cœur) — appeler `TrustCA` puis `SetResolver` en re-dialant le même jeton à chaque fois bloquait le second appel. Corrigé en mettant en cache la connexion dialée une fois, réutilisée pour tous les appels de fonction suivants.
+- `modules/proxmox` : client REST Proxmox VE écrit à la main (`proxmoxapi/`), testé contre des fixtures `httptest` fidèles à l'API documentée (pas de SDK tiers — la surface nécessaire est étroite et de toute façon invérifiable en direct ici). `EnsureVM` idempotent par nom, `DeleteVM` idempotent. **Portée assumée** : `EnsureImage` suppose qu'un template existe déjà (pas de téléchargement d'image cloud + conversion automatique — la chaîne la plus complexe et la moins vérifiable sans cluster réel).
+- **Bug réel #3, trouvé par le test de fixture lui-même** : le clone Proxmox porte l'ID du *template* dans le chemin d'URL et le *nouvel* ID dans un champ de formulaire `newid`, pas l'inverse — le client (`proxmoxapi`) avait déjà ça correctement, c'est la fixture de test qui s'était trompée ; détecté seulement parce que le test exerce la vraie forme de requête de bout en bout plutôt que de mocker à la frontière de chaque méthode.
+- **Gaps J4 comblés en cours de route** (exactement la méthode annoncée par l'utilisateur : « au fur et à mesure des tests, si il manque quelque chose d'obligatoire, on vient le rajouter ») :
+  - `resolver.Module.Config` : la config résolue de la spec (doc04, fusionnée si plusieurs capacités pointent vers le même module) est maintenant transmise à `StepRequest.config` — J4 la laissait toujours vide, faute de module qui en ait eu besoin.
+  - `internal/engine.resolveRefs` : les champs `*_ref` (`env://`, `file://`, `vault://`) sont résolus en valeurs réelles avant d'atteindre un module (`vault://` : erreur claire « pas encore pris en charge, J7 », pas un échec silencieux).
+  - `compute.vm/v1.EnsureVMRequest` gagne `ip`, `gateway`, `ssh_public_key`, `user` (cloud-init, doc07) — ajout additif, pas de rupture.
+- Suite de conformité SDK (`moduletest.RunConformance`) câblée pour `proxmox` et `base-os` (les modules écrits à la main n'en ont pas par défaut, contrairement à ceux générés par `scaffold`) — critère d'acceptation explicite du doc 08.
+
+**Dette**
+- `EnsureImage` (proxmox) : pas de téléchargement/conversion automatique de template — à construire quand validable contre un vrai cluster (J9 ou demande explicite).
+- `Harden` (base-os) : décision de portée ci-dessus, pas encore construit.
+- nftables et résolveur/NTP réellement câblés en `Repoint` (pas seulement à l'appel initial) : pas encore exercé — dépend de vrais modules DNS/PKI (J6/J7).
+- Allocation d'IP depuis le pool (doc04 `network.pool`) : pas encore construite ; `EnsureVMRequest.ip` est pour l'instant fourni par l'appelant, pas alloué par le cœur.
+- `proxmox`/`base-os` jamais exécutés contre une vraie infrastructure — uniquement fixtures HTTP et conteneurs jetables.
+
+**Prochaine étape** : J6 — Modules `chrony`, `coredns`, `powerdns` (doc 07).
+
 ## Dette technique connue
 - Clé maîtresse en fichier local (ADR-007)
 - Profil connected uniquement (ADR-008)
 - Vérification des licences des dépendances non implémentée en CI (J0, reportée à la demande utilisateur)
 - `internal/engine` rejoue le groupe d'étapes complet d'un module non conforme plutôt que reprendre à la RPC exacte en échec (J4, sûr par idempotence mais moins granulaire)
 - Choréographie de passation multi-module explicite (Repoint, migration secrets file→vault) non construite (J4 → J6/J7)
-- `StepRequest.config` toujours vide, la config résolue de la spec n'est pas encore transmise aux modules (J4 → à câbler avec proxmox, J5)
+- `Harden` (base-os) : durcissement pur (SSH, nftables) différé à une itération future, décision utilisateur (J5)
+- `EnsureImage` (proxmox) : pas de téléchargement/conversion automatique de template Proxmox, template pré-existant supposé (J5 → à construire quand validable contre un vrai cluster)
+- Allocation d'IP depuis le pool réseau (doc04) non construite : IP fournie par l'appelant, pas allouée par le cœur (J5)
+- `proxmox`/`base-os` jamais exécutés contre une vraie infrastructure (pas d'accès Proxmox), uniquement fixtures et conteneurs jetables (J5)
