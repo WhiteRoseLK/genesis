@@ -1,0 +1,32 @@
+syntax = "proto3";
+
+// Fonction core.ansible/v1 (docs/03-contrat-module.md, ADR-002) : fournie
+// nativement par le cœur, exécute un playbook dans un conteneur pour
+// n'imposer aucune installation d'Ansible sur la graine.
+package functions.core.ansible.v1;
+
+import "google/protobuf/struct.proto";
+
+option go_package = "genesis/sdk/go/gen/functions/core/ansible/v1;ansiblev1";
+
+service Ansible {
+  rpc RunPlaybook(RunPlaybookRequest) returns (RunPlaybookResponse);
+}
+
+message Target {
+  string host = 1;
+  int32 port = 2;
+  string user = 3;
+  string ssh_private_key = 4; // clé privée OpenSSH, obtenue via core.secrets/v1
+}
+
+message RunPlaybookRequest {
+  Target target = 1;
+  bytes playbook_yaml = 2; // contenu du playbook, fourni par le module appelant
+  google.protobuf.Struct vars = 3; // extra-vars
+}
+
+message RunPlaybookResponse {
+  bool ok = 1;
+  string output = 2; // sortie combinée stdout+stderr, pour diagnostic
+}

@@ -1,0 +1,52 @@
+syntax = "proto3";
+
+// Fonction os.base/v1 (docs/03-contrat-module.md, docs/07-modules-mvp.md) :
+// fournie par base-os. Harden regroupe le durcissement pur (SSH, mises à
+// jour, nftables) — différé, pas encore implémenté au jalon J5. TrustCA,
+// SetResolver et SetNTP portent la configuration fonctionnelle nécessaire
+// au bon fonctionnement de la VM, implémentées dès J5.
+package functions.os.base.v1;
+
+option go_package = "genesis/sdk/go/gen/functions/os/base/v1;osbasev1";
+
+service Base {
+  rpc Harden(HardenRequest) returns (HardenResponse);
+  rpc TrustCA(TrustCARequest) returns (TrustCAResponse);
+  rpc SetResolver(SetResolverRequest) returns (SetResolverResponse);
+  rpc SetNTP(SetNTPRequest) returns (SetNTPResponse);
+}
+
+message Target {
+  string host = 1;
+  int32 port = 2;
+  string user = 3;
+  string ssh_private_key = 4;
+}
+
+message HardenRequest {
+  Target target = 1;
+}
+
+message HardenResponse {}
+
+message TrustCARequest {
+  Target target = 1;
+  string ca_cert_pem = 2;
+}
+
+message TrustCAResponse {}
+
+message SetResolverRequest {
+  Target target = 1;
+  repeated string nameservers = 2;
+  string domain = 3;
+}
+
+message SetResolverResponse {}
+
+message SetNTPRequest {
+  Target target = 1;
+  repeated string servers = 2;
+}
+
+message SetNTPResponse {}

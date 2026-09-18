@@ -1,0 +1,55 @@
+syntax = "proto3";
+
+// Fonction core.container/v1 (docs/03-contrat-module.md) : fournie
+// nativement par le cœur, sur la graine. Runtime détecté (docker ou podman,
+// docs/04-spec.md : seed.container_runtime) piloté en ligne de commande.
+package functions.core.container.v1;
+
+option go_package = "genesis/sdk/go/gen/functions/core/container/v1;containerv1";
+
+service Container {
+  rpc Run(RunRequest) returns (RunResponse);
+  rpc Stop(StopRequest) returns (StopResponse);
+  rpc Status(StatusRequest) returns (StatusResponse);
+}
+
+message Mount {
+  string host_path = 1;
+  string container_path = 2;
+  bool read_only = 3;
+}
+
+message RunRequest {
+  string name = 1; // optionnel, généré si absent
+  string image = 2;
+  repeated string command = 3;
+  map<string, string> env = 4;
+  repeated Mount mounts = 5;
+  // detach=false (par défaut) : Run bloque jusqu'à la fin du conteneur et
+  // renvoie sa sortie (ex. exécuter ansible-playbook). detach=true : Run
+  // démarre un service et rend la main immédiatement (ex. CoreDNS en J6),
+  // à piloter ensuite avec Stop/Status.
+  bool detach = 6;
+}
+
+message RunResponse {
+  string container_id = 1;
+  int32 exit_code = 2; // valide seulement si detach=false
+  string stdout = 3;
+  string stderr = 4;
+}
+
+message StopRequest {
+  string container_id = 1;
+}
+
+message StopResponse {}
+
+message StatusRequest {
+  string container_id = 1;
+}
+
+message StatusResponse {
+  string state = 1; // running | exited | unknown
+  int32 exit_code = 2;
+}
