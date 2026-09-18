@@ -4,10 +4,9 @@
 // (docs/06-secrets-etat.md) : écriture atomique, verrou, jamais de valeur
 // secrète (uniquement des références).
 //
-// Le contenu prévu par le doc (VM, statut par module, fournisseur actif de
-// chaque fonction, versions, endpoints, historique des passations) sera
-// ajouté par les jalons qui le produisent (résolveur J4, modules J5+) : le
-// ajouter maintenant serait spéculatif, aucun composant ne le remplit encore.
+// VM, versions, endpoints et historique des passations restent différés aux
+// jalons qui les produisent (modules réels, J5+) : les ajouter maintenant
+// serait spéculatif, aucun composant ne les remplit encore.
 package state
 
 // State est le contenu persisté dans state_dir/state.json.
@@ -16,6 +15,18 @@ type State struct {
 	// SecretsBackend est le backend actif du store de secrets ("file" ou
 	// "vault" après passation, docs/06-secrets-etat.md).
 	SecretsBackend string `json:"secrets_backend"`
+	// Modules porte, par module, l'état opaque renvoyé par sa dernière étape
+	// réussie (StepResult.state, docs/03-contrat-module.md §2) — c'est ce
+	// qui permet à `Check` de constater qu'une étape est déjà conforme
+	// (internal/engine, jalon J4).
+	Modules map[string]ModuleState `json:"modules,omitempty"`
+}
+
+// ModuleState est l'état propre à un module, opaque pour le cœur.
+type ModuleState struct {
+	// StateJSON est le dernier StepResult.state reçu, en JSON, à repasser
+	// tel quel au module lors du prochain appel.
+	StateJSON []byte `json:"state_json,omitempty"`
 }
 
 // currentSchemaVersion est incrémenté à chaque changement de forme de State.
@@ -26,5 +37,6 @@ func New() *State {
 	return &State{
 		SchemaVersion:  currentSchemaVersion,
 		SecretsBackend: "file",
+		Modules:        map[string]ModuleState{},
 	}
 }
