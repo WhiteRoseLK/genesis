@@ -2,6 +2,7 @@ go 1.27.1
 
 use (
 	.
+	./modules/fake-compute
 	./sdk
 	./test/modules/panicking
 	./test/modules/test-a
