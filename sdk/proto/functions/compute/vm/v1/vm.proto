@@ -39,6 +39,11 @@ message VM {
   string name = 2;
   string ip = 3;
   string status = 4;
+  // ssh_port : 22 pour une vraie VM ; peut différer pour un fournisseur qui
+  // simule des VM en conteneurs (fake-compute) — les modules qui s'y
+  // connectent (os.base/v1.Target, etc.) doivent utiliser ce port, pas
+  // supposer 22.
+  int32 ssh_port = 5;
 }
 
 message GetVMRequest {

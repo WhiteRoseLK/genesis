@@ -207,11 +207,16 @@ func (x *EnsureVMRequest) GetUser() string {
 }
 
 type VM struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Id            string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
-	Name          string                 `protobuf:"bytes,2,opt,name=name,proto3" json:"name,omitempty"`
-	Ip            string                 `protobuf:"bytes,3,opt,name=ip,proto3" json:"ip,omitempty"`
-	Status        string                 `protobuf:"bytes,4,opt,name=status,proto3" json:"status,omitempty"`
+	state  protoimpl.MessageState `protogen:"open.v1"`
+	Id     string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	Name   string                 `protobuf:"bytes,2,opt,name=name,proto3" json:"name,omitempty"`
+	Ip     string                 `protobuf:"bytes,3,opt,name=ip,proto3" json:"ip,omitempty"`
+	Status string                 `protobuf:"bytes,4,opt,name=status,proto3" json:"status,omitempty"`
+	// ssh_port : 22 pour une vraie VM ; peut différer pour un fournisseur qui
+	// simule des VM en conteneurs (fake-compute) — les modules qui s'y
+	// connectent (os.base/v1.Target, etc.) doivent utiliser ce port, pas
+	// supposer 22.
+	SshPort       int32 `protobuf:"varint,5,opt,name=ssh_port,json=sshPort,proto3" json:"ssh_port,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -272,6 +277,13 @@ func (x *VM) GetStatus() string {
 		return x.Status
 	}
 	return ""
+}
+
+func (x *VM) GetSshPort() int32 {
+	if x != nil {
+		return x.SshPort
+	}
+	return 0
 }
 
 type GetVMRequest struct {
@@ -498,12 +510,13 @@ const file_functions_compute_vm_v1_vm_proto_rawDesc = "" +
 	"\n" +
 	"ExtraEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
-	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"P\n" +
+	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"k\n" +
 	"\x02VM\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x12\n" +
 	"\x04name\x18\x02 \x01(\tR\x04name\x12\x0e\n" +
 	"\x02ip\x18\x03 \x01(\tR\x02ip\x12\x16\n" +
-	"\x06status\x18\x04 \x01(\tR\x06status\"\"\n" +
+	"\x06status\x18\x04 \x01(\tR\x06status\x12\x19\n" +
+	"\bssh_port\x18\x05 \x01(\x05R\asshPort\"\"\n" +
 	"\fGetVMRequest\x12\x12\n" +
 	"\x04name\x18\x01 \x01(\tR\x04name\"%\n" +
 	"\x0fDeleteVMRequest\x12\x12\n" +

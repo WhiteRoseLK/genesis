@@ -37,6 +37,7 @@ message RunResponse {
   int32 exit_code = 2; // valide seulement si detach=false
   string stdout = 3;
   string stderr = 4;
+  string ip = 5; // adresse IP du conteneur sur son réseau, valide si detach=true
 }
 
 message StopRequest {

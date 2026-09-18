@@ -43,11 +43,21 @@ func (c *containerServer) Run(ctx context.Context, req *containerv1.RunRequest) 
 	if err != nil {
 		return nil, err
 	}
+
+	var ip string
+	if req.GetDetach() {
+		// L'IP n'a de sens que pour un service qui continue de tourner ;
+		// une erreur ici (réseau pas encore attribué) ne doit pas faire
+		// échouer tout Run, le conteneur est bel et bien démarré.
+		ip, _ = c.runtime.InspectIP(ctx, result.ContainerID)
+	}
+
 	return &containerv1.RunResponse{
 		ContainerId: result.ContainerID,
 		ExitCode:    int32(result.ExitCode),
 		Stdout:      result.Stdout,
 		Stderr:      result.Stderr,
+		Ip:          ip,
 	}, nil
 }
 

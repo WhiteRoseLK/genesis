@@ -179,6 +179,7 @@ type RunResponse struct {
 	ExitCode      int32                  `protobuf:"varint,2,opt,name=exit_code,json=exitCode,proto3" json:"exit_code,omitempty"` // valide seulement si detach=false
 	Stdout        string                 `protobuf:"bytes,3,opt,name=stdout,proto3" json:"stdout,omitempty"`
 	Stderr        string                 `protobuf:"bytes,4,opt,name=stderr,proto3" json:"stderr,omitempty"`
+	Ip            string                 `protobuf:"bytes,5,opt,name=ip,proto3" json:"ip,omitempty"` // adresse IP du conteneur sur son réseau, valide si detach=true
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -237,6 +238,13 @@ func (x *RunResponse) GetStdout() string {
 func (x *RunResponse) GetStderr() string {
 	if x != nil {
 		return x.Stderr
+	}
+	return ""
+}
+
+func (x *RunResponse) GetIp() string {
+	if x != nil {
+		return x.Ip
 	}
 	return ""
 }
@@ -436,12 +444,13 @@ const file_functions_core_container_v1_container_proto_rawDesc = "" +
 	"\x06detach\x18\x06 \x01(\bR\x06detach\x1a6\n" +
 	"\bEnvEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
-	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"}\n" +
+	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"\x8d\x01\n" +
 	"\vRunResponse\x12!\n" +
 	"\fcontainer_id\x18\x01 \x01(\tR\vcontainerId\x12\x1b\n" +
 	"\texit_code\x18\x02 \x01(\x05R\bexitCode\x12\x16\n" +
 	"\x06stdout\x18\x03 \x01(\tR\x06stdout\x12\x16\n" +
-	"\x06stderr\x18\x04 \x01(\tR\x06stderr\"0\n" +
+	"\x06stderr\x18\x04 \x01(\tR\x06stderr\x12\x0e\n" +
+	"\x02ip\x18\x05 \x01(\tR\x02ip\"0\n" +
 	"\vStopRequest\x12!\n" +
 	"\fcontainer_id\x18\x01 \x01(\tR\vcontainerId\"\x0e\n" +
 	"\fStopResponse\"2\n" +
