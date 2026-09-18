@@ -8,7 +8,7 @@
 | J3 — SDK et hôte de modules | fait | |
 | J4 — Résolveur, broker, planificateur, moteur | fait | |
 | J5 — proxmox, base-os | fait (partiel, voir notes) | Harden (durcissement pur) différé à une itération future, décision utilisateur |
-| J6 — chrony, coredns, powerdns | à faire | |
+| J6 — chrony, coredns, powerdns | fait | |
 | J7 — step-ca, vault | à faire | |
 | J8 — openssh-bastion, retrait graine | à faire | |
 | J9 — Durcissement, preuve d'extensibilité | à faire | |
@@ -158,13 +158,43 @@ Premier jalon touchant du terrain non vérifiable dans cet environnement (pas de
 
 **Prochaine étape** : J6 — Modules `chrony`, `coredns`, `powerdns` (doc 07).
 
+### 2026-09-18 — J6 Modules `chrony`, `coredns`, `powerdns`
+Premier jalon à exercer une vraie passation multi-module (docs/05-cycle-bootstrap.md) : `coredns` (graine) → `powerdns` (cible) sur les mêmes fonctions `dns.zone/v1`/`dns.resolver/v1`. Le mécanisme n'existait pas encore dans `internal/engine` (seule l'auto-passation d'un module se reprenant lui-même, `test-a`, était exercée) — construit à ce jalon plutôt que deviné à l'avance, conformément à la méthode déjà validée par l'utilisateur (« on vient rajouter au fur et à mesure des tests »).
+
+**Fait**
+- `modules/coredns` : `dns.zone/v1` + `dns.resolver/v1` en phase graine, conteneur CoreDNS réel sur la graine (`core.container/v1`), zone BIND régénérée à chaque `UpsertRecord`/`DeleteRecord`. Résolution DNS prouvée pour de vrai (requête depuis un conteneur tiers, pas `docker exec` dans CoreDNS lui-même). Devenu un vrai module piloté par le moteur à l'occasion de ce jalon : `Check` distingue désormais `A_FAIRE`/`CONFORME` (`seeded`/`retired`), `SeedUp` amorce, `SeedDown` arrête réellement le conteneur.
+- `modules/chrony` : premier module cible possédant son propre cycle de vie VM complet (`compute.vm.EnsureVM` + paire SSH via `core.secrets`, `Configure` installe/configure `chronyd` serveur via `core.ansible` avec son propre playbook, `Verify` mesure un écart réel (`chronyc tracking`) depuis une VM tierce jetable, seuil < 100 ms, `Destroy` supprime la VM).
+- `modules/powerdns` : `dns.zone/v1` + `dns.resolver/v1` en phase cible — Authoritative (SQLite, API) + Recursor sur sa propre VM. `api.go` parle directement à l'API REST de PowerDNS (même principe que `modules/proxmox/proxmoxapi`, pas de SDK tiers). `Configure` consomme pour de vrai `time.ntp/v1` et `dns.resolver/v1` (chrony/coredns, tous deux réels à ce stade — contrairement à chrony qui n'avait encore aucun fournisseur à construire). `Handover` relit `dns.zone/v1@seed` (coredns), recrée chaque enregistrement via sa propre implémentation, compare. `Verify` prouve résolution directe + inverse + nom externe (recursor) depuis une VM tierce jetable.
+- **`internal/engine` restructuré pour la passation croisée réelle** : enregistrement des fournisseurs par clé qualifiée (`fonction@phase`) en plus de la clé active (sans suffixe) ; un module graine pur (aucune phase cible, ex. coredns) s'arrête à `seed_ready` (`SeedUp`+`Verify`) au lieu d'essayer `provision`/`configure`/`handover` ; `handoverSeedModules` détecte, par fonction fournie en phase cible, un fournisseur graine actif — même module (auto-passation, `test-a`) ou différent (`coredns`→`powerdns`) — et déclenche `SeedDown` sur **chacun**, dédupliqué ; `repoint` fait du module cible le nouveau fournisseur actif après passation réussie, sans redispense.
+- Forwarders broker manquants ajoutés : `os.base/v1`, `dns.zone/v1`, `dns.resolver/v1`, `time.ntp/v1` (seul `compute.vm/v1` en avait un ; aucun module ne consommait encore les autres via le broker réel avant ce jalon).
+- Nouveaux fixtures `test/modules/test-e` (graine pure) / `test-f` (cible, lit `test.e/v1@seed`) : preuve, hors produits réels, que le mécanisme de passation croisée route `Handover` vers le bon module et `SeedDown` vers l'**autre** — `internal/engine/handover_test.go`.
+- Chaque module testé conformément à la règle 7 du doc 03 (« testable seul, fonctions requises simulées ») : le mécanisme de transport réel (`core.ansible/v1` via Docker) est prouvé une fois pour toutes en J5, chaque module test ensuite son propre câblage avec des fournisseurs simulés — sauf `coredns` (résolution DNS prouvée pour de vrai, peu coûteux) et `powerdns.api.go` (round-trip HTTP réel via `httptest`, indépendant de Docker).
+
+**Décisions**
+- ADR-016 : `core.ansible/v1` ouvert à tout module cible, pas réservé à `base-os` — `chrony`/`powerdns` déclarent leur propre playbook produit, `os.base/v1` reste réservé à la configuration commune (CA, résolveur, NTP client).
+- Le `Repoint(RepointRequest)` explicite du proto n'est pas encore déclenché par le cœur vers les modules consommateurs : dans ce MVP, aucun module ne consomme encore `dns.zone/v1`/`dns.resolver/v1`/`time.ntp/v1` sans suffixe de phase au-delà de son propre `Check` (le seul consommateur sensible à la passation, `powerdns`, lit explicitement `dns.zone/v1@seed`, une clé stable que la passation ne change jamais). La clé de registre « active » (repoint) est néanmoins mise à jour pour de vrai après chaque passation — l'infrastructure est en place, simplement pas encore observée par un consommateur réel.
+- `os.base.TrustCA` reste non appelé par `chrony`/`powerdns` (pas de CA avant `step-ca`/J7) ; `SetNTP`/`SetResolver` en revanche sont maintenant réellement exercés par `powerdns` (chrony et coredns existent déjà à ce stade du jalon).
+
+**Dette**
+- Comme `coredns`, les paramètres de connexion de `powerdns` (adresse VM, clé API) vivent en mémoire dans le process du module, peuplés par `Configure` — perdus si le cœur redémarre en cours de cycle de vie (même dette, même justification : `StepResult.state` n'est pas transmis aux gestionnaires de fonction `dns.zone/v1`, seulement aux étapes de cycle de vie).
+- Pas de dérivation automatique de zone inverse/PTR : `dns.zone/v1` accepte n'importe quel type d'enregistrement (PTR compris) de façon générique, mais rien ne crée automatiquement la zone `in-addr.arpa` correspondant à un enregistrement A — `Verify` de `powerdns` le fait à la main pour sa propre sonde.
+- `Repoint(RepointRequest)` explicite non câblé côté cœur (voir décision ci-dessus) — à construire dès qu'un module consomme une fonction à passation sans en capter le jeton de session à chaque appel (voir aussi la nuance suivante).
+- `chrony`/`coredns`/`base-os` mettent en cache leur connexion broker depuis le **premier** jeton reçu (`Check`) et le réutilisent pour tout leur cycle de vie, alors que `internal/engine` fournit un jeton neuf à chaque étape (`test-b`/`test-f` redialent avec le jeton de l'appel en cours, le schéma idiomatique). Sans conséquence ici (aucun de ces modules ne consomme une fonction à passation après son propre `Check`), mais à corriger — dialer avec `req.GetBrokerToken()` à chaque appel, pas un jeton mis en cache — avant qu'un module existant ne consomme une fonction sujette à repoint (`vault`/`openssh-bastion`, J7/J8).
+- Aucun des trois modules n'a été exécuté à travers `internal/engine.Run()` avec un vrai cluster Docker multi-module de bout en bout (coredns+chrony+powerdns+fake-compute+base-os ensemble) — chaque module est prouvé isolément (fonctions requises simulées) plus le mécanisme de passation prouvé génériquement (`test-e`/`test-f`). La preuve multi-module réelle est le périmètre explicite de J9 (doc 08).
+
+**Prochaine étape** : J7 — Modules `step-ca`, `vault` (doc 07).
+
 ## Dette technique connue
 - Clé maîtresse en fichier local (ADR-007)
 - Profil connected uniquement (ADR-008)
 - Vérification des licences des dépendances non implémentée en CI (J0, reportée à la demande utilisateur)
 - `internal/engine` rejoue le groupe d'étapes complet d'un module non conforme plutôt que reprendre à la RPC exacte en échec (J4, sûr par idempotence mais moins granulaire)
-- Choréographie de passation multi-module explicite (Repoint, migration secrets file→vault) non construite (J4 → J6/J7)
+- Passation multi-module (Handover/SeedDown croisé, clé de registre repointée) **construite en J6** ; migration des secrets file→vault reste à faire (J7).
 - `Harden` (base-os) : durcissement pur (SSH, nftables) différé à une itération future, décision utilisateur (J5)
 - `EnsureImage` (proxmox) : pas de téléchargement/conversion automatique de template Proxmox, template pré-existant supposé (J5 → à construire quand validable contre un vrai cluster)
 - Allocation d'IP depuis le pool réseau (doc04) non construite : IP fournie par l'appelant, pas allouée par le cœur (J5)
 - `proxmox`/`base-os` jamais exécutés contre une vraie infrastructure (pas d'accès Proxmox), uniquement fixtures et conteneurs jetables (J5)
+- `coredns`/`powerdns` : paramètres de connexion (`dns.zone/v1`) en mémoire dans le process du module, non transmis via `StepResult.state` (J6)
+- Pas de dérivation automatique de zone inverse/PTR dans `dns.zone/v1` (J6)
+- `Repoint(RepointRequest)` explicite non câblé côté cœur ; `chrony`/`coredns`/`base-os` mettent en cache leur jeton de session depuis leur premier `Check` plutôt que de redialer à chaque appel (`req.GetBrokerToken()`, schéma idiomatique de `test-b`/`test-f`) — sans conséquence tant qu'aucun ne consomme une fonction sujette à passation après son propre `Check`, à corriger avant `vault`/`openssh-bastion` (J7/J8)
+- Aucun test multi-module réel de bout en bout (coredns+chrony+powerdns+fake-compute+base-os ensemble via `internal/engine.Run()`) — périmètre explicite de J9
