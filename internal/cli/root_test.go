@@ -34,12 +34,10 @@ func TestHelpListsDocumentedCommands(t *testing.T) {
 
 // TestStubCommandsFail vérifie que les commandes encore au stade de stub
 // (jalons ultérieurs) renvoient une erreur explicite plutôt qu'un succès
-// silencieux. `init`, `validate`, `secrets` et `modules` sont réellement
-// implémentées (J1/J2/J3) et testées ailleurs.
+// silencieux. `init`, `validate`, `secrets`, `modules`, `plan` et `apply`
+// sont réellement implémentées (J1/J2/J3/J4) et testées ailleurs.
 func TestStubCommandsFail(t *testing.T) {
 	cases := [][]string{
-		{"plan", "-f", "env.yaml"},
-		{"apply", "-f", "env.yaml"},
 		{"status"},
 		{"seed", "retire"},
 		{"destroy", "-f", "env.yaml"},
