@@ -1,0 +1,18 @@
+syntax = "proto3";
+
+// Fonction dns.resolver/v1 (docs/03-contrat-module.md) : fournisseurs MVP
+// coredns (seed) et powerdns (target).
+package functions.dns.resolver.v1;
+
+option go_package = "genesis/sdk/go/gen/functions/dns/resolver/v1;dnsresolverv1";
+
+service DnsResolver {
+  rpc Endpoint(Empty) returns (EndpointInfo);
+}
+
+message Empty {}
+
+message EndpointInfo {
+  string address = 1;
+  int32 port = 2;
+}

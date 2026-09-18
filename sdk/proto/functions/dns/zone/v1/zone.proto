@@ -1,0 +1,43 @@
+syntax = "proto3";
+
+// Fonction dns.zone/v1 (docs/03-contrat-module.md) : fournisseurs MVP
+// coredns (seed) et powerdns (target).
+package functions.dns.zone.v1;
+
+option go_package = "genesis/sdk/go/gen/functions/dns/zone/v1;dnszonev1";
+
+service DnsZone {
+  rpc UpsertRecord(Record) returns (Empty);
+  rpc DeleteRecord(RecordKey) returns (Empty);
+  rpc ListRecords(Zone) returns (Records);
+  rpc Endpoint(Empty) returns (EndpointInfo);
+}
+
+message Empty {}
+
+message Record {
+  string zone = 1;
+  string name = 2;
+  string type = 3; // A, AAAA, CNAME, PTR...
+  repeated string values = 4;
+  uint32 ttl = 5;
+}
+
+message RecordKey {
+  string zone = 1;
+  string name = 2;
+  string type = 3;
+}
+
+message Zone {
+  string zone = 1;
+}
+
+message Records {
+  repeated Record records = 1;
+}
+
+message EndpointInfo {
+  string address = 1;
+  int32 port = 2;
+}
