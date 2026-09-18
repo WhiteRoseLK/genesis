@@ -106,11 +106,16 @@ func (*EnsureImageResponse) Descriptor() ([]byte, []int) {
 }
 
 type EnsureVMRequest struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Name          string                 `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
-	Env           string                 `protobuf:"bytes,2,opt,name=env,proto3" json:"env,omitempty"` // tag genesis-env=<nom>, clé d'idempotence (docs/07)
-	Size          string                 `protobuf:"bytes,3,opt,name=size,proto3" json:"size,omitempty"`
-	Extra         map[string]string      `protobuf:"bytes,4,rep,name=extra,proto3" json:"extra,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
+	state protoimpl.MessageState `protogen:"open.v1"`
+	Name  string                 `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
+	Env   string                 `protobuf:"bytes,2,opt,name=env,proto3" json:"env,omitempty"` // tag genesis-env=<nom>, clé d'idempotence (docs/07)
+	Size  string                 `protobuf:"bytes,3,opt,name=size,proto3" json:"size,omitempty"`
+	Extra map[string]string      `protobuf:"bytes,4,rep,name=extra,proto3" json:"extra,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
+	// cloud-init (docs/07-modules-mvp.md : "IP, clé SSH de service, utilisateur genesis").
+	Ip            string `protobuf:"bytes,5,opt,name=ip,proto3" json:"ip,omitempty"`
+	Gateway       string `protobuf:"bytes,6,opt,name=gateway,proto3" json:"gateway,omitempty"`
+	SshPublicKey  string `protobuf:"bytes,7,opt,name=ssh_public_key,json=sshPublicKey,proto3" json:"ssh_public_key,omitempty"`
+	User          string `protobuf:"bytes,8,opt,name=user,proto3" json:"user,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -171,6 +176,34 @@ func (x *EnsureVMRequest) GetExtra() map[string]string {
 		return x.Extra
 	}
 	return nil
+}
+
+func (x *EnsureVMRequest) GetIp() string {
+	if x != nil {
+		return x.Ip
+	}
+	return ""
+}
+
+func (x *EnsureVMRequest) GetGateway() string {
+	if x != nil {
+		return x.Gateway
+	}
+	return ""
+}
+
+func (x *EnsureVMRequest) GetSshPublicKey() string {
+	if x != nil {
+		return x.SshPublicKey
+	}
+	return ""
+}
+
+func (x *EnsureVMRequest) GetUser() string {
+	if x != nil {
+		return x.User
+	}
+	return ""
 }
 
 type VM struct {
@@ -452,12 +485,16 @@ const file_functions_compute_vm_v1_vm_proto_rawDesc = "" +
 	" functions/compute/vm/v1/vm.proto\x12\x17functions.compute.vm.v1\x1a\x1fgoogle/protobuf/timestamp.proto\"*\n" +
 	"\x12EnsureImageRequest\x12\x14\n" +
 	"\x05image\x18\x01 \x01(\tR\x05image\"\x15\n" +
-	"\x13EnsureImageResponse\"\xd0\x01\n" +
+	"\x13EnsureImageResponse\"\xb4\x02\n" +
 	"\x0fEnsureVMRequest\x12\x12\n" +
 	"\x04name\x18\x01 \x01(\tR\x04name\x12\x10\n" +
 	"\x03env\x18\x02 \x01(\tR\x03env\x12\x12\n" +
 	"\x04size\x18\x03 \x01(\tR\x04size\x12I\n" +
-	"\x05extra\x18\x04 \x03(\v23.functions.compute.vm.v1.EnsureVMRequest.ExtraEntryR\x05extra\x1a8\n" +
+	"\x05extra\x18\x04 \x03(\v23.functions.compute.vm.v1.EnsureVMRequest.ExtraEntryR\x05extra\x12\x0e\n" +
+	"\x02ip\x18\x05 \x01(\tR\x02ip\x12\x18\n" +
+	"\agateway\x18\x06 \x01(\tR\agateway\x12$\n" +
+	"\x0essh_public_key\x18\a \x01(\tR\fsshPublicKey\x12\x12\n" +
+	"\x04user\x18\b \x01(\tR\x04user\x1a8\n" +
 	"\n" +
 	"ExtraEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
