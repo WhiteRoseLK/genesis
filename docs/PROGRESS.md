@@ -6,7 +6,7 @@
 | J1 — Spec et validation | fait | |
 | J2 — Secrets et état | fait | |
 | J3 — SDK et hôte de modules | fait | |
-| J4 — Résolveur, broker, planificateur, moteur | à faire | |
+| J4 — Résolveur, broker, planificateur, moteur | fait | |
 | J5 — proxmox, base-os | à faire | |
 | J6 — chrony, coredns, powerdns | à faire | |
 | J7 — step-ca, vault | à faire | |
@@ -102,8 +102,38 @@
 
 **Prochaine étape** : J4 — Résolveur, broker, planificateur, moteur (docs 02, 05).
 
+### 2026-09-18 — J4 Résolveur, broker, planificateur, moteur
+Le jalon le plus complexe à ce jour. Détail complet des décisions dans les messages de commit (`git log --oneline` depuis « feat: function protocols and bidirectional broker plumbing » jusqu'à « feat: wire genesis plan/apply ») ; résumé ici.
+
+**Fait**
+- **Fonctions concrètes** : `functions/core/secrets/v1` (natif, jamais un module), `functions/compute/vm/v1` (fournie par `fake-compute`), `functions/test/echo/v1` (générique, réutilisée par les modules de test sous des noms différents).
+- **SDK** : `sdk.Serve` accepte des `FunctionProvider` (une fonction fournie = un plugin `function:<nom>` dispensé en plus du cycle de vie) ; `BrokerAware`/`BrokerClient` permettent à un module de dialer, pendant une étape, le sous-canal go-plugin ouvert par le cœur (`StepRequest.broker_token`) — c'est le mécanisme d'appel bidirectionnel (comme les provisioners Terraform), symétrique du sens habituel cœur→module.
+- **`internal/broker`** : `Registry.BuildSession(appelant, allowed)` construit un `grpc.Server` n'enregistrant que les fonctions déclarées — une fonction non déclarée n'est simplement jamais enregistrée, l'appel échoue avec `Unimplemented` **architecturalement**, pas via une vérification ad hoc. `core.secrets/v1` a une implémentation native avec contrôle d'accès (owner/consumers, via `secrets.Store.GetMeta`, ajoutée pour l'occasion). `compute.vm/v1` et `test.*/v1` sont relayées vers le module fournisseur actif (`ForwarderFor`).
+- **`internal/resolver`** : capacité → module (explicite, seul candidat installé, ou `defaults.<capacité>`), fermeture des fonctions requises jusqu'à point fixe (ajout automatique), compatibilité `core` (comparateur semver maison, pas de nouvelle dépendance). `FunctionProviders` est **par phase** (`fonction → phase → module`) : une fonction peut avoir un fournisseur graine et un fournisseur cible différents en même temps (doc 05), ce n'est pas un conflit.
+- **`internal/planner`** : DAG à granularité module (arêtes dérivées des fonctions requises/fournies), tri topologique de Kahn déterministe, détection de cycle.
+- **`internal/engine`** : lance tous les modules résolus, enregistre leurs fonctions fournies dans le broker, puis pour chaque module : un seul `Check` décide de rejouer ou non son groupe d'étapes (seed.up si applicable, provision, configure, verify, puis handover+seed.retire si passation) — simplification assumée par rapport à un `Check` par RPC individuel, sûre car chaque étape est elle-même idempotente (doc 03 §4 règle 3). État persisté après chaque étape réussie.
+- **Modules réels** : `modules/fake-compute` (registre mémoire, pas de conteneurs systemd/SSH pour ce jalon) ; `test/modules/{test-a,test-b,test-c,test-d}` — test-a exerce graine+passation, test-b/c/d appellent réellement leur dépendance à travers le broker pendant `Verify`.
+- **CLI** : `genesis plan`/`genesis apply` branchés pour de vrai (résolution, plan affiché avec modules ajoutés automatiquement marqués, confirmation y/N sauf `--auto-approve`, exécution via le moteur).
+- Les 5 critères d'acceptation vérifiés individuellement par leur nom de test (voir session) : ordre correct, cycle détecté, fonction non déclarée refusée, kill+relance→reprise, second apply→0 changement, plus la preuve d'extensibilité avec `test-d`.
+
+**Décisions**
+- Bug réel trouvé et corrigé en cours de route : `GRPCBroker.AcceptAndServe` de go-plugin est **bloquant** (comme `http.Server.Serve`) ; l'appeler de façon synchrone dans `OpenSession` gelait tout le moteur dès la première étape. Corrigé en le lançant dans une goroutine — `Dial` côté module attend déjà jusqu'à 5s les infos de connexion, aucune synchronisation supplémentaire nécessaire.
+- Généricité du broker sans changement du cœur par module : chaque type de fonction "officiel" (défini une fois dans le SDK) a un forwarder écrit une fois dans `internal/broker` ; ajouter un **module** ne touche jamais ce fichier, seul l'ajout d'une **nouvelle fonction** (rare, au niveau SDK) le ferait — cohérent avec la portée de la règle non négociable.
+- Pas de choréographie `Repoint` explicite envoyée aux consommateurs : dans cette architecture, un consommateur rouvre une session de broker à chaque appel de fonction, donc changer le fournisseur actif dans le registre suffit à « repointer » sans RPC dédié. La choréographie complète multi-module du doc 05 (vraie passation DNS/PKI) reste à construire quand les modules réels (J6/J7) en auront besoin.
+- `internal/state.State` gagne un champ `Modules` (état opaque par module, `StepResult.state` persisté) — c'est le jalon qui le produit réellement, pas un ajout spéculatif.
+- `secrets.Store` gagne `GetMeta` — nécessaire au contrôle d'accès de `core.secrets/v1`, absent jusqu'ici car rien n'en avait besoin.
+
+**Dette**
+- `internal/engine` rejoue le groupe d'étapes complet d'un module non conforme plutôt que de reprendre exactement à la RPC en échec — assumé, sûr par idempotence, mais moins granulaire que ce que le doc02 semble impliquer ("apply reprend à la première étape non conforme").
+- Choréographie de passation multi-module (Repoint explicite, migration secrets file→vault) non construite : différée à J6/J7 avec les vrais modules DNS/PKI.
+- Config résolue de la spec pas encore transmise au module (`StepRequest.config` est toujours vide) : aucun module réel n'en a encore besoin ; à câbler avec proxmox (J5).
+
+**Prochaine étape** : J5 — Modules `proxmox` et `base-os` (doc 07).
+
 ## Dette technique connue
 - Clé maîtresse en fichier local (ADR-007)
 - Profil connected uniquement (ADR-008)
 - Vérification des licences des dépendances non implémentée en CI (J0, reportée à la demande utilisateur)
-- Règle d'import `internal/cmd ↛ modules/` vérifiée manuellement seulement, pas encore par un test automatisé permanent (J0 → à consolider en J4)
+- `internal/engine` rejoue le groupe d'étapes complet d'un module non conforme plutôt que reprendre à la RPC exacte en échec (J4, sûr par idempotence mais moins granulaire)
+- Choréographie de passation multi-module explicite (Repoint, migration secrets file→vault) non construite (J4 → J6/J7)
+- `StepRequest.config` toujours vide, la config résolue de la spec n'est pas encore transmise aux modules (J4 → à câbler avec proxmox, J5)
