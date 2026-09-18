@@ -27,6 +27,11 @@ type Module struct {
 	// fonction requise, sans être demandé explicitement dans la spec
 	// (docs/04-spec.md : "le plan affiche les modules ajoutés").
 	AutoAdded bool
+	// Config est la config résolue des capacités que ce module sert,
+	// fusionnée (doc04 : "deux capacités pointant sur le même module
+	// partagent son instance"). Transmise telle quelle dans
+	// StepRequest.config par internal/engine.
+	Config map[string]any
 }
 
 // Resolved est le résultat de la résolution : l'ensemble des modules
@@ -101,6 +106,14 @@ func Resolve(env *spec.Environment, installed []modulehost.Installed) (*Resolved
 			return nil, err
 		}
 		r.CapabilityModule[capName] = moduleName
+
+		m := r.Modules[moduleName]
+		for k, v := range capability.Config {
+			if m.Config == nil {
+				m.Config = map[string]any{}
+			}
+			m.Config[k] = v
+		}
 	}
 
 	// 2. Fermeture des fonctions requises : ajoute automatiquement les

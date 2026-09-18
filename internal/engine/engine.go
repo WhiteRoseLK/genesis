@@ -202,9 +202,17 @@ func (e *Engine) buildStepRequest(runID string, m *resolver.Module, client *modu
 		stateStruct = s
 	}
 
-	config, err := structpb.NewStruct(map[string]any{})
+	moduleConfig := m.Config
+	if moduleConfig == nil {
+		moduleConfig = map[string]any{}
+	}
+	resolvedConfig, err := resolveRefs(moduleConfig)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("résolution des références de %q : %w", m.Name, err)
+	}
+	config, err := structpb.NewStruct(resolvedConfig)
+	if err != nil {
+		return nil, fmt.Errorf("encodage de la config de %q : %w", m.Name, err)
 	}
 
 	return &modulev1.StepRequest{

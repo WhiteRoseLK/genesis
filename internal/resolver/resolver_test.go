@@ -278,3 +278,26 @@ func TestResolveSeedAndTargetProvidersCoexist(t *testing.T) {
 		t.Error("coredns aurait dû être ajouté automatiquement pour dns.zone/v1@seed")
 	}
 }
+
+// TestResolveCarriesCapabilityConfigToModule vérifie que la config résolue
+// de la spec est bien transmise au module (StepRequest.config, doc02/J5).
+func TestResolveCarriesCapabilityConfigToModule(t *testing.T) {
+	env := &spec.Environment{
+		Capabilities: map[string]spec.Capability{
+			"compute": {
+				Module: "proxmox",
+				Config: map[string]any{"endpoint": "https://pve01:8006", "node": "pve01"},
+			},
+		},
+	}
+	installed := []modulehost.Installed{installedModule("proxmox", withCapabilities("compute"))}
+
+	resolved, err := Resolve(env, installed)
+	if err != nil {
+		t.Fatalf("Resolve : %v", err)
+	}
+	cfg := resolved.Modules["proxmox"].Config
+	if cfg["endpoint"] != "https://pve01:8006" || cfg["node"] != "pve01" {
+		t.Errorf("Config = %+v, attendu endpoint/node de la spec", cfg)
+	}
+}
