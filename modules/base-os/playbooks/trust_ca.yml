@@ -1,0 +1,18 @@
+---
+# TrustCA (functions/os/base/v1) : installe la CA racine dans le magasin de
+# certificats système (image cloud Debian, docs/01-vision-perimetre.md).
+- hosts: target
+  gather_facts: false
+  become: true
+  tasks:
+    - name: installer le certificat CA
+      ansible.builtin.copy:
+        content: "{{ ca_cert_pem }}"
+        dest: /usr/local/share/ca-certificates/genesis-root-ca.crt
+        mode: "0644"
+      register: ca_file
+
+    - name: mettre à jour le magasin de certificats
+      ansible.builtin.command: update-ca-certificates
+      when: ca_file.changed
+      changed_when: true

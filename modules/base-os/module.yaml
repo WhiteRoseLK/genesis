@@ -1,0 +1,25 @@
+apiVersion: genesis/module/v1
+name: base-os
+version: 0.1.0
+description: "configuration fonctionnelle des VM cibles (CA, resolveur, NTP) ; durcissement pur (Harden) differe a une iteration future"
+layer: foundation
+core: ">=0.1.0 <0.2.0"
+protocol: 1
+
+capabilities: []
+
+provides:
+  - function: os.base/v1
+    phases: [target]
+
+requires:
+  target:
+    - function: core.ansible/v1
+
+config_schema: schema.json
+
+secrets: []
+
+resources: []
+
+defaults: {}
