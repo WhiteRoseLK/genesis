@@ -3,6 +3,7 @@ go 1.27.1
 use (
 	.
 	./modules/base-os
+	./modules/chrony
 	./modules/coredns
 	./modules/fake-compute
 	./modules/proxmox

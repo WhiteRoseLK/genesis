@@ -1,0 +1,39 @@
+---
+# Verify (functions/time/ntp/v1, module chrony) : exécuté sur une VM tierce
+# jetable pointée vers le serveur chrony à vérifier — "Verify : depuis une
+# autre VM, source sélectionnée, écart < 100 ms" (docs/07-modules-mvp.md).
+- hosts: target
+  gather_facts: false
+  become: true
+  tasks:
+    - name: installer chrony (client de vérification)
+      ansible.builtin.apt:
+        name: chrony
+        state: present
+        update_cache: true
+
+    - name: pointer chrony vers le serveur à vérifier
+      ansible.builtin.copy:
+        content: |
+          server {{ ntp_server }} iburst
+          driftfile /var/lib/chrony/drift
+        dest: /etc/chrony/chrony.conf
+        mode: "0644"
+
+    - name: redémarrer chronyd
+      ansible.builtin.systemd:
+        name: chrony
+        enabled: true
+        state: restarted
+
+    - name: attendre une synchronisation exploitable
+      ansible.builtin.command: chronyc tracking
+      register: tracking
+      changed_when: false
+      until: "'Not synchronised' not in tracking.stdout"
+      retries: 12
+      delay: 5
+
+    - name: afficher chronyc tracking
+      ansible.builtin.debug:
+        var: tracking.stdout

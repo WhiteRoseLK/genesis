@@ -1,0 +1,38 @@
+---
+# Configure (functions/time/ntp/v1, module chrony) : installe et configure
+# chronyd en serveur NTP (docs/07-modules-mvp.md) — image cloud Debian
+# (docs/01-vision-perimetre.md), même hypothèse que modules/base-os.
+- hosts: target
+  gather_facts: false
+  become: true
+  tasks:
+    - name: installer chrony
+      ansible.builtin.apt:
+        name: chrony
+        state: present
+        update_cache: true
+
+    - name: configurer chrony.conf
+      ansible.builtin.copy:
+        content: |
+          {% for pool in ntp_pools %}
+          pool {{ pool }} iburst
+          {% endfor %}
+          allow {{ allow_cidr }}
+          local stratum 10
+          driftfile /var/lib/chrony/drift
+        dest: /etc/chrony/chrony.conf
+        mode: "0644"
+      register: chrony_conf
+
+    - name: activer et redémarrer chronyd
+      ansible.builtin.systemd:
+        name: chrony
+        enabled: true
+        state: restarted
+      when: chrony_conf.changed
+
+    - name: s'assurer que chronyd tourne
+      ansible.builtin.systemd:
+        name: chrony
+        state: started
