@@ -49,6 +49,12 @@ func withProvides(functions ...string) func(*sdk.ManifestFile) {
 	}
 }
 
+func withProvidesPhases(function string, phases ...string) func(*sdk.ManifestFile) {
+	return func(m *sdk.ManifestFile) {
+		m.Provides = append(m.Provides, sdk.FunctionRef{Function: function, Phases: phases})
+	}
+}
+
 func withRequires(phase string, entries ...sdk.RequireEntry) func(*sdk.ManifestFile) {
 	return func(m *sdk.ManifestFile) {
 		if m.Requires == nil {
@@ -146,8 +152,8 @@ func TestResolveAutoAddsRequiredFunctionProvider(t *testing.T) {
 	if !proxmoxModule.AutoAdded {
 		t.Error("proxmox aurait dû être marqué AutoAdded")
 	}
-	if resolved.FunctionProviders["compute.vm/v1"] != "proxmox" {
-		t.Errorf("FunctionProviders[compute.vm/v1] = %q, attendu proxmox", resolved.FunctionProviders["compute.vm/v1"])
+	if provider, _ := resolved.ProviderFor("compute.vm/v1", ""); provider != "proxmox" {
+		t.Errorf("ProviderFor(compute.vm/v1) = %q, attendu proxmox", provider)
 	}
 }
 
@@ -180,7 +186,7 @@ func TestResolveMissingOptionalFunctionSucceeds(t *testing.T) {
 	if err != nil {
 		t.Fatalf("fonction optionnelle absente : erreur inattendue : %v", err)
 	}
-	if _, ok := resolved.FunctionProviders["platform.cluster/v1"]; ok {
+	if _, ok := resolved.ProviderFor("platform.cluster/v1", ""); ok {
 		t.Error("une fonction optionnelle absente ne devrait pas apparaître dans FunctionProviders")
 	}
 }
@@ -235,5 +241,40 @@ func TestResolveMutualRequirementTerminates(t *testing.T) {
 	}
 	if len(resolved.Modules) != 2 {
 		t.Errorf("modules résolus = %v, attendu 2", resolved.Modules)
+	}
+}
+
+// TestResolveSeedAndTargetProvidersCoexist reflète le schéma de bootstrap du
+// doc 05 : CoreDNS fournit dns.zone/v1 en phase graine, PowerDNS en phase
+// cible — les deux à la fois, ce n'est pas un conflit à résoudre.
+func TestResolveSeedAndTargetProvidersCoexist(t *testing.T) {
+	env := &spec.Environment{
+		Capabilities: map[string]spec.Capability{
+			"dns": {Module: "powerdns"},
+		},
+	}
+	installed := []modulehost.Installed{
+		installedModule("powerdns",
+			withCapabilities("dns"),
+			withProvidesPhases("dns.zone/v1", "target"),
+			// Vault a besoin d'un certificat TLS initial signé par la graine
+			// avant même que la cible existe (docs/03, exemple pki.issuer@seed).
+			withRequires("seed", sdk.RequireEntry{Function: "dns.zone/v1@seed"}),
+		),
+		installedModule("coredns", withProvidesPhases("dns.zone/v1", "seed")),
+	}
+
+	resolved, err := Resolve(env, installed)
+	if err != nil {
+		t.Fatalf("Resolve : %v", err)
+	}
+	if target, _ := resolved.ProviderFor("dns.zone/v1", "target"); target != "powerdns" {
+		t.Errorf("ProviderFor(dns.zone/v1, target) = %q, attendu powerdns", target)
+	}
+	if seed, _ := resolved.ProviderFor("dns.zone/v1", "seed"); seed != "coredns" {
+		t.Errorf("ProviderFor(dns.zone/v1, seed) = %q, attendu coredns", seed)
+	}
+	if _, ok := resolved.Modules["coredns"]; !ok {
+		t.Error("coredns aurait dû être ajouté automatiquement pour dns.zone/v1@seed")
 	}
 }

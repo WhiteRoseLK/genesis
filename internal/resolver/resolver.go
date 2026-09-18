@@ -32,9 +32,33 @@ type Module struct {
 // Resolved est le résultat de la résolution : l'ensemble des modules
 // nécessaires, et la correspondance capacité → module.
 type Resolved struct {
-	Modules           map[string]*Module
-	CapabilityModule  map[string]string
-	FunctionProviders map[string]string // fonction (sans suffixe @phase) -> module
+	Modules          map[string]*Module
+	CapabilityModule map[string]string
+	// FunctionProviders[fonction][phase] = module fournisseur pour cette
+	// fonction dans cette phase ("seed" ou "target") — une même fonction
+	// peut avoir des fournisseurs différents par phase (docs/05-cycle-bootstrap.md :
+	// CoreDNS en graine, PowerDNS en cible, toutes deux dns.zone/v1).
+	FunctionProviders map[string]map[string]string
+}
+
+// ProviderFor retourne le module fournisseur de function pour phase. Si
+// phase est vide (fonction requise sans suffixe @seed/@target), le
+// fournisseur cible est préféré, la graine sert de repli
+// (docs/03-contrat-module.md §1 : "sans suffixe, le fournisseur actif").
+func (r *Resolved) ProviderFor(function, phase string) (string, bool) {
+	byPhase, ok := r.FunctionProviders[function]
+	if !ok {
+		return "", false
+	}
+	if phase != "" {
+		name, ok := byPhase[phase]
+		return name, ok
+	}
+	if name, ok := byPhase["target"]; ok {
+		return name, true
+	}
+	name, ok := byPhase["seed"]
+	return name, ok
 }
 
 // Resolve associe chaque capacité de env à un module installé, ajoute
@@ -49,7 +73,7 @@ func Resolve(env *spec.Environment, installed []modulehost.Installed) (*Resolved
 	r := &Resolved{
 		Modules:           map[string]*Module{},
 		CapabilityModule:  map[string]string{},
-		FunctionProviders: map[string]string{},
+		FunctionProviders: map[string]map[string]string{},
 	}
 
 	// 1. Capacité -> module (explicite ou défaut), doc04.
@@ -137,10 +161,21 @@ func addModule(r *Resolved, installed modulehost.Installed, autoAdded bool) erro
 
 func registerProvides(r *Resolved, m *Module) error {
 	for _, p := range m.Manifest.Provides {
-		if existing, ok := r.FunctionProviders[p.Function]; ok && existing != m.Name {
-			return fmt.Errorf("fonction %q : fournie à la fois par %q et %q, choix explicite requis", p.Function, existing, m.Name)
+		phases := p.Phases
+		if len(phases) == 0 {
+			phases = []string{"target"}
 		}
-		r.FunctionProviders[p.Function] = m.Name
+		byPhase, ok := r.FunctionProviders[p.Function]
+		if !ok {
+			byPhase = map[string]string{}
+			r.FunctionProviders[p.Function] = byPhase
+		}
+		for _, phase := range phases {
+			if existing, ok := byPhase[phase]; ok && existing != m.Name {
+				return fmt.Errorf("fonction %q (phase %s) : fournie à la fois par %q et %q, choix explicite requis", p.Function, phase, existing, m.Name)
+			}
+			byPhase[phase] = m.Name
+		}
 	}
 	return nil
 }
@@ -161,12 +196,12 @@ func closeRequirements(r *Resolved, byName map[string]modulehost.Installed) erro
 			m := r.Modules[name]
 			for _, phaseEntries := range orderedRequires(m.Manifest.Requires) {
 				for _, entry := range phaseEntries.entries {
-					function, _ := splitFunctionPhase(entry.Function)
-					if _, ok := r.FunctionProviders[function]; ok {
+					function, phase := splitFunctionPhase(entry.Function)
+					if _, ok := r.ProviderFor(function, phase); ok {
 						continue
 					}
 
-					provider, err := findProvider(function, byName)
+					provider, err := findProvider(function, phase, byName)
 					if err != nil {
 						if entry.Optional {
 							continue
@@ -212,16 +247,41 @@ func orderedRequires(requires map[string][]sdk.RequireEntry) []namedRequireList 
 	return out
 }
 
-func findProvider(function string, byName map[string]modulehost.Installed) (*modulehost.Installed, error) {
+// findProvider cherche un module installé (non encore résolu ou pas) qui
+// fournit function pour phase. phase vide (require non suffixé) préfère un
+// fournisseur cible, la graine sert de repli — les deux peuvent coexister
+// sans être ambigus l'un envers l'autre (docs/05-cycle-bootstrap.md).
+func findProvider(function, phase string, byName map[string]modulehost.Installed) (*modulehost.Installed, error) {
+	if phase != "" {
+		return pickCandidate(function, providersForPhase(function, phase, byName))
+	}
+	if candidates := providersForPhase(function, "target", byName); len(candidates) > 0 {
+		return pickCandidate(function, candidates)
+	}
+	return pickCandidate(function, providersForPhase(function, "seed", byName))
+}
+
+func providersForPhase(function, phase string, byName map[string]modulehost.Installed) []modulehost.Installed {
 	var candidates []modulehost.Installed
 	for _, m := range byName {
 		for _, p := range m.Manifest.Provides {
-			if p.Function == function {
+			if p.Function != function {
+				continue
+			}
+			phases := p.Phases
+			if len(phases) == 0 {
+				phases = []string{"target"}
+			}
+			if containsString(phases, phase) {
 				candidates = append(candidates, m)
 				break
 			}
 		}
 	}
+	return candidates
+}
+
+func pickCandidate(function string, candidates []modulehost.Installed) (*modulehost.Installed, error) {
 	switch len(candidates) {
 	case 0:
 		return nil, nil
