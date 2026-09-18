@@ -1,0 +1,24 @@
+apiVersion: genesis/module/v1
+name: test-e
+version: 0.1.0
+description: "module de test J6 : fournisseur graine PUR (sans phase cible) de test.e/v1, repris par test-f"
+layer: platform
+core: ">=0.1.0 <0.2.0"
+protocol: 1
+
+capabilities: [test-e]
+
+provides:
+  - function: test.e/v1
+    phases: [seed]
+
+requires: {}
+
+config_schema: schema.json
+
+secrets: []
+
+resources: []
+
+defaults:
+  test-e: true

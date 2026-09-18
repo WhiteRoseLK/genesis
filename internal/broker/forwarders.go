@@ -13,7 +13,11 @@ import (
 // ajoutent de vraies fonctions (compute.vm/v1 en J4 ; dns.zone/v1,
 // pki.issuer/v1... suivront avec leurs modules, J5+).
 var knownForwarders = map[string]func(*grpc.Server, *grpc.ClientConn){
-	"compute.vm/v1": ForwardComputeVM,
+	"compute.vm/v1":   ForwardComputeVM,
+	"os.base/v1":      ForwardOSBase,
+	"dns.zone/v1":     ForwardDNSZone,
+	"dns.resolver/v1": ForwardDNSResolver,
+	"time.ntp/v1":     ForwardTimeNTP,
 }
 
 // ForwarderFor retourne le forwarder à utiliser pour function fournie par un

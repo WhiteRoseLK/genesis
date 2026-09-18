@@ -9,11 +9,20 @@
 // chaque RPC individuellement — chaque étape étant elle-même idempotente
 // (docs/03-contrat-module.md §4, règle 3), rejouer le groupe après une
 // reprise est sûr même si certaines étapes du groupe avaient déjà réussi.
-// La choreographie complète de passation multi-module du doc 05 (Repoint
-// explicite des consommateurs) est différée : dans cette architecture, un
-// consommateur redemande une session de broker à chaque appel, donc changer
-// le fournisseur actif dans le registre suffit à "repointer" — rien de plus
-// n'est nécessaire pour J4.
+//
+// Passation multi-module (docs/05-cycle-bootstrap.md), depuis le jalon J6 :
+// un module cible dont une fonction fournie a un fournisseur graine actif
+// (resolver.Resolved.ProviderFor(fn, "seed")) exécute Handover puis
+// déclenche SeedDown sur CE fournisseur graine (potentiellement un module
+// différent, ex. coredns → powerdns) avant de devenir le nouveau
+// fournisseur actif de la fonction (clé de registre sans suffixe @phase,
+// voir repoint). Le Repoint(RepointRequest) explicite du proto n'est pas
+// encore déclenché par le cœur vers les modules consommateurs : dans ce
+// MVP, aucun module ne consomme encore dns.zone/v1, dns.resolver/v1 ou
+// time.ntp/v1 sans le suffixe de phase après son propre Check (le seul
+// consommateur sensible à la passation, powerdns, lit explicitement
+// dns.zone/v1@seed) — Repoint devra être câblé dès qu'un tel consommateur
+// existera (dette, docs/PROGRESS.md).
 package engine
 
 import (
@@ -24,6 +33,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"slices"
 	"sort"
 	"strings"
 
@@ -39,6 +49,14 @@ import (
 	sdk "genesis/sdk/go"
 	modulev1 "genesis/sdk/go/gen/module/v1"
 )
+
+// providerConn est la connexion dispensée d'un module pour une fonction
+// qu'il fournit, avec son forwarder — mise en cache pour repoint (pas de
+// redispense, voir Run).
+type providerConn struct {
+	conn     *grpc.ClientConn
+	register func(*grpc.Server, *grpc.ClientConn)
+}
 
 // Engine exécute un plan résolu.
 type Engine struct {
@@ -81,6 +99,10 @@ func (e *Engine) Run(ctx context.Context, resolved *resolver.Resolved, plan *pla
 		}
 	}()
 
+	// providers[fonction][module] : connexion dispensée, mise en cache pour
+	// le repoint post-passation (pas de redispense, voir repoint plus bas).
+	providers := map[string]map[string]providerConn{}
+
 	for _, name := range plan.Order {
 		m := resolved.Modules[name]
 		client, err := modulehost.Launch(m.Installed.BinaryPath, m.Manifest)
@@ -98,7 +120,36 @@ func (e *Engine) Run(ctx context.Context, resolved *resolver.Resolved, plan *pla
 			if !ok {
 				return fmt.Errorf("fonction %q (module %q) : type de fonction inconnu du cœur", p.Function, name)
 			}
-			e.Registry.SetModuleProvider(p.Function, conn, register)
+			// Clé qualifiée par phase : permet à un module cible de
+			// consommer explicitement la fonction @seed d'un AUTRE module
+			// pendant sa passation (ex. powerdns lit dns.zone/v1@seed chez
+			// coredns), même quand un troisième module fournit la même
+			// fonction en phase cible (docs/05-cycle-bootstrap.md).
+			for _, phase := range p.Phases {
+				e.Registry.SetModuleProvider(p.Function+"@"+phase, conn, register)
+			}
+			if providers[p.Function] == nil {
+				providers[p.Function] = map[string]providerConn{}
+			}
+			providers[p.Function][name] = providerConn{conn: conn, register: register}
+		}
+	}
+
+	// Clé "active" (sans suffixe @phase) : la graine tant qu'elle existe
+	// (repointée vers la cible après passation, voir repoint), sinon
+	// directement la cible pour les fonctions sans phase graine (ex.
+	// compute.vm/v1).
+	for function, byModule := range providers {
+		phase := "seed"
+		if _, ok := resolved.ProviderFor(function, "seed"); !ok {
+			phase = "target"
+		}
+		providerName, ok := resolved.ProviderFor(function, phase)
+		if !ok {
+			continue
+		}
+		if pc, ok := byModule[providerName]; ok {
+			e.Registry.SetModuleProvider(function, pc.conn, pc.register)
 		}
 	}
 
@@ -109,7 +160,7 @@ func (e *Engine) Run(ctx context.Context, resolved *resolver.Resolved, plan *pla
 
 	for _, name := range plan.Order {
 		m := resolved.Modules[name]
-		if err := e.runModule(ctx, runID, m, clients[name], st); err != nil {
+		if err := e.runModule(ctx, runID, resolved, m, clients, providers, st); err != nil {
 			return err
 		}
 	}
@@ -117,7 +168,16 @@ func (e *Engine) Run(ctx context.Context, resolved *resolver.Resolved, plan *pla
 	return nil
 }
 
-func (e *Engine) runModule(ctx context.Context, runID string, m *resolver.Module, client *modulehost.Client, st *state.State) error {
+func (e *Engine) runModule(
+	ctx context.Context,
+	runID string,
+	resolved *resolver.Resolved,
+	m *resolver.Module,
+	clients map[string]*modulehost.Client,
+	providers map[string]map[string]providerConn,
+	st *state.State,
+) error {
+	client := clients[m.Name]
 	req, err := e.buildStepRequest(runID, m, client, st)
 	if err != nil {
 		return err
@@ -132,13 +192,19 @@ func (e *Engine) runModule(ctx context.Context, runID string, m *resolver.Module
 		return nil
 	}
 
-	hasSeed := providesInPhase(m, "seed")
-
-	if hasSeed {
+	if providesInPhase(m, "seed") {
 		if err := e.action(ctx, runID, m, client, st, "seed.up", client.Module().SeedUp); err != nil {
 			return err
 		}
 	}
+
+	if !providesInPhase(m, "target") {
+		// Module graine pur (ex. coredns) : s'arrête à seed_ready
+		// (docs/03-contrat-module.md §5) — une passation ultérieure d'un
+		// module cible appellera SeedDown en temps voulu (voir plus bas).
+		return e.action(ctx, runID, m, client, st, "verify", client.Module().Verify)
+	}
+
 	if err := e.action(ctx, runID, m, client, st, "provision", client.Module().Provision); err != nil {
 		return err
 	}
@@ -148,15 +214,69 @@ func (e *Engine) runModule(ctx context.Context, runID string, m *resolver.Module
 	if err := e.action(ctx, runID, m, client, st, "verify", client.Module().Verify); err != nil {
 		return err
 	}
-	if hasSeed {
-		if err := e.action(ctx, runID, m, client, st, "handover", client.Module().Handover); err != nil {
-			return err
+
+	seedModules := handoverSeedModules(resolved, m)
+	if len(seedModules) == 0 {
+		return nil // target_ready -> done : pas de passation (docs/03 §5).
+	}
+	if err := e.action(ctx, runID, m, client, st, "handover", client.Module().Handover); err != nil {
+		return err
+	}
+	for _, seedName := range seedModules {
+		seedModule := resolved.Modules[seedName]
+		seedClient := clients[seedName]
+		if seedClient == nil {
+			return fmt.Errorf("passation de %q : module graine %q introuvable", m.Name, seedName)
 		}
-		if err := e.action(ctx, runID, m, client, st, "seed.retire", client.Module().SeedDown); err != nil {
+		if err := e.action(ctx, runID, seedModule, seedClient, st, "seed.retire", seedClient.Module().SeedDown); err != nil {
 			return err
 		}
 	}
+	e.repoint(resolved, m, providers)
 	return nil
+}
+
+// handoverSeedModules retourne, dédupliqué et trié, les modules graine
+// distincts dont AU MOINS une fonction fournie par m en phase cible avait
+// un fournisseur actif en phase graine — c'est la définition même d'une
+// passation (docs/05-cycle-bootstrap.md). Un module qui fournit une même
+// fonction dans les deux phases (auto-passation, ex. test/modules/test-a)
+// s'y retrouve lui-même : Handover puis SeedDown s'exécutent alors tous
+// deux sur lui.
+func handoverSeedModules(resolved *resolver.Resolved, m *resolver.Module) []string {
+	seen := map[string]bool{}
+	var out []string
+	for _, p := range m.Manifest.Provides {
+		if !slices.Contains(p.Phases, "target") {
+			continue
+		}
+		seedName, ok := resolved.ProviderFor(p.Function, "seed")
+		if !ok || seen[seedName] {
+			continue
+		}
+		seen[seedName] = true
+		out = append(out, seedName)
+	}
+	sort.Strings(out)
+	return out
+}
+
+// repoint fait de m le nouveau fournisseur actif (clé sans suffixe @phase)
+// de chacune de ses fonctions cible qui vient d'être reprise d'un
+// fournisseur graine — réutilise la connexion déjà dispensée au lancement,
+// aucune redispense.
+func (e *Engine) repoint(resolved *resolver.Resolved, m *resolver.Module, providers map[string]map[string]providerConn) {
+	for _, p := range m.Manifest.Provides {
+		if !slices.Contains(p.Phases, "target") {
+			continue
+		}
+		if _, ok := resolved.ProviderFor(p.Function, "seed"); !ok {
+			continue
+		}
+		if pc, ok := providers[p.Function][m.Name]; ok {
+			e.Registry.SetModuleProvider(p.Function, pc.conn, pc.register)
+		}
+	}
 }
 
 func (e *Engine) action(
@@ -250,15 +370,18 @@ func providesInPhase(m *resolver.Module, phase string) bool {
 	return false
 }
 
+// requiredFunctions retourne les fonctions déclarées en requires, telles
+// quelles — suffixe @seed/@target inclus quand présent (docs/03 §1 : force
+// le fournisseur) : la clé de registre correspondante n'existe que sous
+// cette forme qualifiée (voir Run, enregistrement par phase).
 func requiredFunctions(m *sdk.ManifestFile) []string {
 	seen := map[string]bool{}
 	var out []string
 	for _, entries := range m.Requires {
 		for _, entry := range entries {
-			name, _ := resolver.SplitFunctionPhase(entry.Function)
-			if !seen[name] {
-				seen[name] = true
-				out = append(out, name)
+			if !seen[entry.Function] {
+				seen[entry.Function] = true
+				out = append(out, entry.Function)
 			}
 		}
 	}

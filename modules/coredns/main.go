@@ -46,6 +46,7 @@ type coreDNSModule struct {
 	broker          *sdk.BrokerClient
 	brokerToken     string
 	containerClient containerv1.ContainerClient
+	zoneServer      *dnsZoneServer
 }
 
 func (m *coreDNSModule) SetBroker(b *sdk.BrokerClient) { m.broker = b }
@@ -58,33 +59,71 @@ func (m *coreDNSModule) Validate(context.Context, *modulev1.ValidateRequest) (*m
 	return &modulev1.Diagnostics{}, nil
 }
 
+// Check : conforme une fois amorcé (seeded) ou déjà retiré par une
+// passation (retired) — coredns ne fournit rien en phase cible, son
+// itération de plan (internal/engine) s'arrête donc à seed_ready
+// (docs/03-contrat-module.md §5) ; le jeton de session est capturé pour
+// que les gestionnaires de fonction (UpsertRecord...) puissent joindre
+// core.container/v1.
 func (m *coreDNSModule) Check(_ context.Context, req *modulev1.StepRequest) (*modulev1.CheckResult, error) {
 	m.brokerToken = req.GetBrokerToken()
-	return &modulev1.CheckResult{Status: modulev1.CheckResult_STATUS_CONFORME}, nil
+	flags := sdk.StateMap(req.GetState())
+	if boolFlag(flags, "seeded") || boolFlag(flags, "retired") {
+		return &modulev1.CheckResult{Status: modulev1.CheckResult_STATUS_CONFORME}, nil
+	}
+	return &modulev1.CheckResult{Status: modulev1.CheckResult_STATUS_A_FAIRE}, nil
 }
 
-func (m *coreDNSModule) step(req *modulev1.StepRequest) (*modulev1.StepResult, error) {
-	s, err := sdk.NewState(sdk.StateMap(req.GetState()))
+func (m *coreDNSModule) SeedUp(_ context.Context, req *modulev1.StepRequest) (*modulev1.StepResult, error) {
+	return m.setFlag(req, "seeded")
+}
+
+// Verify : rien de spécifique au produit à vérifier avant qu'une zone
+// existe (UpsertRecord n'a encore jamais été appelé à ce stade du cycle de
+// vie) — la résolution DNS réelle est prouvée du point de vue consommateur
+// dans internal/modulehost/coredns_test.go, une fois des enregistrements
+// présents.
+func (m *coreDNSModule) Verify(_ context.Context, req *modulev1.StepRequest) (*modulev1.StepResult, error) {
+	return m.setFlag(req, "verified")
+}
+
+// SeedDown arrête réellement le conteneur CoreDNS — déclenché par la
+// passation d'un module cible (ex. powerdns), pas par sa propre itération
+// de plan (docs/08-jalons.md, J6 : "après passation, arrêt de coredns sans
+// impact").
+func (m *coreDNSModule) SeedDown(ctx context.Context, req *modulev1.StepRequest) (*modulev1.StepResult, error) {
+	if err := m.zoneServer.stopContainer(ctx); err != nil {
+		return nil, err
+	}
+	return m.setFlag(req, "retired")
+}
+
+// Destroy : même nettoyage que SeedDown, pour un retrait de la graine hors
+// passation (ex. `genesis destroy` sans module cible installé).
+func (m *coreDNSModule) Destroy(ctx context.Context, req *modulev1.StepRequest) (*modulev1.StepResult, error) {
+	if err := m.zoneServer.stopContainer(ctx); err != nil {
+		return nil, err
+	}
+	s, err := sdk.NewState(map[string]any{})
 	if err != nil {
 		return nil, err
 	}
 	return &modulev1.StepResult{Status: modulev1.StepResult_STATUS_OK, State: s}, nil
 }
 
-func (m *coreDNSModule) Provision(_ context.Context, req *modulev1.StepRequest) (*modulev1.StepResult, error) {
-	return m.step(req)
+func (m *coreDNSModule) setFlag(req *modulev1.StepRequest, flag string) (*modulev1.StepResult, error) {
+	flags := sdk.StateMap(req.GetState())
+	flags[flag] = true
+	s, err := sdk.NewState(flags)
+	if err != nil {
+		return nil, err
+	}
+	return &modulev1.StepResult{Status: modulev1.StepResult_STATUS_OK, State: s}, nil
 }
 
-func (m *coreDNSModule) Configure(_ context.Context, req *modulev1.StepRequest) (*modulev1.StepResult, error) {
-	return m.step(req)
-}
-
-func (m *coreDNSModule) Verify(_ context.Context, req *modulev1.StepRequest) (*modulev1.StepResult, error) {
-	return m.step(req)
-}
-
-func (m *coreDNSModule) Destroy(_ context.Context, req *modulev1.StepRequest) (*modulev1.StepResult, error) {
-	return m.step(req)
+func boolFlag(flags map[string]any, key string) bool {
+	v, _ := flags[key].(bool)
+	return v
 }
 
 // containers dial la session de broker au plus une fois (Dial ne réussit
@@ -165,6 +204,30 @@ func (s *dnsZoneServer) Endpoint(context.Context, *dnszonev1.Empty) (*dnszonev1.
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	return &dnszonev1.EndpointInfo{Address: s.ip, Port: 53}, nil
+}
+
+// stopContainer arrête réellement le conteneur CoreDNS s'il tourne —
+// idempotent (aucun conteneur démarré : no-op, ex. passation avant tout
+// UpsertRecord). Appelé par SeedDown et Destroy.
+func (s *dnsZoneServer) stopContainer(ctx context.Context) error {
+	s.mu.Lock()
+	id := s.containerID
+	s.mu.Unlock()
+	if id == "" {
+		return nil
+	}
+	containers, err := s.module.containers()
+	if err != nil {
+		return err
+	}
+	if _, err := containers.Stop(ctx, &containerv1.StopRequest{ContainerId: id}); err != nil {
+		return fmt.Errorf("arrêt du conteneur CoreDNS : %w", err)
+	}
+	s.mu.Lock()
+	s.containerID = ""
+	s.ip = ""
+	s.mu.Unlock()
+	return nil
 }
 
 // reload régénère le Corefile et les fichiers de zone, puis redémarre le
@@ -268,6 +331,7 @@ func main() {
 
 	module := &coreDNSModule{manifest: mf.ToProto()}
 	zoneServer := &dnsZoneServer{module: module}
+	module.zoneServer = zoneServer
 
 	sdk.Serve(module,
 		sdk.FunctionProvider{

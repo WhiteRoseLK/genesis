@@ -13,4 +13,6 @@ use (
 	./test/modules/test-b
 	./test/modules/test-c
 	./test/modules/test-d
+	./test/modules/test-e
+	./test/modules/test-f
 )

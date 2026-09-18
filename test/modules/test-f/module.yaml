@@ -1,0 +1,26 @@
+apiVersion: genesis/module/v1
+name: test-f
+version: 0.1.0
+description: "module de test J6 : reprend test.e/v1 en phase cible (passation croisée depuis test-e)"
+layer: platform
+core: ">=0.1.0 <0.2.0"
+protocol: 1
+
+capabilities: [test-f]
+
+provides:
+  - function: test.e/v1
+    phases: [target]
+
+requires:
+  target:
+    - function: test.e/v1@seed
+
+config_schema: schema.json
+
+secrets: []
+
+resources: []
+
+defaults:
+  test-f: true

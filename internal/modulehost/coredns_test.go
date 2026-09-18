@@ -81,8 +81,17 @@ func TestCoreDNSResolvesUpsertedRecord(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Check : %v", err)
 	}
-	if checkResp.GetStatus() != modulev1.CheckResult_STATUS_CONFORME {
-		t.Fatalf("Check().Status = %v, attendu CONFORME", checkResp.GetStatus())
+	if checkResp.GetStatus() != modulev1.CheckResult_STATUS_A_FAIRE {
+		t.Fatalf("Check().Status = %v, attendu A_FAIRE (pas encore amorcé)", checkResp.GetStatus())
+	}
+
+	seedToken := registry.OpenSession(client.Broker(), "coredns", []string{"core.container/v1"})
+	seedUpResp, err := client.Module().SeedUp(ctx, &modulev1.StepRequest{RunId: "test", BrokerToken: seedToken})
+	if err != nil {
+		t.Fatalf("SeedUp : %v", err)
+	}
+	if seedUpResp.GetStatus() != modulev1.StepResult_STATUS_OK {
+		t.Fatalf("SeedUp().Status = %v", seedUpResp.GetStatus())
 	}
 
 	conn, err := client.DispenseFunction("dns.zone/v1")
