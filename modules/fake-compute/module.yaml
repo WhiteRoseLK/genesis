@@ -1,7 +1,7 @@
 apiVersion: genesis/module/v1
 name: fake-compute
 version: 0.1.0
-description: "fournit compute.vm/v1 en registre memoire, pour tester le coeur et les modules de service sans hyperviseur (docs/07-modules-mvp.md)"
+description: "fournit compute.vm/v1 via de vrais conteneurs SSH sur la graine, pour tester le coeur et les modules de service sans hyperviseur (docs/07-modules-mvp.md)"
 layer: platform
 core: ">=0.1.0 <0.2.0"
 protocol: 1
@@ -12,7 +12,9 @@ provides:
   - function: compute.vm/v1
     phases: [target]
 
-requires: {}
+requires:
+  target:
+    - function: core.container/v1
 
 config_schema: schema.json
 

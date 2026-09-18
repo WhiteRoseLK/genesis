@@ -113,13 +113,18 @@ func (r *ContainerRuntime) Run(ctx context.Context, opts RunOptions) (*RunResult
 	return &RunResult{ExitCode: exitCode, Stdout: stdout.String(), Stderr: stderr.String()}, nil
 }
 
-// Stop arrête un conteneur détaché.
+// Stop arrête et supprime un conteneur détaché. "docker stop" seul ne
+// libère pas le nom du conteneur (bug trouvé en construisant J6 :
+// fake-compute.DeleteVM puis EnsureVM du même nom échouait avec "Conflict.
+// The container name ... is already in use") — Stop doit vraiment vouloir
+// dire "ce conteneur peut disparaître", pas juste "en pause" : rien
+// n'appelle Status après Stop pour vouloir l'inspecter encore.
 func (r *ContainerRuntime) Stop(ctx context.Context, containerID string) error {
-	cmd := exec.CommandContext(ctx, r.binary, "stop", containerID)
+	cmd := exec.CommandContext(ctx, r.binary, "rm", "-f", containerID)
 	var stderr bytes.Buffer
 	cmd.Stderr = &stderr
 	if err := cmd.Run(); err != nil {
-		return fmt.Errorf("%s stop %s : %w\n%s", r.binary, containerID, err, stderr.String())
+		return fmt.Errorf("%s rm -f %s : %w\n%s", r.binary, containerID, err, stderr.String())
 	}
 	return nil
 }

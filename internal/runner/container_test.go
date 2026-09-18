@@ -85,12 +85,10 @@ func TestRunDetachedStopAndStatus(t *testing.T) {
 	if err := rt.Stop(ctx, result.ContainerID); err != nil {
 		t.Fatalf("Stop : %v", err)
 	}
-	state, _, err = rt.Status(ctx, result.ContainerID)
-	if err != nil {
-		t.Fatalf("Status après Stop : %v", err)
-	}
-	if state == "running" {
-		t.Errorf("state après Stop = %q, ne devrait plus être running", state)
+	// Stop supprime le conteneur (pas juste un arrêt réversible) : Status
+	// dessus ensuite doit échouer, il n'existe plus.
+	if _, _, err := rt.Status(ctx, result.ContainerID); err == nil {
+		t.Error("Status après Stop : succès inattendu, le conteneur devrait être supprimé")
 	}
 }
 
