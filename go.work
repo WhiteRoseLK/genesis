@@ -4,6 +4,7 @@ use (
 	.
 	./modules/base-os
 	./modules/fake-compute
+	./modules/proxmox
 	./sdk
 	./test/modules/panicking
 	./test/modules/test-a
