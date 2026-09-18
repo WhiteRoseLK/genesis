@@ -1,0 +1,22 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "required": ["endpoint", "node", "credentials"],
+  "additionalProperties": true,
+  "properties": {
+    "endpoint": { "type": "string", "minLength": 1 },
+    "node": { "type": "string", "minLength": 1 },
+    "storage": { "type": "string" },
+    "bridge": { "type": "string" },
+    "image": { "type": "string" },
+    "credentials": {
+      "type": "object",
+      "required": ["token_id_ref", "token_secret_ref"],
+      "additionalProperties": false,
+      "properties": {
+        "token_id_ref": { "type": "string", "pattern": "^(env|file|vault)://" },
+        "token_secret_ref": { "type": "string", "pattern": "^(env|file|vault)://" }
+      }
+    }
+  }
+}

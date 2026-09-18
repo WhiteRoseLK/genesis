@@ -20,6 +20,19 @@ type VM struct {
 	Template int    `json:"template,omitempty"` // 1 si c'est un template
 }
 
+// NextID demande au cluster un identifiant de VM libre.
+func (c *Client) NextID(ctx context.Context) (int, error) {
+	var idStr string
+	if err := c.do(ctx, http.MethodGet, "/cluster/nextid", nil, &idStr); err != nil {
+		return 0, err
+	}
+	id, err := strconv.Atoi(idStr)
+	if err != nil {
+		return 0, fmt.Errorf("identifiant inattendu depuis /cluster/nextid : %q", idStr)
+	}
+	return id, nil
+}
+
 // ListVMs liste les VM (et templates) du nœud.
 func (c *Client) ListVMs(ctx context.Context, node string) ([]VM, error) {
 	var vms []VM
