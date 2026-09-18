@@ -8,4 +8,5 @@ use (
 	./test/modules/test-a
 	./test/modules/test-b
 	./test/modules/test-c
+	./test/modules/test-d
 )
