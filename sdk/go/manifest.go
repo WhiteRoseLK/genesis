@@ -34,6 +34,10 @@ type ManifestFile struct {
 type FunctionRef struct {
 	Function string   `yaml:"function"`
 	Phases   []string `yaml:"phases"`
+	// Fleet : fonction « de parc » (docs/09-decisions.md ADR-017) — tous
+	// les fournisseurs installés sont appelés (diffusion), pas un seul
+	// fournisseur actif choisi/repointable comme le reste des fonctions.
+	Fleet bool `yaml:"fleet,omitempty"`
 }
 
 // RequireEntry est une fonction requise par le module. Le YAML accepte soit

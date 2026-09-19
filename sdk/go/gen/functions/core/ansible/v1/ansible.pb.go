@@ -32,8 +32,15 @@ type Target struct {
 	Port          int32                  `protobuf:"varint,2,opt,name=port,proto3" json:"port,omitempty"`
 	User          string                 `protobuf:"bytes,3,opt,name=user,proto3" json:"user,omitempty"`
 	SshPrivateKey string                 `protobuf:"bytes,4,opt,name=ssh_private_key,json=sshPrivateKey,proto3" json:"ssh_private_key,omitempty"` // clé privée OpenSSH, obtenue via core.secrets/v1
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	// ssh_certificate_pem : certificat OpenSSH signé (ex. par la CA Teleport,
+	// "tctl auth sign --format=openssh") accompagnant ssh_private_key —
+	// authentification par certificat plutôt que clé nue, sans rien changer
+	// au transport (SSH standard, docs/09-decisions.md ADR-018 : le service
+	// ssh_service de Teleport parle SSH standard sur son propre port, pas
+	// un protocole propriétaire).
+	SshCertificatePem string `protobuf:"bytes,5,opt,name=ssh_certificate_pem,json=sshCertificatePem,proto3" json:"ssh_certificate_pem,omitempty"`
+	unknownFields     protoimpl.UnknownFields
+	sizeCache         protoimpl.SizeCache
 }
 
 func (x *Target) Reset() {
@@ -90,6 +97,13 @@ func (x *Target) GetUser() string {
 func (x *Target) GetSshPrivateKey() string {
 	if x != nil {
 		return x.SshPrivateKey
+	}
+	return ""
+}
+
+func (x *Target) GetSshCertificatePem() string {
+	if x != nil {
+		return x.SshCertificatePem
 	}
 	return ""
 }
@@ -210,12 +224,13 @@ var File_functions_core_ansible_v1_ansible_proto protoreflect.FileDescriptor
 
 const file_functions_core_ansible_v1_ansible_proto_rawDesc = "" +
 	"\n" +
-	"'functions/core/ansible/v1/ansible.proto\x12\x19functions.core.ansible.v1\x1a\x1cgoogle/protobuf/struct.proto\"l\n" +
+	"'functions/core/ansible/v1/ansible.proto\x12\x19functions.core.ansible.v1\x1a\x1cgoogle/protobuf/struct.proto\"\x9c\x01\n" +
 	"\x06Target\x12\x12\n" +
 	"\x04host\x18\x01 \x01(\tR\x04host\x12\x12\n" +
 	"\x04port\x18\x02 \x01(\x05R\x04port\x12\x12\n" +
 	"\x04user\x18\x03 \x01(\tR\x04user\x12&\n" +
-	"\x0fssh_private_key\x18\x04 \x01(\tR\rsshPrivateKey\"\xa1\x01\n" +
+	"\x0fssh_private_key\x18\x04 \x01(\tR\rsshPrivateKey\x12.\n" +
+	"\x13ssh_certificate_pem\x18\x05 \x01(\tR\x11sshCertificatePem\"\xa1\x01\n" +
 	"\x12RunPlaybookRequest\x129\n" +
 	"\x06target\x18\x01 \x01(\v2!.functions.core.ansible.v1.TargetR\x06target\x12#\n" +
 	"\rplaybook_yaml\x18\x02 \x01(\fR\fplaybookYaml\x12+\n" +

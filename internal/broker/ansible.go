@@ -59,6 +59,16 @@ func (a *ansibleServer) RunPlaybook(ctx context.Context, req *ansiblev1.RunPlayb
 	if err := os.WriteFile(keyPath, []byte(target.GetSshPrivateKey()), 0o644); err != nil {
 		return nil, fmt.Errorf("écriture de la clé privée : %w", err)
 	}
+	// ssh_certificate_pem (ADR-018) : authentification par certificat (ex.
+	// signé par la CA Teleport) plutôt que par la seule clé nue — le nom
+	// "<clé>-cert.pub" est la convention qu'OpenSSH reconnaît
+	// automatiquement à côté de la clé privée, aucune option
+	// supplémentaire nécessaire côté client.
+	if cert := target.GetSshCertificatePem(); cert != "" {
+		if err := os.WriteFile(keyPath+"-cert.pub", []byte(cert), 0o644); err != nil {
+			return nil, fmt.Errorf("écriture du certificat SSH : %w", err)
+		}
+	}
 
 	inventory := fmt.Sprintf(
 		"target ansible_host=%s ansible_port=%d ansible_user=%s ansible_ssh_private_key_file=/work/id_target ansible_ssh_common_args='-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null'\n",

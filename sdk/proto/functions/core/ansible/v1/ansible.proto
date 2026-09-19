@@ -18,6 +18,13 @@ message Target {
   int32 port = 2;
   string user = 3;
   string ssh_private_key = 4; // clé privée OpenSSH, obtenue via core.secrets/v1
+  // ssh_certificate_pem : certificat OpenSSH signé (ex. par la CA Teleport,
+  // "tctl auth sign --format=openssh") accompagnant ssh_private_key —
+  // authentification par certificat plutôt que clé nue, sans rien changer
+  // au transport (SSH standard, docs/09-decisions.md ADR-018 : le service
+  // ssh_service de Teleport parle SSH standard sur son propre port, pas
+  // un protocole propriétaire).
+  string ssh_certificate_pem = 5;
 }
 
 message RunPlaybookRequest {
