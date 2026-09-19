@@ -9,7 +9,7 @@
 | J4 — Résolveur, broker, planificateur, moteur | fait | |
 | J5 — proxmox, base-os | fait (partiel, voir notes) | Harden (durcissement pur) différé à une itération future, décision utilisateur |
 | J6 — chrony, coredns, powerdns | fait | |
-| J7 — step-ca, vault | à faire | |
+| J7 — step-ca, vault | fait | |
 | J8 — openssh-bastion, retrait graine | à faire | |
 | J9 — Durcissement, preuve d'extensibilité | à faire | |
 
@@ -184,17 +184,49 @@ Premier jalon à exercer une vraie passation multi-module (docs/05-cycle-bootstr
 
 **Prochaine étape** : J7 — Modules `step-ca`, `vault` (doc 07).
 
+### 2026-09-19 — J7 Modules `step-ca`, `vault`
+Le jalon le plus lourd du projet à ce jour, découpé en deux étapes validées séparément par l'utilisateur (step-ca d'abord, point d'étape, puis vault). Premier jalon à exercer une vraie hiérarchie PKI (racine → intermédiaire → intermédiaire tiers) et une migration de secrets orchestrée par le cœur.
+
+**Fait**
+- `modules/step-ca` : `pki.issuer/v1` en phase graine — `IssueCert`/`SignCSR`/`CAChain` pilotent réellement le CLI `step` du conteneur `smallstep/step-ca` (mode local/hors-ligne : `step certificate create`/`sign`, pas de serveur réseau détaché — évite toute la complexité TLS/DNS/provisioners du mode API, non nécessaire tant que rien ne consomme l'API HTTP de step-ca elle-même). `SignSSH` : stub `Unimplemented` explicite, différé à `openssh-bastion` (J8), même méthode que `Harden` dans `base-os` (J5).
+- **Bug réel trouvé en préparant vault** : la racine step-ca par défaut (`--profile root-ca`, pathlen:1) ne permet de signer qu'un seul niveau d'intermédiaire — insuffisant pour que `vault` obtienne son propre `pki_int` (un intermédiaire de plus dans la chaîne) signé par step-ca. Corrigé : racine générée via template (`--template`, seul moyen de fixer `maxPathLen` sur une racine auto-signée) avec `maxPathLen: 2` ; `SignCSRRequest` gagne `is_ca`/`path_len_constraint` (ajout additif) pour demander un intermédiaire plutôt qu'une feuille.
+- `modules/vault` : `pki.issuer/v1` + `secrets.kv/v1` en phase cible — Raft mono-nœud, TLS initial via `pki.issuer/v1@seed` (step-ca signe le certificat serveur de vault), `pki_int` signé par step-ca (exactement le scénario du bug ci-dessus), KV v2, AppRole `genesis`. `api.go` parle directement à l'API REST de Vault (même principe que `modules/powerdns/api.go`, `modules/proxmox/proxmoxapi`).
+- `Handover` (vault) : réémet son propre certificat TLS via son propre `pki_int` (pas celui de step-ca), redéploie, révoque le root token (docs07).
+- Mécanisme de **migration `file` → `vault`** construit dans `internal/engine` (`migrateSecretsIfNeeded`) : dès que le module choisi pour la capacité `secrets` fournit `secrets.kv/v1` et devient `target_ready`, chaque secret non-`recovery` est copié, vérifié par relecture, puis `state.SecretsBackend` bascule — ce n'est pas un handover de fonction classique (`secrets.kv/v1` n'a pas de fournisseur graine à reprendre, c'est `core.secrets/v1`, natif, qui change de backend), donc un déclencheur séparé de `handoverSeedModules`/`repoint` (J6). Prouvé génériquement avec un nouveau fixture `test-kv` (KV en mémoire), comme `test-e`/`test-f` pour la passation croisée.
+- Nouveau proto `secrets.kv/v1` (`Read`/`Write`/`List`) + forwarder broker ; forwarder `pki.issuer/v1` ajouté.
+- `step-ca` testé contre le vrai conteneur (émission + signature de CSR réelles, chaîne vérifiée cryptographiquement jusqu'à la racine, idempotence prouvée à travers un redémarrage du module, et signature d'un intermédiaire tiers capable de signer sa propre feuille — le scénario exact dont `vault` a besoin).
+- `vault` testé contre un vrai conteneur `hashicorp/vault` et un vrai `step-ca` : Vault a besoin d'un vrai systemd+apt Debian pour son installation réelle (contrairement à chrony/coredns/powerdns, hors de portée des conteneurs Alpine de `fake-compute`) — le faux `core.ansible/v1` du test pilote donc directement Docker avec les VRAIES variables (certificats, `role_id`/`secret_id`) que le module lui transmet, pour exercer pour de vrai tout le reste (init, unseal, `pki_int`, KV, AppRole, Handover, Verify).
+- **Quatre bugs réels supplémentaires trouvés en testant `vault` contre un vrai serveur** : délai d'élection Raft après descellement même mono-nœud (« local node not active ») ; policy AppRole sans accès à `pki_int/issue` (`IssueCert` échouait en 403 avec le token AppRole, seulement testé jusque-là avec le root token) ; SAN IP envoyé dans `alt_names` (DNS) au lieu de `ip_sans` (silencieusement ignoré par Vault) ; durée de l'intermédiaire et des feuilles confondues (un émetteur ne peut jamais signer un certificat expirant après lui-même) ; redescellement nécessaire après chaque redémarrage du service (le scellement Vault est toujours en mémoire, jamais persistant, y compris pendant `Handover`).
+
+**Décisions**
+- Découpage explicite demandé par l'utilisateur : step-ca complètement construit et testé avant de commencer vault, avec point d'étape entre les deux — contrairement à J6 où chrony/coredns/powerdns avaient été enchaînés sans repasser par l'utilisateur.
+- Vault reste **un seul module** portant toutes ses fonctionnalités (PKI intermédiaire, KV, AppRole) — décision explicite de l'utilisateur, pas éclaté en plusieurs modules.
+- step-ca pilote le **vrai produit** smallstep/step-ca en conteneur (pas une réimplémentation Go de `crypto/x509`) — décision explicite de l'utilisateur, cohérente avec le reste du projet (coredns/chrony/powerdns pilotent aussi de vrais produits).
+- Signature des certificats en mode **local/hors-ligne** (`step certificate sign`, pas `step ca sign` réseau) : évite entièrement la complexité de bootstrap TLS/fingerprint/provisioner du mode serveur de step-ca, qu'aucun consommateur n'exige à ce jalon.
+
+**Dette**
+- Aucun renouvellement automatique planifié pour l'intermédiaire step-ca ni les certificats TLS de vault — seulement régénérés/réémis au prochain appel qui les trouve expirés (ou proches de l'expiration pour l'intermédiaire step-ca).
+- `secrets.kv/v1.List` (vault) : stub `Unimplemented` — LIST v2 KV nécessite une méthode HTTP non standard, pas encore de consommateur réel (la migration écrit/relit par ref connue, ne liste jamais).
+- La policy AppRole `genesis` n'est écrite qu'une fois (idempotent via la présence de `role_id`/`secret_id` stockés) : si son contenu doit évoluer plus tard, rien ne la réécrit automatiquement sur un vault déjà configuré.
+- Migration `file` → `vault` prouvée génériquement (`test-kv`) mais jamais exécutée en bout en bout avec le vrai module `vault` dans un run `internal/engine.Run()` complet — périmètre explicite de J9.
+- Mise à jour de la note J6 : `vault` a maintenant été construit et ne souffre pas du problème de cache de jeton de session identifié alors (aucune fonction sujette à repoint n'est consommée après son propre `Check`) — la vigilance reste nécessaire pour `openssh-bastion` (J8).
+
+**Prochaine étape** : J8 — Module `openssh-bastion` et retrait de la graine (doc 07).
+
 ## Dette technique connue
 - Clé maîtresse en fichier local (ADR-007)
 - Profil connected uniquement (ADR-008)
 - Vérification des licences des dépendances non implémentée en CI (J0, reportée à la demande utilisateur)
 - `internal/engine` rejoue le groupe d'étapes complet d'un module non conforme plutôt que reprendre à la RPC exacte en échec (J4, sûr par idempotence mais moins granulaire)
-- Passation multi-module (Handover/SeedDown croisé, clé de registre repointée) **construite en J6** ; migration des secrets file→vault reste à faire (J7).
+- Passation multi-module (Handover/SeedDown croisé, clé de registre repointée) **construite en J6** ; migration des secrets file→vault **construite en J7** (prouvée génériquement, jamais exécutée en bout en bout avec le vrai module vault).
 - `Harden` (base-os) : durcissement pur (SSH, nftables) différé à une itération future, décision utilisateur (J5)
 - `EnsureImage` (proxmox) : pas de téléchargement/conversion automatique de template Proxmox, template pré-existant supposé (J5 → à construire quand validable contre un vrai cluster)
 - Allocation d'IP depuis le pool réseau (doc04) non construite : IP fournie par l'appelant, pas allouée par le cœur (J5)
 - `proxmox`/`base-os` jamais exécutés contre une vraie infrastructure (pas d'accès Proxmox), uniquement fixtures et conteneurs jetables (J5)
 - `coredns`/`powerdns` : paramètres de connexion (`dns.zone/v1`) en mémoire dans le process du module, non transmis via `StepResult.state` (J6)
 - Pas de dérivation automatique de zone inverse/PTR dans `dns.zone/v1` (J6)
-- `Repoint(RepointRequest)` explicite non câblé côté cœur ; `chrony`/`coredns`/`base-os` mettent en cache leur jeton de session depuis leur premier `Check` plutôt que de redialer à chaque appel (`req.GetBrokerToken()`, schéma idiomatique de `test-b`/`test-f`) — sans conséquence tant qu'aucun ne consomme une fonction sujette à passation après son propre `Check`, à corriger avant `vault`/`openssh-bastion` (J7/J8)
-- Aucun test multi-module réel de bout en bout (coredns+chrony+powerdns+fake-compute+base-os ensemble via `internal/engine.Run()`) — périmètre explicite de J9
+- `Repoint(RepointRequest)` explicite non câblé côté cœur ; `chrony`/`coredns`/`base-os`/`step-ca`/`vault` mettent en cache leur jeton de session depuis leur premier `Check` plutôt que de redialer à chaque appel (`req.GetBrokerToken()`, schéma idiomatique de `test-b`/`test-f`) — sans conséquence tant qu'aucun ne consomme une fonction sujette à passation après son propre `Check` (vérifié pour vault en J7), à corriger avant `openssh-bastion` (J8)
+- Aucun test multi-module réel de bout en bout (coredns+chrony+powerdns+fake-compute+base-os+step-ca+vault ensemble via `internal/engine.Run()`) — périmètre explicite de J9
+- `pki.issuer/v1.SignSSH` (step-ca, vault) : stub `Unimplemented`, différé à `openssh-bastion` (J8) qui sera le premier consommateur réel (J7)
+- `secrets.kv/v1.List` (vault) : stub `Unimplemented`, pas de méthode LIST v2 KV standard, aucun consommateur réel (J7)
+- Aucun renouvellement automatique de certificat planifié (intermédiaire step-ca 30 jours, TLS vault) : régénéré/réémis seulement quand un appel le découvre expiré ou proche de l'expiration (J7)
