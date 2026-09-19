@@ -1,0 +1,99 @@
+---
+# Configure (functions/pki/issuer/v1 + secrets/kv/v1, module vault) :
+# installe Vault (Raft mono-noeud, TLS) — image cloud Debian
+# (docs/01-vision-perimetre.md), depot APT officiel HashiCorp. Rejoue sans
+# risque pendant Handover pour redeployer un nouveau certificat TLS (les
+# tasks apt sont idempotentes, seul le TLS/redemarrage change).
+- hosts: target
+  gather_facts: true
+  become: true
+  tasks:
+    - name: installer les prerequis
+      ansible.builtin.apt:
+        name: [gnupg, curl, unzip, ca-certificates, lsb-release]
+        state: present
+        update_cache: true
+
+    - name: ajouter la cle GPG HashiCorp
+      ansible.builtin.apt_key:
+        url: https://apt.releases.hashicorp.com/gpg
+        state: present
+
+    - name: ajouter le depot HashiCorp
+      ansible.builtin.apt_repository:
+        repo: "deb [arch=amd64] https://apt.releases.hashicorp.com {{ ansible_distribution_release | default('bookworm') }} main"
+        state: present
+        filename: hashicorp
+
+    - name: installer vault
+      ansible.builtin.apt:
+        name: vault
+        state: present
+        update_cache: true
+
+    - name: creer le repertoire TLS
+      ansible.builtin.file:
+        path: /etc/vault.d/tls
+        state: directory
+        owner: vault
+        group: bin
+        mode: "0750"
+
+    - name: deposer le certificat TLS (feuille + chaine)
+      ansible.builtin.copy:
+        content: "{{ tls_cert_pem }}"
+        dest: /etc/vault.d/tls/vault-cert.pem
+        owner: vault
+        group: bin
+        mode: "0640"
+      register: tls_cert
+
+    - name: deposer la cle privee TLS
+      ansible.builtin.copy:
+        content: "{{ tls_key_pem }}"
+        dest: /etc/vault.d/tls/vault-key.pem
+        owner: vault
+        group: bin
+        mode: "0640"
+      register: tls_key
+
+    - name: creer le repertoire de donnees raft
+      ansible.builtin.file:
+        path: /opt/vault/data
+        state: directory
+        owner: vault
+        group: bin
+        mode: "0750"
+
+    - name: configurer vault.hcl
+      ansible.builtin.copy:
+        content: |
+          storage "raft" {
+            path = "/opt/vault/data"
+            node_id = "genesis-vault-1"
+          }
+          listener "tcp" {
+            address = "0.0.0.0:8200"
+            tls_cert_file = "/etc/vault.d/tls/vault-cert.pem"
+            tls_key_file = "/etc/vault.d/tls/vault-key.pem"
+          }
+          api_addr = "https://{{ vm_ip }}:8200"
+          cluster_addr = "https://{{ vm_ip }}:8201"
+          disable_mlock = true
+        dest: /etc/vault.d/vault.hcl
+        owner: vault
+        group: bin
+        mode: "0640"
+      register: vault_conf
+
+    - name: activer et redemarrer vault si la configuration a change
+      ansible.builtin.systemd:
+        name: vault
+        enabled: true
+        state: restarted
+      when: tls_cert.changed or tls_key.changed or vault_conf.changed
+
+    - name: s'assurer que vault tourne
+      ansible.builtin.systemd:
+        name: vault
+        state: started

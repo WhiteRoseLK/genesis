@@ -1,0 +1,61 @@
+---
+# Verify (functions/pki/issuer/v1 + secrets/kv/v1, module vault) : exécuté
+# sur une VM tierce jetable — émission + validation de chaîne, lecture KV
+# via AppRole, pas le root token (docs/07-modules-mvp.md,
+# docs/03-contrat-module.md règle 2).
+- hosts: target
+  gather_facts: false
+  become: true
+  tasks:
+    - name: installer les outils de vérification
+      ansible.builtin.apt:
+        name: [curl, python3, ca-certificates]
+        state: present
+        update_cache: true
+
+    - name: déposer la racine step-ca (pour vérifier la chaîne TLS et PKI)
+      ansible.builtin.copy:
+        content: "{{ root_ca_pem }}"
+        dest: /tmp/root_ca.pem
+        mode: "0644"
+
+    - name: déposer le script de vérification
+      ansible.builtin.copy:
+        content: |
+          #!/bin/sh
+          set -e
+          TOKEN=$(curl -sf --cacert /tmp/root_ca.pem -X POST \
+            -d "{\"role_id\":\"{{ role_id }}\",\"secret_id\":\"{{ secret_id }}\"}" \
+            "{{ vault_addr }}/v1/auth/approle/login" \
+            | python3 -c 'import json,sys; print(json.load(sys.stdin)["auth"]["client_token"])')
+
+          ISSUE=$(curl -sf --cacert /tmp/root_ca.pem -X POST \
+            -H "X-Vault-Token: $TOKEN" \
+            -d '{"common_name":"{{ probe_common_name }}"}' \
+            "{{ vault_addr }}/v1/{{ pki_mount }}/issue/{{ pki_role }}")
+          echo "$ISSUE" | python3 -c 'import json,sys; d=json.load(sys.stdin)["data"]; print(d["certificate"]); print(d["issuing_ca"])' > /tmp/issued_chain.pem
+          cat /tmp/root_ca.pem >> /tmp/issued_chain.pem
+          openssl verify -partial_chain -CAfile /tmp/root_ca.pem -untrusted /tmp/issued_chain.pem /tmp/issued_chain.pem \
+            || (echo "CHAIN_INVALID"; exit 1)
+          echo "CHAIN_OK"
+
+          curl -sf --cacert /tmp/root_ca.pem -X POST \
+            -H "X-Vault-Token: $TOKEN" \
+            -d '{"data":{"value":"{{ kv_test_value }}"}}' \
+            "{{ vault_addr }}/v1/{{ kv_mount }}/data/{{ kv_test_path }}" >/dev/null
+
+          READ_VALUE=$(curl -sf --cacert /tmp/root_ca.pem -H "X-Vault-Token: $TOKEN" \
+            "{{ vault_addr }}/v1/{{ kv_mount }}/data/{{ kv_test_path }}" \
+            | python3 -c 'import json,sys; print(json.load(sys.stdin)["data"]["data"]["value"])')
+          echo "KV_VALUE=$READ_VALUE"
+        dest: /tmp/check_vault.sh
+        mode: "0755"
+
+    - name: exécuter la vérification
+      ansible.builtin.command: sh /tmp/check_vault.sh
+      register: check
+      changed_when: false
+
+    - name: afficher le résultat
+      ansible.builtin.debug:
+        var: check.stdout

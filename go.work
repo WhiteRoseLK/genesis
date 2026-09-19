@@ -9,6 +9,7 @@ use (
 	./modules/powerdns
 	./modules/proxmox
 	./modules/step-ca
+	./modules/vault
 	./sdk
 	./test/modules/panicking
 	./test/modules/test-a
