@@ -26,6 +26,15 @@ message SignCSRRequest {
   string csr_pem = 1;
   int64 ttl_seconds = 2; // 0 : durée par défaut du fournisseur
   map<string, string> extra = 3;
+  // is_ca : signe le CSR comme certificat intermédiaire (CA) plutôt que
+  // feuille — nécessaire pour qu'un autre pki.issuer/v1 (ex. vault) obtienne
+  // son propre intermédiaire signé par celui-ci (docs/07-modules-mvp.md :
+  // "pki_int signé par la racine").
+  bool is_ca = 4;
+  // path_len_constraint : profondeur d'intermédiaires supplémentaires que
+  // le certificat émis pourra lui-même signer (0 : uniquement des feuilles).
+  // Ignoré si is_ca est faux.
+  int32 path_len_constraint = 5;
 }
 
 // Certificate : private_key_pem n'est renseigné que par IssueCert (le

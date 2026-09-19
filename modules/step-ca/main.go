@@ -52,7 +52,31 @@ const (
 	// renouvellement planifié/périodique, seulement détecté au prochain
 	// appel — docs/PROGRESS.md).
 	expiryMargin = 24 * time.Hour
+	// intermediatePathLen : profondeur d'intermédiaires supplémentaires que
+	// l'intermédiaire graine de step-ca peut lui-même signer — 1, pour
+	// permettre à un pki.issuer/v1 tiers (ex. vault) d'obtenir SON propre
+	// intermédiaire (pathlen 0, feuilles uniquement) signé par celui-ci.
+	// La racine doit donc autoriser au moins 2 niveaux (elle → cet
+	// intermédiaire → l'intermédiaire du tiers), vérifié manuellement dans
+	// Docker : --profile root-ca (pathlen:1 par défaut) est insuffisant.
+	intermediatePathLen = 1
+	// notBeforeSkew : recule légèrement le début de validité de chaque
+	// certificat émis/signé, pour éviter une erreur "notBefore before
+	// signer's notBefore" côté consommateur (ex. Vault) quand son horloge
+	// ou son émission suit de quelques secondes la signature de son propre
+	// intermédiaire — observé manuellement, pratique standard PKI.
+	notBeforeSkew = "-1m"
 )
+
+// rootTemplate fixe maxPathLen sur la racine auto-signée — --template est
+// le seul moyen d'y parvenir (incompatible avec --profile root-ca, qui
+// impose pathlen:1).
+const rootTemplate = `{
+  "subject": {"commonName": "Genesis Root CA"},
+  "issuer": {"commonName": "Genesis Root CA"},
+  "keyUsage": ["certSign", "crlSign"],
+  "basicConstraints": {"isCA": true, "maxPathLen": 2}
+}`
 
 // pkiMaterial est le matériel PKI actif, mis en cache en mémoire une fois
 // chargé/généré — même dette que modules/coredns et modules/powerdns
@@ -301,10 +325,19 @@ func (m *stepCAModule) ensureRoot(ctx context.Context, password string) (certPEM
 	if err := writePasswordFile(dir, password); err != nil {
 		return "", "", err
 	}
+	// --profile root-ca (par défaut) pose pathlen:1 sur la racine, ce qui
+	// suffit pour signer UN intermédiaire mais pas pour qu'un pki.issuer/v1
+	// tiers (ex. vault) obtienne à son tour un intermédiaire signé par
+	// celui de step-ca — vérifié manuellement dans Docker avant d'écrire ce
+	// code. --template est le seul moyen de contrôler maxPathLen sur une
+	// racine auto-signée (incompatible avec --profile).
+	if err := os.WriteFile(filepath.Join(dir, "root.tpl"), []byte(rootTemplate), 0o644); err != nil {
+		return "", "", err
+	}
 
 	if _, _, err := m.runStep(ctx, dir, []string{
 		"step", "certificate", "create", "Genesis Root CA", "/pki/root_ca.crt", "/pki/root_ca_key",
-		"--profile", "root-ca", "--password-file", "/pki/password", "--force",
+		"--template", "/pki/root.tpl", "--password-file", "/pki/password", "--force",
 	}); err != nil {
 		return "", "", fmt.Errorf("génération de la CA racine : %w", err)
 	}
@@ -358,19 +391,29 @@ func (m *stepCAModule) ensureIntermediate(ctx context.Context, rootCert, rootKey
 	}
 
 	ttl := fmt.Sprintf("%dh", days*24)
+	// create --profile intermediate-ca ne permet pas de fixer pathlen (pas
+	// de flag --path-len sur `create`, seulement sur `sign`) : CSR généré
+	// séparément puis signé, pour que l'intermédiaire graine puisse à son
+	// tour signer l'intermédiaire d'un pki.issuer/v1 tiers (ex. vault) —
+	// vérifié manuellement dans Docker avant d'écrire ce code.
 	if _, _, err := m.runStep(ctx, dir, []string{
-		"step", "certificate", "create", "Genesis Root CA Intermediate", "/pki/intermediate_ca.crt", "/pki/intermediate_ca_key",
-		"--profile", "intermediate-ca",
-		"--ca", "/pki/root_ca.crt", "--ca-key", "/pki/root_ca_key", "--ca-password-file", "/pki/password",
-		"--password-file", "/pki/password", "--not-after", ttl, "--force",
+		"step", "certificate", "create", "Genesis Root CA Intermediate", "/pki/intermediate_ca.csr", "/pki/intermediate_ca_key",
+		"--csr", "--password-file", "/pki/password", "--force",
 	}); err != nil {
+		return "", "", fmt.Errorf("génération du CSR de l'intermédiaire : %w", err)
+	}
+	// step certificate sign n'a pas de fichier de sortie positionnel : le
+	// certificat signé sort sur stdout (vérifié manuellement, même
+	// comportement que pour SignCSR plus bas).
+	cert, _, err = m.runStep(ctx, dir, []string{
+		"step", "certificate", "sign", "--profile", "intermediate-ca",
+		fmt.Sprintf("--path-len=%d", intermediatePathLen), "--not-before", notBeforeSkew, "--not-after", ttl,
+		"/pki/intermediate_ca.csr", "/pki/root_ca.crt", "/pki/root_ca_key", "--password-file", "/pki/password",
+	})
+	if err != nil {
 		return "", "", fmt.Errorf("génération de l'intermédiaire : %w", err)
 	}
 
-	cert, err = m.catFile(ctx, dir, "intermediate_ca.crt")
-	if err != nil {
-		return "", "", err
-	}
 	key, err = m.catFile(ctx, dir, "intermediate_ca_key")
 	if err != nil {
 		return "", "", err
@@ -451,7 +494,7 @@ func (m *stepCAModule) IssueCert(ctx context.Context, req *pkiissuerv1.IssueCert
 
 	args := []string{
 		"step", "certificate", "create", req.GetCommonName(), "/pki/leaf.crt", "/pki/leaf.key",
-		"--profile", "leaf",
+		"--profile", "leaf", "--not-before", notBeforeSkew,
 		"--ca", "/pki/intermediate_ca.crt", "--ca-key", "/pki/intermediate_ca_key", "--ca-password-file", "/pki/password",
 		"--no-password", "--insecure", "--force",
 	}
@@ -497,7 +540,13 @@ func (m *stepCAModule) SignCSR(ctx context.Context, req *pkiissuerv1.SignCSRRequ
 
 	args := []string{
 		"step", "certificate", "sign", "/pki/csr.pem", "/pki/intermediate_ca.crt", "/pki/intermediate_ca_key",
-		"--password-file", "/pki/password", "--bundle",
+		"--password-file", "/pki/password", "--bundle", "--not-before", notBeforeSkew,
+	}
+	if req.GetIsCa() {
+		// Nécessaire pour qu'un pki.issuer/v1 tiers (ex. vault) obtienne
+		// son propre intermédiaire signé par celui-ci, plutôt qu'un
+		// certificat feuille (docs07 : "pki_int signé par la racine").
+		args = append(args, "--profile", "intermediate-ca", fmt.Sprintf("--path-len=%d", req.GetPathLenConstraint()))
 	}
 	args = append(args, durationFlag(req.GetTtlSeconds())...)
 	// step certificate sign n'a pas de fichier de sortie positionnel : le

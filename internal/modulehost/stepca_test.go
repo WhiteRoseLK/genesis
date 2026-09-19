@@ -10,6 +10,7 @@ import (
 	"crypto/x509"
 	"crypto/x509/pkix"
 	"encoding/pem"
+	"math/big"
 	"testing"
 
 	"genesis/internal/broker"
@@ -218,4 +219,72 @@ func TestStepCAReusesRootAcrossRestarts(t *testing.T) {
 	if firstChain.GetChainPem() != secondChain.GetChainPem() {
 		t.Error("la seconde instance de step-ca a régénéré une chaîne différente au lieu de réutiliser celle déjà stockée")
 	}
+}
+
+// TestStepCASignsThirdPartyIntermediate prouve le scénario exact dont
+// modules/vault (J7) aura besoin : SignCSR avec is_ca=true doit produire un
+// VRAI intermédiaire, capable de signer à son tour une feuille, avec une
+// chaîne complète (feuille tierce -> intermédiaire tiers -> intermédiaire
+// step-ca -> racine) valide jusqu'à la racine de step-ca
+// (docs/07-modules-mvp.md : "pki_int signé par la racine"). Ce chemin a
+// révélé un vrai bug (pathlen insuffisant sur la racine par défaut de
+// step-ca) découvert en validant manuellement le workflow Vault dans
+// Docker avant d'écrire modules/vault.
+func TestStepCASignsThirdPartyIntermediate(t *testing.T) {
+	pki := launchStepCA(t)
+	ctx := context.Background()
+
+	rootChain, err := pki.CAChain(ctx, &pkiissuerv1.Empty{})
+	if err != nil {
+		t.Fatalf("CAChain : %v", err)
+	}
+
+	// CSR d'un intermédiaire tiers (comme le ferait modules/vault pour
+	// pki_int/intermediate/generate/internal).
+	intKey, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	if err != nil {
+		t.Fatalf("génération de la clé de l'intermédiaire tiers : %v", err)
+	}
+	intCSRDER, err := x509.CreateCertificateRequest(rand.Reader, &x509.CertificateRequest{
+		Subject: pkix.Name{CommonName: "Third Party Intermediate"},
+	}, intKey)
+	if err != nil {
+		t.Fatalf("création du CSR de l'intermédiaire tiers : %v", err)
+	}
+	intCSRPEM := pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE REQUEST", Bytes: intCSRDER})
+
+	signedInt, err := pki.SignCSR(ctx, &pkiissuerv1.SignCSRRequest{
+		CsrPem: string(intCSRPEM), IsCa: true, PathLenConstraint: 0, TtlSeconds: 3600,
+	})
+	if err != nil {
+		t.Fatalf("SignCSR (is_ca=true) : %v", err)
+	}
+	intCert := parseCertPEM(t, signedInt.GetCertPem())
+	if !intCert.IsCA {
+		t.Fatal("SignCSR (is_ca=true) : le certificat obtenu n'est pas une CA")
+	}
+	verifyAgainstRoot(t, signedInt.GetChainPem(), rootChain.GetChainPem())
+
+	// L'intermédiaire tiers signe maintenant sa propre feuille, en Go pur —
+	// prouve que le certificat émis est un VRAI intermédiaire fonctionnel,
+	// pas seulement marqué CA:TRUE.
+	leafKey, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	if err != nil {
+		t.Fatalf("génération de la clé de la feuille : %v", err)
+	}
+	leafTemplate := &x509.Certificate{
+		SerialNumber: big.NewInt(1),
+		Subject:      pkix.Name{CommonName: "leaf-under-third-party.lab.internal"},
+		NotBefore:    intCert.NotBefore,
+		NotAfter:     intCert.NotAfter,
+		KeyUsage:     x509.KeyUsageDigitalSignature,
+	}
+	leafDER, err := x509.CreateCertificate(rand.Reader, leafTemplate, intCert, &leafKey.PublicKey, intKey)
+	if err != nil {
+		t.Fatalf("signature de la feuille par l'intermédiaire tiers : %v", err)
+	}
+	leafPEM := pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: leafDER})
+
+	fullChain := string(leafPEM) + signedInt.GetChainPem()
+	verifyAgainstRoot(t, fullChain, rootChain.GetChainPem())
 }

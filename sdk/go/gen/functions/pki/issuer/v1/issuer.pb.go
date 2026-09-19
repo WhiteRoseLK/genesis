@@ -129,12 +129,21 @@ func (x *IssueCertRequest) GetExtra() map[string]string {
 }
 
 type SignCSRRequest struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	CsrPem        string                 `protobuf:"bytes,1,opt,name=csr_pem,json=csrPem,proto3" json:"csr_pem,omitempty"`
-	TtlSeconds    int64                  `protobuf:"varint,2,opt,name=ttl_seconds,json=ttlSeconds,proto3" json:"ttl_seconds,omitempty"` // 0 : durée par défaut du fournisseur
-	Extra         map[string]string      `protobuf:"bytes,3,rep,name=extra,proto3" json:"extra,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	state      protoimpl.MessageState `protogen:"open.v1"`
+	CsrPem     string                 `protobuf:"bytes,1,opt,name=csr_pem,json=csrPem,proto3" json:"csr_pem,omitempty"`
+	TtlSeconds int64                  `protobuf:"varint,2,opt,name=ttl_seconds,json=ttlSeconds,proto3" json:"ttl_seconds,omitempty"` // 0 : durée par défaut du fournisseur
+	Extra      map[string]string      `protobuf:"bytes,3,rep,name=extra,proto3" json:"extra,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
+	// is_ca : signe le CSR comme certificat intermédiaire (CA) plutôt que
+	// feuille — nécessaire pour qu'un autre pki.issuer/v1 (ex. vault) obtienne
+	// son propre intermédiaire signé par celui-ci (docs/07-modules-mvp.md :
+	// "pki_int signé par la racine").
+	IsCa bool `protobuf:"varint,4,opt,name=is_ca,json=isCa,proto3" json:"is_ca,omitempty"`
+	// path_len_constraint : profondeur d'intermédiaires supplémentaires que
+	// le certificat émis pourra lui-même signer (0 : uniquement des feuilles).
+	// Ignoré si is_ca est faux.
+	PathLenConstraint int32 `protobuf:"varint,5,opt,name=path_len_constraint,json=pathLenConstraint,proto3" json:"path_len_constraint,omitempty"`
+	unknownFields     protoimpl.UnknownFields
+	sizeCache         protoimpl.SizeCache
 }
 
 func (x *SignCSRRequest) Reset() {
@@ -186,6 +195,20 @@ func (x *SignCSRRequest) GetExtra() map[string]string {
 		return x.Extra
 	}
 	return nil
+}
+
+func (x *SignCSRRequest) GetIsCa() bool {
+	if x != nil {
+		return x.IsCa
+	}
+	return false
+}
+
+func (x *SignCSRRequest) GetPathLenConstraint() int32 {
+	if x != nil {
+		return x.PathLenConstraint
+	}
+	return 0
 }
 
 // Certificate : private_key_pem n'est renseigné que par IssueCert (le
@@ -442,12 +465,14 @@ const file_functions_pki_issuer_v1_issuer_proto_rawDesc = "" +
 	"\n" +
 	"ExtraEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
-	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"\xce\x01\n" +
+	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"\x93\x02\n" +
 	"\x0eSignCSRRequest\x12\x17\n" +
 	"\acsr_pem\x18\x01 \x01(\tR\x06csrPem\x12\x1f\n" +
 	"\vttl_seconds\x18\x02 \x01(\x03R\n" +
 	"ttlSeconds\x12H\n" +
-	"\x05extra\x18\x03 \x03(\v22.functions.pki.issuer.v1.SignCSRRequest.ExtraEntryR\x05extra\x1a8\n" +
+	"\x05extra\x18\x03 \x03(\v22.functions.pki.issuer.v1.SignCSRRequest.ExtraEntryR\x05extra\x12\x13\n" +
+	"\x05is_ca\x18\x04 \x01(\bR\x04isCa\x12.\n" +
+	"\x13path_len_constraint\x18\x05 \x01(\x05R\x11pathLenConstraint\x1a8\n" +
 	"\n" +
 	"ExtraEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
