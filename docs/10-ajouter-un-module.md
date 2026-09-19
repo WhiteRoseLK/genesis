@@ -14,7 +14,7 @@ Objectif : prouver que l'architecture est extensible. **Ajouter un produit ne mo
 ## Exemple 1 — Remplacer PowerDNS par Bind
 - Module `bind` fournissant `dns.zone/v1` et `dns.resolver/v1`, `requires` : `compute.vm`, `os.base`, `dns.zone@seed`.
 - Spec : `dns: { module: bind }`.
-- Aucun changement dans `vault`, `openssh-bastion` ou le cœur : ils appellent `dns.zone/v1`, pas PowerDNS.
+- Aucun changement dans `vault`, `teleport` ou le cœur : ils appellent `dns.zone/v1`, pas PowerDNS.
 
 ## Exemple 2 — Ajouter GitLab (itération 2)
 - Module `gitlab`, capacité `scm`, fournit `scm.git/v1`.

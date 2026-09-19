@@ -44,8 +44,8 @@ Chaque module vit dans `modules/<nom>/` avec son `module.yaml`, son code, ses r�
 - **Handover** : bascule `pki.issuer`, réémission de son propre certificat, migration des secrets du backend fichiers (orchestrée par le cœur via `core.secrets`), révocation du token root.
 - **Verify** : émission et validation de chaîne depuis une VM tierce ; lecture KV via AppRole.
 
-## `openssh-bastion` (services)
-- **Fournit** : `access.ssh/v1`. **Requiert** : `compute.vm`, `os.base`, `pki.issuer` (SignSSH), `dns.zone`.
-- CA SSH utilisateur de Vault déployée en `TrustedUserCAKeys` ; SSH des VM limité à l'IP du bastion.
-- **Repoint** : le cœur bascule ses propres runners SSH en `ProxyJump` par le bastion.
-- **Verify** : connexion via bastion OK, directe refusée.
+## `teleport` (services, module « de parc »)
+- **Fournit** : `access.ssh/v1`, `fleet.agent/v1` (ADR-017 : fonction à fournisseurs multiples — plusieurs modules « de parc » peuvent coexister, tous appelés). **Requiert** : `compute.vm`, `os.base`, `pki.issuer` (certificat TLS du service Auth/Proxy), `dns.zone`.
+- Teleport (Auth + Proxy) déployé sur sa propre VM, avec sa propre CA interne pour les certificats SSH utilisateur et hôte (pas de délégation à `pki.issuer/v1` pour la signature SSH — mécanisme propre à Teleport). Agent Teleport installé sur **chaque** VM du parc : tout module qui provisionne une VM (`chrony`, `powerdns`, `vault`…) déclare `fleet.agent/v1` dans ses `requires` et l'appelle depuis `Configure`, comme il appelle déjà `os.base/v1` — c'est ce qui rend Teleport actif sur tout le parc dès sa présence dans la spec, sans qu'aucun module existant ne connaisse Teleport spécifiquement (doc02).
+- **Repoint** : le cœur bascule ses propres runners SSH (`core.ansible/v1`) pour passer par l'agent Teleport plutôt qu'un accès SSH direct.
+- **Verify** : connexion via l'agent Teleport OK, SSH direct refusé.

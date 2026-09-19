@@ -34,8 +34,8 @@ Implémenter dans l'ordre. Chaque jalon est livrable et testable seul.
 ## J7 — Modules `step-ca`, `vault`
 - **Accepté si** : `Verify` du doc 07 ; secrets non-`recovery` migrés vers Vault.
 
-## J8 — Module `openssh-bastion` et retrait de la graine
-- **Accepté si** : SSH direct refusé, via bastion OK ; après `seed retire`, environnement vert.
+## J8 — Module `teleport` et retrait de la graine
+- **Accepté si** : SSH direct refusé, via l'agent Teleport OK ; après `seed retire`, environnement vert.
 
 ## J9 — Durcissement et preuve d'extensibilité
 - Test e2e complet sur Proxmox (build tag `integration`), documentation utilisateur et guide module (doc 10).

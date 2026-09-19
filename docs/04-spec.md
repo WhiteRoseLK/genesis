@@ -53,7 +53,7 @@ capabilities:
   secrets:
     module: vault                # même module que pki → même instance
   bastion:
-    module: openssh-bastion
+    module: teleport
     config:
       allowed_users: [admin]
 

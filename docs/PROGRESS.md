@@ -10,7 +10,7 @@
 | J5 — proxmox, base-os | fait (partiel, voir notes) | Harden (durcissement pur) différé à une itération future, décision utilisateur |
 | J6 — chrony, coredns, powerdns | fait | |
 | J7 — step-ca, vault | fait | |
-| J8 — openssh-bastion, retrait graine | à faire | |
+| J8 — teleport, retrait graine | à faire | ADR-017 : teleport remplace le bastion OpenSSH prévu au doc07, module « de parc » (agent sur toutes les VM) |
 | J9 — Durcissement, preuve d'extensibilité | à faire | |
 
 ## Journal
@@ -211,7 +211,7 @@ Le jalon le plus lourd du projet à ce jour, découpé en deux étapes validées
 - Migration `file` → `vault` prouvée génériquement (`test-kv`) mais jamais exécutée en bout en bout avec le vrai module `vault` dans un run `internal/engine.Run()` complet — périmètre explicite de J9.
 - Mise à jour de la note J6 : `vault` a maintenant été construit et ne souffre pas du problème de cache de jeton de session identifié alors (aucune fonction sujette à repoint n'est consommée après son propre `Check`) — la vigilance reste nécessaire pour `openssh-bastion` (J8).
 
-**Prochaine étape** : J8 — Module `openssh-bastion` et retrait de la graine (doc 07).
+**Prochaine étape** : J8 — Module `teleport` et retrait de la graine (doc 07, ADR-017 : teleport remplace le bastion OpenSSH prévu initialement).
 
 ## Dette technique connue
 - Clé maîtresse en fichier local (ADR-007)
@@ -225,8 +225,8 @@ Le jalon le plus lourd du projet à ce jour, découpé en deux étapes validées
 - `proxmox`/`base-os` jamais exécutés contre une vraie infrastructure (pas d'accès Proxmox), uniquement fixtures et conteneurs jetables (J5)
 - `coredns`/`powerdns` : paramètres de connexion (`dns.zone/v1`) en mémoire dans le process du module, non transmis via `StepResult.state` (J6)
 - Pas de dérivation automatique de zone inverse/PTR dans `dns.zone/v1` (J6)
-- `Repoint(RepointRequest)` explicite non câblé côté cœur ; `chrony`/`coredns`/`base-os`/`step-ca`/`vault` mettent en cache leur jeton de session depuis leur premier `Check` plutôt que de redialer à chaque appel (`req.GetBrokerToken()`, schéma idiomatique de `test-b`/`test-f`) — sans conséquence tant qu'aucun ne consomme une fonction sujette à passation après son propre `Check` (vérifié pour vault en J7), à corriger avant `openssh-bastion` (J8)
+- `Repoint(RepointRequest)` explicite non câblé côté cœur ; `chrony`/`coredns`/`base-os`/`step-ca`/`vault` mettent en cache leur jeton de session depuis leur premier `Check` plutôt que de redialer à chaque appel (`req.GetBrokerToken()`, schéma idiomatique de `test-b`/`test-f`) — sans conséquence tant qu'aucun ne consomme une fonction sujette à passation après son propre `Check` (vérifié pour vault en J7), à corriger avant `teleport` (J8)
 - Aucun test multi-module réel de bout en bout (coredns+chrony+powerdns+fake-compute+base-os+step-ca+vault ensemble via `internal/engine.Run()`) — périmètre explicite de J9
-- `pki.issuer/v1.SignSSH` (step-ca, vault) : stub `Unimplemented`, différé à `openssh-bastion` (J8) qui sera le premier consommateur réel (J7)
+- `pki.issuer/v1.SignSSH` (step-ca, vault) : stub `Unimplemented` — devenu sans objet pour `teleport` (J8, ADR-017) qui a sa propre CA SSH interne, pas de délégation à `pki.issuer/v1` ; reste un stub tant qu'aucun consommateur réel n'existe
 - `secrets.kv/v1.List` (vault) : stub `Unimplemented`, pas de méthode LIST v2 KV standard, aucun consommateur réel (J7)
 - Aucun renouvellement automatique de certificat planifié (intermédiaire step-ca 30 jours, TLS vault) : régénéré/réémis seulement quand un appel le découvre expiré ou proche de l'expiration (J7)

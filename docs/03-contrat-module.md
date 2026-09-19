@@ -92,7 +92,8 @@ Fonctions de l'itération 1 :
 | `dns.resolver/v1` | Endpoint | `coredns` (seed), `powerdns` |
 | `pki.issuer/v1` | IssueCert, SignCSR, SignSSH, CAChain | `step-ca` (seed), `vault` |
 | `secrets.kv/v1` | Read, Write, List | `vault` |
-| `access.ssh/v1` | JumpHost, SignUserKey | `openssh-bastion` |
+| `access.ssh/v1` | JumpHost, SignUserKey | `teleport` |
+| `fleet.agent/v1` | Install(target) — fonction « de parc », tous les fournisseurs installés sont appelés (ADR-017), pas un seul fournisseur actif | `teleport` |
 
 Exemple de définition :
 

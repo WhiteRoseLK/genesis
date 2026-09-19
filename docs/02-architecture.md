@@ -14,6 +14,7 @@ Ajouter un produit (Bind au lieu de PowerDNS, Nutanix au lieu de Proxmox, GitLab
 | **Capacité** | Ce que l'utilisateur demande dans la spec ; se résout en une ou plusieurs fonctions | `dns` → `dns.zone` + `dns.resolver` |
 | **Module** | Implémentation packagée d'un produit : manifest + binaire plugin + assets | `powerdns`, `proxmox`, `vault` |
 | **Couche** | Étiquette d'affichage et de tri, **jamais une contrainte codée en dur** | `physical`, `platform`, `foundation`, `services` |
+| **Module de parc** | Module dont la fonction fournie a **plusieurs fournisseurs actifs simultanés**, tous appelés (par opposition au mode par défaut, un seul fournisseur actif) — sa présence dans la spec affecte alors toute VM du parc, pas une capacité choisie parmi plusieurs (ADR-017) | `teleport` (`fleet.agent/v1`) |
 
 L'ordre de construction découle **uniquement** des dépendances entre fonctions. C'est ce qui permet d'insérer plus tard la construction de l'hyperviseur « avant le reste » sans rien réécrire : un module qui fournit la plateforme devient simplement un prédécesseur dans le graphe.
 
@@ -35,7 +36,7 @@ flowchart TB
   HOST <-->|gRPC| M1[module proxmox<br/>fournit compute.vm]
   HOST <-->|gRPC| M2[module powerdns<br/>fournit dns.zone]
   HOST <-->|gRPC| M3[module vault<br/>fournit pki.issuer, secrets.kv]
-  HOST <-->|gRPC| M4[module openssh-bastion<br/>fournit access.ssh]
+  HOST <-->|gRPC| M4[module teleport<br/>fournit access.ssh, fleet.agent]
 ```
 
 ## Comment les modules interagissent
@@ -53,6 +54,9 @@ Le broker route l'appel vers le module qui fournit la fonction **à cet instant*
 - la passation graine → cible est transparente pour les consommateurs.
 
 Les secrets passent par le broker via la fonction intégrée `core.secrets/v1` (le cœur décide du backend : fichiers ou Vault).
+
+### Fonctions « de parc » (plusieurs fournisseurs simultanés)
+Le mode par défaut (`dns.zone`, `time.ntp`, `pki.issuer`…) route une fonction vers **un** fournisseur actif à la fois — c'est un choix exclusif entre produits concurrents, repointable lors d'une passation (doc05). Certaines fonctions n'ont pas cette sémantique : leur rôle est d'être appliquées à *toute* VM du parc, et plusieurs peuvent être actives en même temps (ex. `fleet.agent/v1`, fourni par `teleport` et, plus tard, un futur module de supervision/journalisation — ADR-017). Pour ces fonctions, déclarées « à fournisseurs multiples », le broker appelle **tous** les modules installés qui les fournissent, avec le `target` (VM, clé SSH de service) déjà connu de l'appelant — jamais de clé partagée entre modules. Chaque module qui provisionne une VM (`chrony`, `powerdns`, `vault`…) appelle ces fonctions depuis `Configure`, comme il appelle `os.base/v1`. Le projet construisant toujours une infrastructure entière de zéro (jamais un ajout après coup sur un parc déjà en production), le planificateur DAG classique suffit à garantir l'ordre : un module « de parc » est construit avant tout module qui en dépend, sans mécanisme réactif.
 
 ## Composants du cœur
 
@@ -77,7 +81,7 @@ Exécution, reprise, audit. Parallélisme autorisé plus tard entre branches ind
 - Vérification de l'empreinte SHA-256 de chaque module contre `genesis.lock`.
 
 ### Broker de fonctions (`internal/broker`)
-Registre `fonction → fournisseur actif`, routage des appels entre modules, contrôle d'accès : un module ne peut appeler **que les fonctions déclarées dans ses `requires`**, et ne peut lire **que ses propres secrets** et ceux explicitement partagés.
+Registre `fonction → fournisseur actif`, routage des appels entre modules, contrôle d'accès : un module ne peut appeler **que les fonctions déclarées dans ses `requires`**, et ne peut lire **que ses propres secrets** et ceux explicitement partagés. Deux modes de résolution : fournisseur actif unique (par défaut, repointable) et diffusion vers plusieurs fournisseurs simultanés (fonctions « de parc », voir plus haut, ADR-017).
 
 ### État, secrets, runners
 Inchangés (doc 06). Les runners sont exposés aux modules comme fonctions intégrées : `core.ansible/v1`, `core.container/v1`, `core.ssh/v1`. Un module n'a donc pas besoin d'embarquer Ansible ou un client SSH.
@@ -101,7 +105,7 @@ modules/                      chaque module = go.mod propre + binaire propre
     module.yaml
     main.go
     assets/
-  powerdns/  coredns/  chrony/  vault/  step-ca/  openssh-bastion/  base-os/
+  powerdns/  coredns/  chrony/  vault/  step-ca/  teleport/  base-os/
   fake-compute/               module de test
 docs/
 test/e2e/
