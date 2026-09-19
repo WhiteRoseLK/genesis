@@ -47,6 +47,7 @@ import (
 	"genesis/internal/secrets"
 	"genesis/internal/state"
 	sdk "genesis/sdk/go"
+	secretskvv1 "genesis/sdk/go/gen/functions/secrets/kv/v1"
 	modulev1 "genesis/sdk/go/gen/module/v1"
 )
 
@@ -63,6 +64,10 @@ type Engine struct {
 	Registry *broker.Registry
 	StateDir string
 	Logger   *slog.Logger
+	// Secrets : accès direct (pas seulement via core.secrets/v1) pour la
+	// migration file->vault (docs/06-secrets-etat.md) — seul le cœur peut
+	// lister TOUTES les entrées, un module n'accède qu'aux siennes.
+	Secrets secrets.Store
 }
 
 // New construit un moteur : registre du broker avec core.secrets/v1 déjà
@@ -70,7 +75,7 @@ type Engine struct {
 func New(stateDir string, secretsStore secrets.Store) *Engine {
 	registry := broker.NewRegistry()
 	registry.SetNative("core.secrets/v1", broker.NativeSecrets(secretsStore))
-	return &Engine{Registry: registry, StateDir: stateDir, Logger: slog.Default()}
+	return &Engine{Registry: registry, StateDir: stateDir, Logger: slog.Default(), Secrets: secretsStore}
 }
 
 // Run exécute plan dans l'ordre, avec le verrou d'état
@@ -215,6 +220,10 @@ func (e *Engine) runModule(
 		return err
 	}
 
+	if err := e.migrateSecretsIfNeeded(ctx, resolved, m, client, st); err != nil {
+		return err
+	}
+
 	seedModules := handoverSeedModules(resolved, m)
 	if len(seedModules) == 0 {
 		return nil // target_ready -> done : pas de passation (docs/03 §5).
@@ -277,6 +286,76 @@ func (e *Engine) repoint(resolved *resolver.Resolved, m *resolver.Module, provid
 			e.Registry.SetModuleProvider(p.Function, pc.conn, pc.register)
 		}
 	}
+}
+
+// migrateSecretsIfNeeded implémente docs/06-secrets-etat.md : "Migration
+// file -> vault, déclenchée par la passation de la capacité secrets" — ce
+// n'est PAS un handover de fonction classique (secrets.kv/v1 n'a pas de
+// fournisseur graine à reprendre, c'est core.secrets/v1, natif, qui change
+// de backend), donc pas couvert par handoverSeedModules/repoint : dès que
+// le module choisi pour la capacité "secrets" fournit secrets.kv/v1 en
+// cible et vient de passer Provision/Configure/Verify, chaque secret non
+// `recovery` du backend file est copié, vérifié par relecture, puis le
+// backend actif bascule dans l'état.
+func (e *Engine) migrateSecretsIfNeeded(ctx context.Context, resolved *resolver.Resolved, m *resolver.Module, client *modulehost.Client, st *state.State) error {
+	if resolved.CapabilityModule["secrets"] != m.Name {
+		return nil
+	}
+	if !providesFunction(m, "secrets.kv/v1") {
+		return nil
+	}
+	if st.SecretsBackend == "vault" {
+		return nil // déjà migré (idempotent).
+	}
+
+	conn, err := client.DispenseFunction("secrets.kv/v1")
+	if err != nil {
+		return fmt.Errorf("migration des secrets vers %q : %w", m.Name, err)
+	}
+	kv := secretskvv1.NewSecretsKVClient(conn)
+
+	entries, err := e.Secrets.List(ctx, "")
+	if err != nil {
+		return fmt.Errorf("migration des secrets : liste du backend file : %w", err)
+	}
+
+	migrated := 0
+	for _, entry := range entries {
+		if entry.Meta.Recovery {
+			continue // docs06 : "Les entrées Recovery: true restent dans file".
+		}
+		value, err := e.Secrets.Get(ctx, entry.Ref)
+		if err != nil {
+			return fmt.Errorf("migration de %q : lecture file : %w", entry.Ref, err)
+		}
+		if _, err := kv.Write(ctx, &secretskvv1.WriteRequest{Ref: string(entry.Ref), Value: value.ExposeSecret()}); err != nil {
+			return fmt.Errorf("migration de %q : écriture vault : %w", entry.Ref, err)
+		}
+		readBack, err := kv.Read(ctx, &secretskvv1.ReadRequest{Ref: string(entry.Ref)})
+		if err != nil {
+			return fmt.Errorf("migration de %q : relecture vault : %w", entry.Ref, err)
+		}
+		if !readBack.GetFound() || readBack.GetValue() != value.ExposeSecret() {
+			return fmt.Errorf("migration de %q : relecture vault ne correspond pas à la valeur écrite", entry.Ref)
+		}
+		migrated++
+	}
+
+	st.SecretsBackend = "vault"
+	if err := state.Save(e.StateDir, st); err != nil {
+		return fmt.Errorf("persistance du backend de secrets après migration : %w", err)
+	}
+	e.audit(m.Name, "secrets.migrate", fmt.Sprintf("%d entrée(s) migrée(s) vers vault", migrated))
+	return nil
+}
+
+func providesFunction(m *resolver.Module, function string) bool {
+	for _, p := range m.Manifest.Provides {
+		if p.Function == function {
+			return true
+		}
+	}
+	return false
 }
 
 func (e *Engine) action(

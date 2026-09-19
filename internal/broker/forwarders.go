@@ -19,6 +19,7 @@ var knownForwarders = map[string]func(*grpc.Server, *grpc.ClientConn){
 	"dns.resolver/v1": ForwardDNSResolver,
 	"time.ntp/v1":     ForwardTimeNTP,
 	"pki.issuer/v1":   ForwardPkiIssuer,
+	"secrets.kv/v1":   ForwardSecretsKV,
 }
 
 // ForwarderFor retourne le forwarder à utiliser pour function fournie par un

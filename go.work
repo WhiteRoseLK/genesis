@@ -17,4 +17,5 @@ use (
 	./test/modules/test-d
 	./test/modules/test-e
 	./test/modules/test-f
+	./test/modules/test-kv
 )
