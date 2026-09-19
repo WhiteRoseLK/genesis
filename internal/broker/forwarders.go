@@ -34,3 +34,16 @@ func ForwarderFor(function string) (func(*grpc.Server, *grpc.ClientConn), bool) 
 	}
 	return nil, false
 }
+
+// knownFleetForwarders associe chaque fonction « de parc » (ADR-017) à son
+// forwarder fan-out (une connexion par fournisseur installé, tous appelés).
+var knownFleetForwarders = map[string]func(*grpc.Server, []*grpc.ClientConn){
+	"fleet.agent/v1": ForwardFleetAgent,
+}
+
+// fleetForwarderFor retourne le forwarder fan-out à utiliser pour une
+// fonction « de parc ».
+func fleetForwarderFor(function string) (func(*grpc.Server, []*grpc.ClientConn), bool) {
+	f, ok := knownFleetForwarders[function]
+	return f, ok
+}

@@ -121,6 +121,14 @@ func (e *Engine) Run(ctx context.Context, resolved *resolver.Resolved, plan *pla
 			if err != nil {
 				return fmt.Errorf("connexion à la fonction %q du module %q : %w", p.Function, name, err)
 			}
+			if p.Fleet {
+				// Fonction « de parc » (ADR-017) : toutes les connexions
+				// accumulées sont appelées (diffusion), pas un seul
+				// fournisseur actif choisi/repointable — pas de clé @phase
+				// ni de clé "active" bare, ce concept n'existe pas ici.
+				e.Registry.AddFleetProvider(p.Function, conn)
+				continue
+			}
 			register, ok := broker.ForwarderFor(p.Function)
 			if !ok {
 				return fmt.Errorf("fonction %q (module %q) : type de fonction inconnu du cœur", p.Function, name)

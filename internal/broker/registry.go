@@ -24,6 +24,10 @@ type Registry struct {
 	mu      sync.RWMutex
 	native  map[string]nativeFactory
 	forward map[string]func(*grpc.Server) // fonctions fournies par un module
+	// fleet : fonctions « de parc » (docs/09-decisions.md ADR-017) — toutes
+	// les connexions accumulées sont appelées (diffusion), jamais un seul
+	// fournisseur actif remplaçant le précédent comme dans forward.
+	fleet map[string][]*grpc.ClientConn
 }
 
 // NewRegistry construit un registre vide.
@@ -31,6 +35,7 @@ func NewRegistry() *Registry {
 	return &Registry{
 		native:  map[string]nativeFactory{},
 		forward: map[string]func(*grpc.Server){},
+		fleet:   map[string][]*grpc.ClientConn{},
 	}
 }
 
@@ -51,6 +56,16 @@ func (r *Registry) SetModuleProvider(function string, conn *grpc.ClientConn, reg
 	r.forward[function] = func(s *grpc.Server) { register(s, conn) }
 }
 
+// AddFleetProvider accumule une connexion supplémentaire pour une fonction
+// « de parc » (ADR-017) — contrairement à SetModuleProvider, qui remplace
+// le fournisseur actif unique, plusieurs fournisseurs coexistent pour une
+// même fonction fleet, tous appelés (voir ForwardFleetAgent, fan-out).
+func (r *Registry) AddFleetProvider(function string, conn *grpc.ClientConn) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.fleet[function] = append(r.fleet[function], conn)
+}
+
 // Unset retire une fonction du registre (ex. SeedDown du fournisseur graine
 // après passation).
 func (r *Registry) Unset(function string) {
@@ -66,7 +81,7 @@ func (r *Registry) HasProvider(function string) bool {
 	defer r.mu.RUnlock()
 	_, native := r.native[function]
 	_, forwarded := r.forward[function]
-	return native || forwarded
+	return native || forwarded || len(r.fleet[function]) > 0
 }
 
 // BuildSession construit un grpc.Server n'exposant que les fonctions listées
@@ -82,6 +97,12 @@ func (r *Registry) BuildSession(caller string, allowed []string, opts ...grpc.Se
 	for _, fn := range allowed {
 		if factory, ok := r.native[fn]; ok {
 			factory(caller)(s)
+			continue
+		}
+		if conns, ok := r.fleet[fn]; ok && len(conns) > 0 {
+			if registerFleet, ok := fleetForwarderFor(fn); ok {
+				registerFleet(s, conns)
+			}
 			continue
 		}
 		if register, ok := r.forward[fn]; ok {
