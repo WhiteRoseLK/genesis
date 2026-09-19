@@ -121,6 +121,10 @@ func (m *vaultModule) Configure(ctx context.Context, req *modulev1.StepRequest) 
 	m.approleToken = approleToken
 	m.mu.Unlock()
 
+	if err := m.installFleetAgents(ctx, target); err != nil {
+		return nil, err
+	}
+
 	return &modulev1.StepResult{Status: modulev1.StepResult_STATUS_OK, State: req.GetState()}, nil
 }
 

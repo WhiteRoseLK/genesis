@@ -18,11 +18,14 @@ import (
 	"sync"
 
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 
 	sdk "genesis/sdk/go"
 	computevmv1 "genesis/sdk/go/gen/functions/compute/vm/v1"
 	ansiblev1 "genesis/sdk/go/gen/functions/core/ansible/v1"
 	secretsv1 "genesis/sdk/go/gen/functions/core/secrets/v1"
+	fleetagentv1 "genesis/sdk/go/gen/functions/fleet/agent/v1"
 	timentpv1 "genesis/sdk/go/gen/functions/time/ntp/v1"
 	modulev1 "genesis/sdk/go/gen/module/v1"
 )
@@ -57,13 +60,14 @@ type chronyModule struct {
 	modulev1.UnimplementedModuleServer
 	manifest *modulev1.Manifest
 
-	mu            sync.Mutex
-	broker        *sdk.BrokerClient
-	brokerToken   string
-	vmClient      computevmv1.ComputeVMClient
-	ansibleClient ansiblev1.AnsibleClient
-	secretsClient secretsv1.SecretsClient
-	ntpEndpoint   *timentpv1.EndpointInfo
+	mu               sync.Mutex
+	broker           *sdk.BrokerClient
+	brokerToken      string
+	vmClient         computevmv1.ComputeVMClient
+	ansibleClient    ansiblev1.AnsibleClient
+	secretsClient    secretsv1.SecretsClient
+	fleetAgentClient fleetagentv1.FleetAgentClient
+	ntpEndpoint      *timentpv1.EndpointInfo
 }
 
 func (m *chronyModule) SetBroker(b *sdk.BrokerClient) { m.broker = b }
@@ -100,6 +104,22 @@ func (m *chronyModule) dial() error {
 	m.vmClient = computevmv1.NewComputeVMClient(conn)
 	m.ansibleClient = ansiblev1.NewAnsibleClient(conn)
 	m.secretsClient = secretsv1.NewSecretsClient(conn)
+	m.fleetAgentClient = fleetagentv1.NewFleetAgentClient(conn)
+	return nil
+}
+
+// installFleetAgents appelle fleet.agent/v1.Install(target) (docs/09-decisions.md
+// ADR-017) : diffusé vers tout module « de parc » installé (ex. teleport),
+// no-op silencieux si aucun n'est présent (fleet.agent/v1 est un requires
+// optionnel — Unimplemented est alors la réponse normale du broker, pas
+// une erreur).
+func (m *chronyModule) installFleetAgents(ctx context.Context, target *ansiblev1.Target) error {
+	_, err := m.fleetAgentClient.Install(ctx, &fleetagentv1.InstallRequest{
+		Target: &fleetagentv1.Target{Host: target.GetHost(), Port: target.GetPort(), User: target.GetUser(), SshPrivateKey: target.GetSshPrivateKey()},
+	})
+	if err != nil && status.Code(err) != codes.Unimplemented {
+		return fmt.Errorf("fleet.agent/v1.Install : %w", err)
+	}
 	return nil
 }
 
@@ -231,6 +251,9 @@ func (m *chronyModule) Configure(ctx context.Context, req *modulev1.StepRequest)
 	}
 	if !resp.GetOk() {
 		return nil, fmt.Errorf("Configure(chrony) a échoué :\n%s", resp.GetOutput())
+	}
+	if err := m.installFleetAgents(ctx, target); err != nil {
+		return nil, err
 	}
 
 	m.mu.Lock()

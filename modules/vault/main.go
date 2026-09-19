@@ -20,12 +20,15 @@ import (
 	"sync"
 
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 
 	sdk "genesis/sdk/go"
 	computevmv1 "genesis/sdk/go/gen/functions/compute/vm/v1"
 	ansiblev1 "genesis/sdk/go/gen/functions/core/ansible/v1"
 	secretsv1 "genesis/sdk/go/gen/functions/core/secrets/v1"
 	dnsresolverv1 "genesis/sdk/go/gen/functions/dns/resolver/v1"
+	fleetagentv1 "genesis/sdk/go/gen/functions/fleet/agent/v1"
 	osbasev1 "genesis/sdk/go/gen/functions/os/base/v1"
 	pkiissuerv1 "genesis/sdk/go/gen/functions/pki/issuer/v1"
 	secretskvv1 "genesis/sdk/go/gen/functions/secrets/kv/v1"
@@ -102,6 +105,7 @@ type vaultModule struct {
 	timeNTPClient     timentpv1.TimeNTPClient
 	dnsResolverClient dnsresolverv1.DnsResolverClient
 	pkiSeedClient     pkiissuerv1.PkiIssuerClient
+	fleetAgentClient  fleetagentv1.FleetAgentClient
 
 	// Actif une fois Configure passé (docs/PROGRESS.md : dette, en mémoire
 	// seulement).
@@ -147,6 +151,22 @@ func (m *vaultModule) dial() error {
 	m.timeNTPClient = timentpv1.NewTimeNTPClient(conn)
 	m.dnsResolverClient = dnsresolverv1.NewDnsResolverClient(conn)
 	m.pkiSeedClient = pkiissuerv1.NewPkiIssuerClient(conn)
+	m.fleetAgentClient = fleetagentv1.NewFleetAgentClient(conn)
+	return nil
+}
+
+// installFleetAgents appelle fleet.agent/v1.Install(target) (docs/09-decisions.md
+// ADR-017) : diffusé vers tout module « de parc » installé (ex. teleport),
+// no-op silencieux si aucun n'est présent (fleet.agent/v1 est un requires
+// optionnel — Unimplemented est alors la réponse normale du broker, pas
+// une erreur), même méthode que modules/chrony et modules/powerdns.
+func (m *vaultModule) installFleetAgents(ctx context.Context, target connTarget) error {
+	_, err := m.fleetAgentClient.Install(ctx, &fleetagentv1.InstallRequest{
+		Target: &fleetagentv1.Target{Host: target.Host, Port: target.Port, User: target.User, SshPrivateKey: target.PrivateKey},
+	})
+	if err != nil && status.Code(err) != codes.Unimplemented {
+		return fmt.Errorf("fleet.agent/v1.Install : %w", err)
+	}
 	return nil
 }
 

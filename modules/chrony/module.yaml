@@ -18,6 +18,8 @@ requires:
     - function: os.base/v1
     - function: core.ansible/v1
     - function: core.secrets/v1
+    - function: fleet.agent/v1
+      optional: true
 
 config_schema: schema.json
 
