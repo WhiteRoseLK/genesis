@@ -35,7 +35,8 @@ Implémenter dans l'ordre. Chaque jalon est livrable et testable seul.
 - **Accepté si** : `Verify` du doc 07 ; secrets non-`recovery` migrés vers Vault.
 
 ## J8 — Module `teleport` et retrait de la graine
-- **Accepté si** : SSH direct refusé, via l'agent Teleport OK ; après `seed retire`, environnement vert.
+- **Accepté si** : connexion via l'agent Teleport OK ; après `seed retire`, environnement vert.
+- **Repoint différé (dette, doc07)** : le refus de l'accès SSH direct n'est pas exigé à ce jalon — `fleet.agent/v1.Install` laisse le sshd natif actif, `core.ansible/v1` continue d'utiliser l'accès direct par clé. Faire basculer le cœur vers l'agent Teleport est tracé par une issue dédiée, hors périmètre J8.
 
 ## J9 — Durcissement et preuve d'extensibilité
 - Test e2e complet sur Proxmox (build tag `integration`), documentation utilisateur et guide module (doc 10).
