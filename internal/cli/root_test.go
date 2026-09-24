@@ -12,7 +12,7 @@ import (
 // toutes les commandes du tableau CLI de docs/02-architecture.md (critère
 // d'acceptation du jalon J0).
 func TestHelpListsDocumentedCommands(t *testing.T) {
-	want := []string{"init", "modules", "validate", "plan", "apply", "status", "secrets", "seed", "destroy"}
+	want := []string{"init", "modules", "validate", "plan", "apply", "status", "secrets", "destroy"}
 
 	root := NewRootCmd()
 	out := &bytes.Buffer{}
@@ -39,7 +39,6 @@ func TestHelpListsDocumentedCommands(t *testing.T) {
 func TestStubCommandsFail(t *testing.T) {
 	cases := [][]string{
 		{"status"},
-		{"seed", "retire"},
 		{"destroy", "-f", "env.yaml"},
 	}
 

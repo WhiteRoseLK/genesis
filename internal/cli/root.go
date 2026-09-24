@@ -40,7 +40,6 @@ func NewRootCmd() *cobra.Command {
 		newApplyCmd(),
 		newStatusCmd(),
 		newSecretsCmd(),
-		newSeedCmd(),
 		newDestroyCmd(),
 	)
 

@@ -15,6 +15,10 @@ type State struct {
 	// SecretsBackend est le backend actif du store de secrets ("file" ou
 	// "vault" après passation, docs/06-secrets-etat.md).
 	SecretsBackend string `json:"secrets_backend"`
+	// SeedRetired passe à vrai quand tous les services graine ont été
+	// arrêtés en fin d'apply (docs/05-cycle-bootstrap.md, phase 4) : un apply
+	// ultérieur ne relance plus jamais la graine.
+	SeedRetired bool `json:"seed_retired,omitempty"`
 	// Modules porte, par module, l'état opaque renvoyé par sa dernière étape
 	// réussie (StepResult.state, docs/03-contrat-module.md §2) — c'est ce
 	// qui permet à `Check` de constater qu'une étape est déjà conforme
