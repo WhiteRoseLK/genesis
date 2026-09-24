@@ -129,7 +129,7 @@ stateDiagram-v2
   provisioning --> configured: Provision + Configure
   configured --> target_ready: Verify
   target_ready --> handed_over: Handover + Repoint consommateurs + Verify
-  handed_over --> seed_retired: SeedDown du module graine
+  handed_over --> seed_retired: SeedDown du module graine (fin d'apply, ADR-020)
   target_ready --> done: pas de passation
   seed_retired --> done
   provisioning --> failed

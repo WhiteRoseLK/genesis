@@ -7,8 +7,8 @@
 | 0. Pré-vol | Prérequis graine, horloge, accès au module compute, validation spec |
 | 1. Graine | Démarrage des services temporaires nécessaires |
 | 2. Construction | Provision + configuration des capacités cibles dans l'ordre du DAG |
-| 3. Passation | Migration des données et rebascule des consommateurs |
-| 4. Retrait | Arrêt des services graine, archivage de l'état |
+| 3. Passation | Migration des données et rebascule des consommateurs ; la graine reste active |
+| 4. Retrait | Automatique en fin d'`apply` si tout est vert : arrêt des services graine |
 
 ## Phase 0 — Pré-vol (bloquante)
 1. Runtime conteneur présent et fonctionnel.
@@ -61,9 +61,15 @@ sequenceDiagram
 Ordre : `dns` → `pki` → `secrets` → `bastion`. Chaque passation est suivie d'un `Verify` depuis au moins une VM cible autre que le fournisseur.
 
 ## Phase 4 — Retrait
-- `SeedDown` de chaque capacité passée (CoreDNS, step-ca).
+Au fil de la construction, chaque service cible prend la main dès qu'il est prêt et vérifié : les modules construits ensuite l'utilisent. La graine, elle, reste active jusqu'au bout, et ses propres services continuent de se servir d'elle. Le retrait est automatique en fin d'`apply` (ADR-020), à trois conditions :
+1. chaque fonction fournie par la graine a été reprise par un fournisseur cible (sinon la graine est conservée, l'`apply` réussit et le journal indique les fonctions sans relève) ;
+2. si une capacité `secrets` est déclarée, les secrets ont migré vers Vault ;
+3. un `Verify` final de chaque module cible, dans la configuration définitive, est vert (sinon l'`apply` échoue et la graine est conservée).
+
+Alors :
+- `SeedDown` de chaque module graine, dans l'ordre inverse du plan (CoreDNS, step-ca…) ; l'état note `seed_retired`, et un `apply` ultérieur ne relance plus jamais la graine.
 - Le secret store local reste en **lecture seule** comme copie de secours chiffrée des secrets de récupération (racine CA, clés de descellement Vault).
-- La graine peut être éteinte ou supprimée. `status` indique ce qu'il faut conserver hors ligne avant suppression (clé maîtresse, export d'état).
+- La graine peut être éteinte ou supprimée. `apply` indique ce qu'il faut conserver hors ligne avant suppression (clé maîtresse, secrets de récupération, état).
 
 ## Reprise sur erreur
 - Chaque étape réussie est persistée ; `apply` reprend à la première étape non conforme.
