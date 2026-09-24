@@ -1,0 +1,35 @@
+apiVersion: genesis/module/v1
+name: teleport
+version: 0.1.0
+description: "Bastion cible « de parc » (docs/07-modules-mvp.md) : access.ssh/v1 et fleet.agent/v1 (ADR-017), Auth+Proxy Teleport sur sa propre VM, agent SSH installé sur chaque VM du parc via fleet.agent/v1.Install"
+layer: services
+core: ">=0.1.0 <0.2.0"
+protocol: 1
+
+capabilities: []
+
+provides:
+  - function: access.ssh/v1
+    phases: [target]
+  - function: fleet.agent/v1
+    phases: [target]
+    fleet: true
+
+requires:
+  target:
+    - function: compute.vm/v1
+    - function: os.base/v1
+    - function: core.ansible/v1
+    - function: core.secrets/v1
+    - function: time.ntp/v1
+    - function: dns.resolver/v1
+    - function: pki.issuer/v1
+
+config_schema: schema.json
+
+secrets: []
+
+resources:
+  - { role: teleport, count: 1, size: medium }
+
+defaults: {}

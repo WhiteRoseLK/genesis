@@ -1,0 +1,17 @@
+# fleet.agent/v1.Install (module teleport) : génère un jeton d'enrôlement à
+# usage court sur la VM Auth+Proxy elle-même (tctl tourne en local, API
+# Auth sur 127.0.0.1:3025) -- un jeton par enrôlement, jamais réutilisé.
+- hosts: target
+  gather_facts: false
+  become: true
+  tasks:
+    - name: generer un jeton d'enrolement de noeud
+      ansible.builtin.command: >
+        tctl tokens add --type=node --ttl={{ join_ttl }}
+        --config=/etc/teleport/teleport.yaml
+      register: token_out
+      changed_when: true
+
+    - name: afficher le jeton (marqueur pour le module)
+      ansible.builtin.debug:
+        var: token_out.stdout

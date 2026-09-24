@@ -1,0 +1,119 @@
+# Configure (functions/access/ssh/v1 + fleet/agent/v1, module teleport) :
+# installe Teleport (Auth + Proxy, dépôt APT officiel Teleport), dépose le
+# certificat TLS émis par pki.issuer/v1 (résolu vers vault, docs07), puis
+# lit le pin de la CA interne Teleport (tctl status) -- réutilisé par
+# fleet.agent/v1.Install pour chaque enrôlement (docs/09-decisions.md
+# ADR-017/ADR-018). Idempotent : rejouable sans changement si déjà installé.
+- hosts: target
+  gather_facts: true
+  become: true
+  tasks:
+    - name: installer les prerequis
+      ansible.builtin.apt:
+        name: [gnupg, curl, ca-certificates]
+        state: present
+        update_cache: true
+
+    - name: creer le repertoire des cles APT
+      ansible.builtin.file:
+        path: /usr/share/keyrings
+        state: directory
+        mode: "0755"
+
+    - name: ajouter la cle GPG Teleport
+      ansible.builtin.get_url:
+        url: https://apt.releases.teleport.dev/gpg
+        dest: /usr/share/keyrings/teleport-archive-keyring.asc
+        mode: "0644"
+
+    - name: ajouter le depot Teleport
+      ansible.builtin.apt_repository:
+        repo: "deb [signed-by=/usr/share/keyrings/teleport-archive-keyring.asc] https://apt.releases.teleport.dev/debian/ {{ ansible_distribution_release | default('bookworm') }} stable/v17"
+        state: present
+        filename: teleport
+
+    - name: installer teleport
+      ansible.builtin.apt:
+        name: teleport
+        state: present
+        update_cache: true
+
+    - name: creer le repertoire TLS
+      ansible.builtin.file:
+        path: /etc/teleport/tls
+        state: directory
+        mode: "0750"
+
+    - name: deposer le certificat TLS
+      ansible.builtin.copy:
+        content: "{{ tls_cert_pem }}"
+        dest: /etc/teleport/tls/proxy-cert.pem
+        mode: "0640"
+      register: tls_cert
+
+    - name: deposer la cle privee TLS
+      ansible.builtin.copy:
+        content: "{{ tls_key_pem }}"
+        dest: /etc/teleport/tls/proxy-key.pem
+        mode: "0640"
+      register: tls_key
+
+    - name: deposer la racine pki.issuer/v1 dans le magasin de confiance systeme
+      ansible.builtin.copy:
+        content: "{{ ca_chain_pem }}"
+        dest: /usr/local/share/ca-certificates/genesis-root-ca.crt
+        mode: "0644"
+      register: ca_chain
+
+    - name: mettre a jour le magasin de confiance systeme
+      ansible.builtin.command: update-ca-certificates
+      when: ca_chain.changed
+
+    - name: configurer teleport.yaml (Auth + Proxy)
+      ansible.builtin.copy:
+        content: |
+          version: v3
+          teleport:
+            nodename: {{ node_name }}
+            data_dir: /var/lib/teleport
+          auth_service:
+            enabled: true
+            cluster_name: {{ cluster_name }}
+            listen_addr: 0.0.0.0:3025
+            proxy_listener_mode: multiplex
+          proxy_service:
+            enabled: true
+            web_listen_addr: 0.0.0.0:3080
+            public_addr: "{{ vm_ip }}:3080"
+            https_keypairs:
+              - key_file: /etc/teleport/tls/proxy-key.pem
+                cert_file: /etc/teleport/tls/proxy-cert.pem
+          ssh_service:
+            enabled: false
+        dest: /etc/teleport/teleport.yaml
+        mode: "0640"
+      register: teleport_conf
+
+    - name: activer et (re)demarrer teleport si la configuration a change
+      ansible.builtin.systemd:
+        name: teleport
+        enabled: true
+        state: restarted
+      when: tls_cert.changed or tls_key.changed or ca_chain.changed or teleport_conf.changed
+
+    - name: s'assurer que teleport tourne
+      ansible.builtin.systemd:
+        name: teleport
+        state: started
+
+    - name: attendre que l'API Auth de teleport reponde (tctl status)
+      ansible.builtin.command: tctl status --config=/etc/teleport/teleport.yaml
+      register: tctl_status
+      retries: 30
+      delay: 2
+      until: tctl_status.rc == 0
+      changed_when: false
+
+    - name: afficher le statut teleport (pin de la CA inclus, lu par le module)
+      ansible.builtin.debug:
+        var: tctl_status.stdout

@@ -1,0 +1,32 @@
+syntax = "proto3";
+
+// Fonction access.ssh/v1 (docs/03-contrat-module.md) : accès SSH au parc,
+// fournie par un module bastion (teleport). JumpHost expose le point
+// d'entrée public (proxy) ; SignUserKey signera une clé publique
+// utilisateur en certificat SSH court terme -- pas encore de consommateur
+// réel à ce jalon (docs/PROGRESS.md), voir modules/teleport.
+package functions.access.ssh.v1;
+
+option go_package = "genesis/sdk/go/gen/functions/access/ssh/v1;accesssshv1";
+
+service AccessSSH {
+  rpc JumpHost(Empty) returns (JumpHostInfo);
+  rpc SignUserKey(SignUserKeyRequest) returns (SignUserKeyResponse);
+}
+
+message Empty {}
+
+message JumpHostInfo {
+  string address = 1;
+  int32 port = 2;
+}
+
+message SignUserKeyRequest {
+  string public_key_openssh = 1;
+  repeated string principals = 2;
+  int64 ttl_seconds = 3;
+}
+
+message SignUserKeyResponse {
+  string certificate_openssh = 1;
+}
