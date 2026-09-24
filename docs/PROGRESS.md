@@ -10,7 +10,7 @@
 | J5 — proxmox, base-os | fait (partiel, voir notes) | Harden (durcissement pur) différé à une itération future, décision utilisateur |
 | J6 — chrony, coredns, powerdns | fait | |
 | J7 — step-ca, vault | fait | |
-| J8 — teleport, retrait graine | à faire | ADR-017 : teleport remplace le bastion OpenSSH prévu au doc07, module « de parc » (agent sur toutes les VM) |
+| J8 — teleport, retrait graine | en cours | module `teleport` fait (ADR-017/018/019) ; reste `genesis seed retire` |
 | J9 — Durcissement, preuve d'extensibilité | à faire | |
 
 ## Journal
@@ -213,6 +213,14 @@ Le jalon le plus lourd du projet à ce jour, découpé en deux étapes validées
 
 **Prochaine étape** : J8 — Module `teleport` et retrait de la graine (doc 07, ADR-017 : teleport remplace le bastion OpenSSH prévu initialement).
 
+### 2026-09-24 — J8 (partiel) Module `teleport`
+- `sdk/proto/functions/access/ssh/v1` : nouvelle fonction `access.ssh/v1` (`JumpHost`, `SignUserKey`).
+- `modules/teleport` : Auth+Proxy Teleport sur sa propre VM (dépôt APT officiel, canal `stable/v17`), certificat TLS du proxy via `pki.issuer/v1` + racine (`CAChain`) déposée dans le magasin de confiance système (la Proxy valide sa propre chaîne au démarrage). Pin de CA lu dans `tctl status`. `fleet.agent/v1.Install` : jeton d'enrôlement à usage court (`tctl tokens add`) par cible, agent `ssh_service` (port 3022, `join_params`). `access.ssh/v1.JumpHost` réel, `SignUserKey` stub `Unimplemented` (aucun consommateur).
+- `Verify` : VM cible jetable enrôlée + certificat utilisateur `tctl auth sign --format=openssh` + connexion OpenSSH réelle via l'agent depuis une VM tierce.
+- Tests (`internal/modulehost/teleport_test.go`) : même méthode que vault — le faux `core.ansible/v1` pilote deux vrais conteneurs Teleport (auth+proxy, agent) sur un réseau docker dédié, avec les vrais certificats/jetons/pins produits par le module ; SSH réel depuis le process de test. Image `teleport:14` : dernière publiée avec un shell (≥ v16 uniquement distroless, sans shell → exécution de commande SSH impossible).
+- Bugs réels trouvés par ces tests et corrigés dans les playbooks de production : `proxy_listener_mode` appartient à `auth_service` (pas `teleport`), l'enrôlement se configure via `join_params` (pas `auth_token`), la racine PKI doit être dans le magasin de confiance système.
+- ADR-019 : repoint SSH vers l'agent différé (décision utilisateur) — sshd natif laissé actif, critère doc08 ajusté.
+
 ## Dette technique connue
 - Clé maîtresse en fichier local (ADR-007)
 - Profil connected uniquement (ADR-008)
@@ -230,3 +238,6 @@ Le jalon le plus lourd du projet à ce jour, découpé en deux étapes validées
 - `pki.issuer/v1.SignSSH` (step-ca, vault) : stub `Unimplemented` — devenu sans objet pour `teleport` (J8, ADR-017) qui a sa propre CA SSH interne, pas de délégation à `pki.issuer/v1` ; reste un stub tant qu'aucun consommateur réel n'existe
 - `secrets.kv/v1.List` (vault) : stub `Unimplemented`, pas de méthode LIST v2 KV standard, aucun consommateur réel (J7)
 - Aucun renouvellement automatique de certificat planifié (intermédiaire step-ca 30 jours, TLS vault) : régénéré/réémis seulement quand un appel le découvre expiré ou proche de l'expiration (J7)
+- Repoint SSH vers l'agent Teleport non fait (ADR-019) : sshd natif actif, `core.ansible/v1` toujours par clé/port 22 ; `access.ssh/v1.SignUserKey` stub `Unimplemented` (J8)
+- `teleport` : `ownTarget`/`caPin` en mémoire dans le process du module (pas dans `StepResult.state`), comme `rootCAPEM` de vault ; session broker mise en cache depuis `Check` (fournisseur de `pki.issuer/v1` figé à ce moment — sans effet tant que les sessions ne sont jamais fermées et que Check suit la passation de vault) (J8)
+- `internal/modulehost/coredns_test.go` ne supprime pas son conteneur `genesis-coredns` : relancer la suite sans nettoyage échoue sur un conflit de nom (préexistant, constaté en J8)
