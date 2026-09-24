@@ -127,8 +127,7 @@ Règle vérifiée en CI : `internal/` n'importe jamais `modules/`, et `modules/*
 | `genesis modules list/install/verify` | Gestion des modules |
 | `genesis validate -f env.yaml` | Spec + résolution des modules + `Validate` de chaque module |
 | `genesis plan -f env.yaml` | Plan, avec couches et modules ajoutés automatiquement |
-| `genesis apply -f env.yaml [--auto-approve]` | Exécution jusqu'à la passation |
+| `genesis apply -f env.yaml [--auto-approve]` | Exécution complète : graine, cible, passations, puis retrait automatique de la graine si tout est vert (ADR-020) |
 | `genesis status` | État par module et par fonction (fournisseur actif) |
 | `genesis secrets list/get` | Secrets générés |
-| `genesis seed retire` | Arrêt des services graine |
 | `genesis destroy -f env.yaml` | Suppression des ressources cibles |

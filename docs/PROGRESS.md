@@ -10,7 +10,7 @@
 | J5 — proxmox, base-os | fait (partiel, voir notes) | Harden (durcissement pur) différé à une itération future, décision utilisateur |
 | J6 — chrony, coredns, powerdns | fait | |
 | J7 — step-ca, vault | fait | |
-| J8 — teleport, retrait graine | en cours | module `teleport` fait (ADR-017/018/019) ; reste `genesis seed retire` |
+| J8 — teleport, retrait graine | fait | ADR-017/018/019/020 ; repoint SSH vers l'agent différé (#16) |
 | J9 — Durcissement, preuve d'extensibilité | à faire | |
 
 ## Journal
@@ -213,13 +213,17 @@ Le jalon le plus lourd du projet à ce jour, découpé en deux étapes validées
 
 **Prochaine étape** : J8 — Module `teleport` et retrait de la graine (doc 07, ADR-017 : teleport remplace le bastion OpenSSH prévu initialement).
 
-### 2026-09-24 — J8 (partiel) Module `teleport`
+### 2026-09-24 — J8 Module `teleport` et retrait de la graine
 - `sdk/proto/functions/access/ssh/v1` : nouvelle fonction `access.ssh/v1` (`JumpHost`, `SignUserKey`).
 - `modules/teleport` : Auth+Proxy Teleport sur sa propre VM (dépôt APT officiel, canal `stable/v17`), certificat TLS du proxy via `pki.issuer/v1` + racine (`CAChain`) déposée dans le magasin de confiance système (la Proxy valide sa propre chaîne au démarrage). Pin de CA lu dans `tctl status`. `fleet.agent/v1.Install` : jeton d'enrôlement à usage court (`tctl tokens add`) par cible, agent `ssh_service` (port 3022, `join_params`). `access.ssh/v1.JumpHost` réel, `SignUserKey` stub `Unimplemented` (aucun consommateur).
 - `Verify` : VM cible jetable enrôlée + certificat utilisateur `tctl auth sign --format=openssh` + connexion OpenSSH réelle via l'agent depuis une VM tierce.
 - Tests (`internal/modulehost/teleport_test.go`) : même méthode que vault — le faux `core.ansible/v1` pilote deux vrais conteneurs Teleport (auth+proxy, agent) sur un réseau docker dédié, avec les vrais certificats/jetons/pins produits par le module ; SSH réel depuis le process de test. Image `teleport:14` : dernière publiée avec un shell (≥ v16 uniquement distroless, sans shell → exécution de commande SSH impossible).
 - Bugs réels trouvés par ces tests et corrigés dans les playbooks de production : `proxy_listener_mode` appartient à `auth_service` (pas `teleport`), l'enrôlement se configure via `join_params` (pas `auth_token`), la racine PKI doit être dans le magasin de confiance système.
 - ADR-019 : repoint SSH vers l'agent différé (décision utilisateur) — sshd natif laissé actif, critère doc08 ajusté.
+- Retrait de la graine (ADR-020, décision utilisateur) : la passation ne coupe plus la graine ; `internal/engine.retireSeed` l'arrête en fin d'`apply` (ordre inverse du plan) si chaque fonction graine a une relève cible, si les secrets ont migré vers Vault (capacité `secrets`), et si un `verify.final` de chaque module cible est vert. `state.seed_retired` : un `apply` ultérieur n'interroge plus la graine, ne rejoue plus `Handover`, pointe directement la cible. `apply` affiche ce qu'il faut garder hors ligne. Commande `genesis seed retire` supprimée.
+- Tests : ordre handover → verify.final → seed.retire, graine jamais réinterrogée après retrait, graine conservée si une fonction n'a pas de relève, sortie CLI d'`apply`.
+
+**Prochaine étape** : J9 — Durcissement et preuve d'extensibilité (doc 08).
 
 ## Dette technique connue
 - Clé maîtresse en fichier local (ADR-007)
@@ -241,3 +245,5 @@ Le jalon le plus lourd du projet à ce jour, découpé en deux étapes validées
 - Repoint SSH vers l'agent Teleport non fait (ADR-019) : sshd natif actif, `core.ansible/v1` toujours par clé/port 22 ; `access.ssh/v1.SignUserKey` stub `Unimplemented` (J8)
 - `teleport` : `ownTarget`/`caPin` en mémoire dans le process du module (pas dans `StepResult.state`), comme `rootCAPEM` de vault ; session broker mise en cache depuis `Check` (fournisseur de `pki.issuer/v1` figé à ce moment — sans effet tant que les sessions ne sont jamais fermées et que Check suit la passation de vault) (J8)
 - `internal/modulehost/coredns_test.go` ne supprime pas son conteneur `genesis-coredns` : relancer la suite sans nettoyage échoue sur un conflit de nom (préexistant, constaté en J8)
+- Store fichier non passé en lecture seule après retrait de la graine (doc05) : `core.secrets/v1` continue d'écrire dans le backend fichier, même après migration vers Vault (J8, ADR-020)
+- Retrait de la graine prouvé uniquement avec les modules de test (`test-e`/`test-f`) ; le parcours complet réel (coredns/step-ca → powerdns/vault) relève du e2e de J9
