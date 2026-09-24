@@ -22,9 +22,9 @@ import (
 // critère du doc 08 "après passation, arrêt [du module graine] sans
 // impact") — contrairement à test-a (qui se reprend lui-même), test-e
 // (graine pure) et test-f (cible, lit test.e/v1@seed) sont deux processus
-// séparés : ce test vérifie que c'est bien SeedDown de test-e qui est
-// appelé par l'exécution DE test-f, et que test-f devient ensuite le
-// fournisseur actif (clé de registre sans suffixe @phase).
+// séparés : ce test vérifie que test-f reprend test.e/v1 (Handover lit
+// réellement test.e/v1@seed), puis que la graine test-e n'est arrêtée
+// qu'en fin de Run, après la vérification finale (ADR-020).
 func TestHandoverRetiresCrossModuleSeedProvider(t *testing.T) {
 	searchRoot := t.TempDir()
 	installedE := buildAndInstall(t, "test-e", searchRoot)
@@ -69,8 +69,7 @@ func TestHandoverRetiresCrossModuleSeedProvider(t *testing.T) {
 	if !strings.Contains(logStr, "module=test-f étape=handover résultat=ok") {
 		t.Errorf("test-f aurait dû recevoir Handover :\n%s", logStr)
 	}
-	// Le cœur du test : c'est SeedDown de test-e (pas de test-f) qui est
-	// déclenché par la passation, depuis l'itération de plan DE test-f.
+	// SeedDown vise la graine test-e, jamais le module cible test-f.
 	if !strings.Contains(logStr, "module=test-e étape=seed.retire résultat=ok") {
 		t.Errorf("test-e aurait dû recevoir SeedDown suite à la passation de test-f :\n%s", logStr)
 	}
@@ -85,9 +84,22 @@ func TestHandoverRetiresCrossModuleSeedProvider(t *testing.T) {
 		}
 	}
 
+	// La graine reste active pendant toute la construction de la cible :
+	// SeedDown n'arrive qu'après la passation ET la vérification finale
+	// (ADR-020).
+	handoverAt := strings.Index(logStr, "module=test-f étape=handover résultat=ok")
+	finalVerifyAt := strings.Index(logStr, "module=test-f étape=verify.final résultat=ok")
+	retireAt := strings.Index(logStr, "module=test-e étape=seed.retire résultat=ok")
+	if handoverAt < 0 || finalVerifyAt < 0 || retireAt < 0 || handoverAt >= finalVerifyAt || finalVerifyAt >= retireAt {
+		t.Errorf("ordre attendu : handover(test-f) < verify.final(test-f) < seed.retire(test-e) :\n%s", logStr)
+	}
+
 	st, err := state.Load(stateDir)
 	if err != nil {
 		t.Fatalf("Load état : %v", err)
+	}
+	if !st.SeedRetired {
+		t.Error("état : seed_retired=false, attendu true après retrait de la graine")
 	}
 	assertFlag(t, st, "test-e", "retired", true)
 	assertFlag(t, st, "test-f", "handed_over", true)
@@ -109,6 +121,9 @@ func TestHandoverRetiresCrossModuleSeedProvider(t *testing.T) {
 		t.Fatalf("second Run : %v", err)
 	}
 	secondLogStr := secondLog.String()
+	if !strings.Contains(secondLogStr, "module=test-e étape=check résultat=\"graine retirée, ignoré\"") {
+		t.Errorf("après retrait, la graine ne doit même plus être interrogée :\n%s", secondLogStr)
+	}
 	for _, forbidden := range []string{"étape=seed.up", "étape=provision", "étape=configure", "étape=verify", "étape=handover", "étape=seed.retire"} {
 		if strings.Contains(secondLogStr, forbidden+" résultat=ok") {
 			t.Errorf("le second run a exécuté %q, attendu 0 changement :\n%s", forbidden, secondLogStr)
@@ -129,5 +144,50 @@ func assertFlag(t *testing.T, st *state.State, module, flag string, want bool) {
 	got, _ := flags[flag].(bool)
 	if got != want {
 		t.Errorf("%q : %s=%v, attendu %v", module, flag, got, want)
+	}
+}
+
+// TestSeedKeptWhenAFunctionHasNoTarget : une fonction graine sans relève
+// cible (test-e seul, personne ne reprend test.e/v1) interdit le retrait —
+// la graine reste l'unique fournisseur.
+func TestSeedKeptWhenAFunctionHasNoTarget(t *testing.T) {
+	searchRoot := t.TempDir()
+	installedE := buildAndInstall(t, "test-e", searchRoot)
+
+	env := &spec.Environment{
+		Capabilities: map[string]spec.Capability{
+			"test-e": {Module: "test-e"},
+		},
+	}
+	resolved, err := resolver.Resolve(env, []modulehost.Installed{installedE})
+	if err != nil {
+		t.Fatalf("Resolve : %v", err)
+	}
+	plan, err := planner.Build(resolved)
+	if err != nil {
+		t.Fatalf("Build : %v", err)
+	}
+
+	stateDir := t.TempDir()
+	var logBuf bytes.Buffer
+	e := New(stateDir, newTestSecretsStore(t))
+	e.Logger = slog.New(slog.NewTextHandler(&logBuf, nil))
+	if err := e.Run(context.Background(), resolved, plan); err != nil {
+		t.Fatalf("Run : %v", err)
+	}
+
+	logStr := logBuf.String()
+	if strings.Contains(logStr, "étape=seed.retire résultat=ok") {
+		t.Errorf("la graine ne devait pas être retirée sans relève cible :\n%s", logStr)
+	}
+	if !strings.Contains(logStr, "aucune relève cible pour test.e/v1") {
+		t.Errorf("le journal devrait expliquer pourquoi la graine est conservée :\n%s", logStr)
+	}
+	st, err := state.Load(stateDir)
+	if err != nil {
+		t.Fatalf("Load état : %v", err)
+	}
+	if st.SeedRetired {
+		t.Error("état : seed_retired=true, attendu false")
 	}
 }

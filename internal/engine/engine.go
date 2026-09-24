@@ -5,18 +5,20 @@
 //
 // Simplification assumée pour le jalon J4 : un seul Check par module décide
 // s'il faut rejouer son groupe d'étapes en entier (seed.up, provision,
-// configure, verify, [handover, seed.retire]) plutôt qu'un Check devant
+// configure, verify, [handover]) plutôt qu'un Check devant
 // chaque RPC individuellement — chaque étape étant elle-même idempotente
 // (docs/03-contrat-module.md §4, règle 3), rejouer le groupe après une
 // reprise est sûr même si certaines étapes du groupe avaient déjà réussi.
 //
-// Passation multi-module (docs/05-cycle-bootstrap.md), depuis le jalon J6 :
-// un module cible dont une fonction fournie a un fournisseur graine actif
-// (resolver.Resolved.ProviderFor(fn, "seed")) exécute Handover puis
-// déclenche SeedDown sur CE fournisseur graine (potentiellement un module
-// différent, ex. coredns → powerdns) avant de devenir le nouveau
-// fournisseur actif de la fonction (clé de registre sans suffixe @phase,
-// voir repoint). Le Repoint(RepointRequest) explicite du proto n'est pas
+// Passation multi-module (docs/05-cycle-bootstrap.md) : un module cible dont
+// une fonction fournie a un fournisseur graine actif
+// (resolver.Resolved.ProviderFor(fn, "seed")) exécute Handover puis devient
+// le fournisseur actif de la fonction pour tous les modules construits
+// ensuite (clé de registre sans suffixe @phase, voir repoint). La graine,
+// elle, reste active : ses propres services continuent de se servir d'elle.
+// Elle n'est arrêtée qu'en fin de Run (retireSeed, ADR-020), une fois
+// chaque fonction graine reprise par la cible et tous les Verify cible
+// verts. Le Repoint(RepointRequest) explicite du proto n'est pas
 // encore déclenché par le cœur vers les modules consommateurs : dans ce
 // MVP, aucun module ne consomme encore dns.zone/v1, dns.resolver/v1 ou
 // time.ntp/v1 sans le suffixe de phase après son propre Check (le seul
@@ -151,10 +153,10 @@ func (e *Engine) Run(ctx context.Context, resolved *resolver.Resolved, plan *pla
 	// Clé "active" (sans suffixe @phase) : la graine tant qu'elle existe
 	// (repointée vers la cible après passation, voir repoint), sinon
 	// directement la cible pour les fonctions sans phase graine (ex.
-	// compute.vm/v1).
+	// compute.vm/v1) ou quand la graine a déjà été retirée.
 	for function, byModule := range providers {
 		phase := "seed"
-		if _, ok := resolved.ProviderFor(function, "seed"); !ok {
+		if _, ok := resolved.ProviderFor(function, "seed"); !ok || st.SeedRetired {
 			phase = "target"
 		}
 		providerName, ok := resolved.ProviderFor(function, phase)
@@ -178,7 +180,7 @@ func (e *Engine) Run(ctx context.Context, resolved *resolver.Resolved, plan *pla
 		}
 	}
 
-	return nil
+	return e.retireSeed(ctx, runID, resolved, plan, clients, st)
 }
 
 func (e *Engine) runModule(
@@ -191,6 +193,12 @@ func (e *Engine) runModule(
 	st *state.State,
 ) error {
 	client := clients[m.Name]
+	if st.SeedRetired && !providesInPhase(m, "target") {
+		// Graine pure déjà retirée : ni Check ni SeedUp, elle ne doit
+		// jamais redémarrer.
+		e.audit(m.Name, "check", "graine retirée, ignoré")
+		return nil
+	}
 	req, err := e.buildStepRequest(runID, m, client, st)
 	if err != nil {
 		return err
@@ -202,10 +210,13 @@ func (e *Engine) runModule(
 	}
 	if checkResult.GetStatus() == modulev1.CheckResult_STATUS_CONFORME {
 		e.audit(m.Name, "check", "conforme, aucune action")
+		// Registre neuf à chaque Run : sans ce repoint, un module construit
+		// plus loin dans ce Run consommerait encore la graine.
+		e.repoint(resolved, m, providers)
 		return nil
 	}
 
-	if providesInPhase(m, "seed") {
+	if providesInPhase(m, "seed") && !st.SeedRetired {
 		if err := e.action(ctx, runID, m, client, st, "seed.up", client.Module().SeedUp); err != nil {
 			return err
 		}
@@ -213,8 +224,8 @@ func (e *Engine) runModule(
 
 	if !providesInPhase(m, "target") {
 		// Module graine pur (ex. coredns) : s'arrête à seed_ready
-		// (docs/03-contrat-module.md §5) — une passation ultérieure d'un
-		// module cible appellera SeedDown en temps voulu (voir plus bas).
+		// (docs/03-contrat-module.md §5) — SeedDown n'arrive qu'en fin de
+		// Run (retireSeed).
 		return e.action(ctx, runID, m, client, st, "verify", client.Module().Verify)
 	}
 
@@ -232,25 +243,96 @@ func (e *Engine) runModule(
 		return err
 	}
 
-	seedModules := handoverSeedModules(resolved, m)
-	if len(seedModules) == 0 {
+	if len(handoverSeedModules(resolved, m)) == 0 {
 		return nil // target_ready -> done : pas de passation (docs/03 §5).
 	}
-	if err := e.action(ctx, runID, m, client, st, "handover", client.Module().Handover); err != nil {
-		return err
-	}
-	for _, seedName := range seedModules {
-		seedModule := resolved.Modules[seedName]
-		seedClient := clients[seedName]
-		if seedClient == nil {
-			return fmt.Errorf("passation de %q : module graine %q introuvable", m.Name, seedName)
-		}
-		if err := e.action(ctx, runID, seedModule, seedClient, st, "seed.retire", seedClient.Module().SeedDown); err != nil {
+	if !st.SeedRetired {
+		// Après retrait, la graine n'existe plus : Handover (qui peut la
+		// lire, ex. powerdns via dns.zone/v1@seed) n'a plus d'objet.
+		if err := e.action(ctx, runID, m, client, st, "handover", client.Module().Handover); err != nil {
 			return err
 		}
 	}
 	e.repoint(resolved, m, providers)
 	return nil
+}
+
+// retireSeed arrête la graine en fin de Run (docs/05-cycle-bootstrap.md,
+// phase 4 ; ADR-020), sans intervention de l'opérateur, mais seulement si :
+//   - chaque fonction fournie en phase graine a un fournisseur cible (sinon
+//     la graine reste le seul fournisseur et est conservée) ;
+//   - la capacité "secrets", si présente, a migré vers vault ;
+//   - un Verify final de chaque module cible, dans la configuration
+//     définitive (tous les repoints faits), est vert.
+//
+// Les modules graine sont arrêtés dans l'ordre inverse du plan (un service
+// graine peut dépendre d'un autre, ex. step-ca du DNS de coredns).
+func (e *Engine) retireSeed(ctx context.Context, runID string, resolved *resolver.Resolved, plan *planner.Plan, clients map[string]*modulehost.Client, st *state.State) error {
+	if st.SeedRetired {
+		return nil
+	}
+	var seedModules, targetModules []string
+	for _, name := range plan.Order {
+		m := resolved.Modules[name]
+		if providesInPhase(m, "seed") {
+			seedModules = append(seedModules, name)
+		}
+		if providesInPhase(m, "target") {
+			targetModules = append(targetModules, name)
+		}
+	}
+	if len(seedModules) == 0 {
+		return nil
+	}
+
+	if missing := functionsWithoutTarget(resolved, seedModules); len(missing) > 0 {
+		e.audit("graine", "seed.retire", "conservée : aucune relève cible pour "+strings.Join(missing, ", "))
+		return nil
+	}
+	if resolved.CapabilityModule["secrets"] != "" && st.SecretsBackend != "vault" {
+		e.audit("graine", "seed.retire", "conservée : secrets pas encore migrés vers vault")
+		return nil
+	}
+
+	for _, name := range targetModules {
+		if err := e.action(ctx, runID, resolved.Modules[name], clients[name], st, "verify.final", clients[name].Module().Verify); err != nil {
+			return fmt.Errorf("graine conservée, vérification finale en échec : %w", err)
+		}
+	}
+
+	for i := len(seedModules) - 1; i >= 0; i-- {
+		name := seedModules[i]
+		if err := e.action(ctx, runID, resolved.Modules[name], clients[name], st, "seed.retire", clients[name].Module().SeedDown); err != nil {
+			return err
+		}
+	}
+
+	st.SeedRetired = true
+	if err := state.Save(e.StateDir, st); err != nil {
+		return fmt.Errorf("persistance du retrait de la graine : %w", err)
+	}
+	e.audit("graine", "seed.retire", "graine retirée")
+	return nil
+}
+
+// functionsWithoutTarget liste, triées, les fonctions fournies en phase
+// graine par seedModules qui n'ont aucun fournisseur en phase cible.
+func functionsWithoutTarget(resolved *resolver.Resolved, seedModules []string) []string {
+	seen := map[string]bool{}
+	var out []string
+	for _, name := range seedModules {
+		for _, p := range resolved.Modules[name].Manifest.Provides {
+			if !slices.Contains(p.Phases, "seed") || seen[p.Function] {
+				continue
+			}
+			seen[p.Function] = true
+			if _, ok := resolved.ProviderFor(p.Function, "target"); !ok {
+				out = append(out, p.Function)
+			}
+		}
+	}
+	sort.Strings(out)
+	return out
 }
 
 // handoverSeedModules retourne, dédupliqué et trié, les modules graine

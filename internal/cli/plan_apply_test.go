@@ -87,6 +87,9 @@ func TestApplyRunsAndSecondApplyIsNoop(t *testing.T) {
 	if !strings.Contains(firstOut, "apply terminé") {
 		t.Errorf("sortie du premier apply = %q, attendu la confirmation de fin", firstOut)
 	}
+	if !strings.Contains(firstOut, "graine retirée") || !strings.Contains(firstOut, "master.key") {
+		t.Errorf("sortie du premier apply = %q, attendu le retrait de la graine et la liste à conserver hors ligne", firstOut)
+	}
 
 	secondOut, err := runCLI(t, "apply", "-f", specFile, "--state-dir", stateDir, "--auto-approve")
 	if err != nil {

@@ -7,17 +7,19 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"path/filepath"
 	"strings"
 
 	"github.com/spf13/cobra"
 
 	"genesis/internal/engine"
+	"genesis/internal/state"
 )
 
 func newApplyCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "apply",
-		Short: "Exécute le plan jusqu'à la passation",
+		Short: "Exécute le plan : graine, cible, passation puis retrait de la graine",
 	}
 	cmd.Flags().StringP("file", "f", "", "chemin de la spec YAML")
 	_ = cmd.MarkFlagRequired("file")
@@ -66,10 +68,32 @@ func newApplyCmd() *cobra.Command {
 			return err
 		}
 
-		_, err = fmt.Fprintln(out, "apply terminé.")
-		return err
+		if _, err := fmt.Fprintln(out, "apply terminé."); err != nil {
+			return err
+		}
+		return printSeedStatus(out, stateDir)
 	}
 	return cmd
+}
+
+// printSeedStatus indique si la graine a été retirée et, le cas échéant, ce
+// qu'il faut conserver hors ligne avant de supprimer la machine graine
+// (docs/05-cycle-bootstrap.md, phase 4).
+func printSeedStatus(out io.Writer, stateDir string) error {
+	st, err := state.Load(stateDir)
+	if err != nil {
+		return err
+	}
+	if !st.SeedRetired {
+		_, err := fmt.Fprintln(out, "graine conservée : toutes ses fonctions ne sont pas encore reprises par la cible (voir le journal).")
+		return err
+	}
+	_, err = fmt.Fprintf(out, `graine retirée. À conserver hors ligne avant de supprimer la machine graine :
+  - %s (clé maîtresse, déchiffre les secrets de récupération)
+  - %s (copie chiffrée des secrets de récupération : racine CA, clés de descellement)
+  - %s (état)
+`, filepath.Join(stateDir, "master.key"), filepath.Join(stateDir, "secrets"), filepath.Join(stateDir, "state.json"))
+	return err
 }
 
 func confirm(cmd *cobra.Command) (bool, error) {
