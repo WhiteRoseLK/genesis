@@ -1,0 +1,29 @@
+# Verify (module teleport) : depuis une VM tierce jetable, prouve une
+# connexion SSH réelle à travers l'agent Teleport (port 3022, certificat
+# signé par la CA interne via tctl auth sign --format=openssh,
+# docs/09-decisions.md ADR-018 : SSH standard, pas un protocole
+# propriétaire).
+- hosts: target
+  gather_facts: false
+  become: true
+  tasks:
+    - name: deposer la cle privee du certificat utilisateur
+      ansible.builtin.copy:
+        content: "{{ user_private_key_pem }}"
+        dest: /tmp/genesis-teleport-verify
+        mode: "0600"
+
+    - name: deposer le certificat OpenSSH signe par teleport
+      ansible.builtin.copy:
+        content: "{{ user_certificate_openssh }}"
+        dest: /tmp/genesis-teleport-verify-cert.pub
+        mode: "0644"
+
+    - name: connexion via l'agent teleport (port 3022, par certificat)
+      ansible.builtin.command: >
+        ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null
+        -o BatchMode=yes -o ConnectTimeout=10
+        -i /tmp/genesis-teleport-verify -p 3022
+        {{ agent_user }}@{{ agent_host }} echo AGENT_SSH_OK
+      register: agent_ssh
+      changed_when: false

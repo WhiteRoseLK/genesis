@@ -1,0 +1,80 @@
+# fleet.agent/v1.Install (module teleport, ADR-017) : installe l'agent
+# Teleport (ssh_service seul) sur une VM du parc et l'enrôle via un jeton à
+# usage court (join_token/ca_pin/auth_server reçus du module). Le sshd natif
+# reste actif à ce jalon -- le cœur ne bascule pas encore ses runners
+# core.ansible/v1 vers l'agent (Repoint différé, docs/PROGRESS.md, dette
+# suivie par une issue dédiée) : le désactiver casserait tout appel
+# ultérieur de core.ansible/v1 sur cette VM (ex. Handover de vault).
+- hosts: target
+  gather_facts: true
+  become: true
+  tasks:
+    - name: installer les prerequis
+      ansible.builtin.apt:
+        name: [gnupg, curl, ca-certificates]
+        state: present
+        update_cache: true
+
+    - name: creer le repertoire des cles APT
+      ansible.builtin.file:
+        path: /usr/share/keyrings
+        state: directory
+        mode: "0755"
+
+    - name: ajouter la cle GPG Teleport
+      ansible.builtin.get_url:
+        url: https://apt.releases.teleport.dev/gpg
+        dest: /usr/share/keyrings/teleport-archive-keyring.asc
+        mode: "0644"
+
+    - name: ajouter le depot Teleport
+      ansible.builtin.apt_repository:
+        repo: "deb [signed-by=/usr/share/keyrings/teleport-archive-keyring.asc] https://apt.releases.teleport.dev/debian/ {{ ansible_distribution_release | default('bookworm') }} stable/v17"
+        state: present
+        filename: teleport
+
+    - name: installer teleport
+      ansible.builtin.apt:
+        name: teleport
+        state: present
+        update_cache: true
+
+    - name: verifier si l'agent est deja enrole
+      ansible.builtin.stat:
+        path: /var/lib/teleport/host_uuid
+      register: enrolled
+
+    - name: configurer teleport.yaml (agent SSH seul)
+      ansible.builtin.copy:
+        content: |
+          version: v3
+          teleport:
+            nodename: {{ node_name }}
+            data_dir: /var/lib/teleport
+            join_params:
+              token_name: {{ join_token }}
+              method: token
+            ca_pin: {{ ca_pin }}
+            auth_server: {{ auth_server }}
+          auth_service:
+            enabled: false
+          proxy_service:
+            enabled: false
+          ssh_service:
+            enabled: true
+            listen_addr: 0.0.0.0:3022
+        dest: /etc/teleport/teleport.yaml
+        mode: "0640"
+      when: not enrolled.stat.exists
+
+    - name: activer et demarrer l'agent teleport
+      ansible.builtin.systemd:
+        name: teleport
+        enabled: true
+        state: restarted
+      when: not enrolled.stat.exists
+
+    - name: s'assurer que l'agent tourne
+      ansible.builtin.systemd:
+        name: teleport
+        state: started

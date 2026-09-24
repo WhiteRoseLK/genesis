@@ -1,0 +1,44 @@
+# Verify (module teleport) : crée (idempotent) un utilisateur Teleport de
+# vérification et signe un certificat SSH utilisateur court terme (tctl
+# auth sign --format=openssh) -- même CA interne que les agents, tctl
+# tourne en local sur la propre VM teleport (docs/09-decisions.md ADR-018).
+- hosts: target
+  gather_facts: false
+  become: true
+  tasks:
+    - name: lister les utilisateurs teleport existants
+      ansible.builtin.command: tctl users ls --config=/etc/teleport/teleport.yaml
+      register: users_out
+      changed_when: false
+
+    - name: creer l'utilisateur de verification
+      ansible.builtin.command: >
+        tctl users add {{ verify_user }} --roles=access --logins={{ ssh_login }}
+        --config=/etc/teleport/teleport.yaml
+      when: verify_user not in users_out.stdout
+      changed_when: true
+
+    - name: signer un certificat SSH court terme pour l'utilisateur de verification
+      ansible.builtin.command: >
+        tctl auth sign --user={{ verify_user }} --out=/tmp/genesis-verify
+        --ttl={{ cert_ttl }} --format=openssh --overwrite
+        --config=/etc/teleport/teleport.yaml
+      changed_when: true
+
+    - name: lire la cle privee generee
+      ansible.builtin.slurp:
+        src: /tmp/genesis-verify
+      register: priv_key_b64
+
+    - name: lire le certificat genere
+      ansible.builtin.slurp:
+        src: /tmp/genesis-verify-cert.pub
+      register: cert_b64
+
+    - name: afficher la cle privee (marqueur pour le module)
+      ansible.builtin.debug:
+        msg: "PRIVATE_KEY_B64:{{ priv_key_b64.content }}"
+
+    - name: afficher le certificat (marqueur pour le module)
+      ansible.builtin.debug:
+        msg: "CERTIFICATE_B64:{{ cert_b64.content }}"
