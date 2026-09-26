@@ -183,7 +183,7 @@ func (s *computeVMServer) EnsureVM(ctx context.Context, req *computevmv1.EnsureV
 		if err != nil {
 			return nil, err
 		}
-		return &computevmv1.VM{Id: strconv.Itoa(existing.VMID), Name: existing.Name, Ip: req.GetIp(), Status: status.Status}, nil
+		return &computevmv1.VM{Id: strconv.Itoa(existing.VMID), Name: existing.Name, Ip: req.GetIp(), Status: status.Status, SshPort: sshPort}, nil
 	}
 
 	template, err := client.FindTemplateByName(ctx, cfg.Node, cfg.Image)
@@ -223,8 +223,12 @@ func (s *computeVMServer) EnsureVM(ctx context.Context, req *computevmv1.EnsureV
 	if err != nil {
 		return nil, err
 	}
-	return &computevmv1.VM{Id: strconv.Itoa(newID), Name: req.GetName(), Ip: req.GetIp(), Status: status.Status}, nil
+	return &computevmv1.VM{Id: strconv.Itoa(newID), Name: req.GetName(), Ip: req.GetIp(), Status: status.Status, SshPort: sshPort}, nil
 }
+
+// sshPort : une VM Proxmox est une vraie VM, SSH écoute sur le port standard
+// (compute.vm/v1 : les consommateurs utilisent VM.ssh_port, jamais 22 en dur).
+const sshPort = 22
 
 func (s *computeVMServer) GetVM(ctx context.Context, req *computevmv1.GetVMRequest) (*computevmv1.VM, error) {
 	client, cfg, err := s.client()
@@ -242,7 +246,7 @@ func (s *computeVMServer) GetVM(ctx context.Context, req *computevmv1.GetVMReque
 	if err != nil {
 		return nil, err
 	}
-	return &computevmv1.VM{Id: strconv.Itoa(vm.VMID), Name: vm.Name, Status: status.Status}, nil
+	return &computevmv1.VM{Id: strconv.Itoa(vm.VMID), Name: vm.Name, Status: status.Status, SshPort: sshPort}, nil
 }
 
 // DeleteVM est idempotent : une VM déjà absente n'est pas une erreur.
