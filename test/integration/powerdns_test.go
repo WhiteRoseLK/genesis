@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 
-package modulehost
+package integration
 
 import (
 	"context"
@@ -16,6 +16,7 @@ import (
 	"google.golang.org/grpc"
 
 	"github.com/WhiteRoseLK/genesis/internal/broker"
+	"github.com/WhiteRoseLK/genesis/internal/modulehost"
 	computevmv1 "github.com/WhiteRoseLK/genesis/sdk/go/gen/functions/compute/vm/v1"
 	ansiblev1 "github.com/WhiteRoseLK/genesis/sdk/go/gen/functions/core/ansible/v1"
 	dnsresolverv1 "github.com/WhiteRoseLK/genesis/sdk/go/gen/functions/dns/resolver/v1"
@@ -281,7 +282,7 @@ func TestPowerDNSLifecycle(t *testing.T) {
 	binaryPath, manifest := buildModule(t, "powerdns")
 	pdnsAPI := startFakePowerDNSAPI(t)
 
-	client, err := Launch(binaryPath, manifest)
+	client, err := modulehost.Launch(binaryPath, manifest)
 	if err != nil {
 		t.Fatalf("Launch : %v", err)
 	}

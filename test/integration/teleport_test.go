@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: Apache-2.0
 
-package modulehost
+//go:build docker
+
+package integration
 
 import (
 	"context"
@@ -17,7 +19,8 @@ import (
 	"google.golang.org/grpc"
 
 	"github.com/WhiteRoseLK/genesis/internal/broker"
-	"github.com/WhiteRoseLK/genesis/internal/runner"
+	"github.com/WhiteRoseLK/genesis/internal/modulehost"
+	"github.com/WhiteRoseLK/genesis/internal/testutil"
 	computevmv1 "github.com/WhiteRoseLK/genesis/sdk/go/gen/functions/compute/vm/v1"
 	ansiblev1 "github.com/WhiteRoseLK/genesis/sdk/go/gen/functions/core/ansible/v1"
 	dnsresolverv1 "github.com/WhiteRoseLK/genesis/sdk/go/gen/functions/dns/resolver/v1"
@@ -47,7 +50,7 @@ import (
 // (playbooks/install_teleport.yml, install_agent.yml) cible le dépôt APT
 // officiel en canal stable/v17, indépendamment de cette image de test.
 const (
-	teleportImage    = "public.ecr.aws/gravitational/teleport:14"
+	teleportImage    = "public.ecr.aws/gravitational/teleport:14.4.1@sha256:1a0b1561362e5203197908d9a0769078f6df6dd3ae3654697f7000c1280bc293"
 	teleportNodePort = "13022"
 	// teleportTestSSHUser doit correspondre à sshUser (modules/teleport/main.go) :
 	// internal/ ne peut pas importer modules/, cette constante est donc
@@ -476,7 +479,7 @@ func (f *teleportFakeAnsibleServer) cleanup() {
 }
 
 type teleportTestHandle struct {
-	client        *Client
+	client        *modulehost.Client
 	token         string
 	configured    *modulev1.StepResult
 	ansibleServer *teleportFakeAnsibleServer
@@ -486,10 +489,7 @@ func launchTeleportTest(t *testing.T) teleportTestHandle {
 	t.Helper()
 	ctx := context.Background()
 
-	rt, err := runner.DetectContainerRuntime("auto")
-	if err != nil {
-		t.Skipf("aucun runtime de conteneur disponible : %v", err)
-	}
+	rt := testutil.RequireRuntime(t)
 	store := newTestSecretsStore(t)
 	registry := broker.NewRegistry()
 	registry.SetNative("core.container/v1", broker.NativeContainer(rt))
@@ -498,9 +498,9 @@ func launchTeleportTest(t *testing.T) teleportTestHandle {
 	// step-ca réel : seul fournisseur pki.issuer/v1 crédible pour ce test
 	// (même choix que internal/modulehost/vault_test.go).
 	stepCABinary, stepCAManifest := buildModule(t, "step-ca")
-	stepCAClient, err := Launch(stepCABinary, stepCAManifest)
+	stepCAClient, err := modulehost.Launch(stepCABinary, stepCAManifest)
 	if err != nil {
-		t.Fatalf("Launch(step-ca) : %v", err)
+		t.Fatalf("modulehost.Launch(step-ca) : %v", err)
 	}
 	t.Cleanup(stepCAClient.Close)
 	stepCAToken := registry.OpenSession(stepCAClient.Broker(), "step-ca", []string{"core.container/v1", "core.secrets/v1"})
@@ -517,9 +517,9 @@ func launchTeleportTest(t *testing.T) teleportTestHandle {
 	}
 
 	binaryPath, manifest := buildModule(t, "teleport")
-	client, err := Launch(binaryPath, manifest)
+	client, err := modulehost.Launch(binaryPath, manifest)
 	if err != nil {
-		t.Fatalf("Launch(teleport) : %v", err)
+		t.Fatalf("modulehost.Launch(teleport) : %v", err)
 	}
 	t.Cleanup(client.Close)
 

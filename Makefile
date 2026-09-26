@@ -1,4 +1,4 @@
-.PHONY: build test lint proto e2e mod-check
+.PHONY: build test test-docker lint proto e2e mod-check
 
 # Modules Go du monorepo, un par go.mod (cœur, sdk, modules/*, test/modules/*).
 # Découverts automatiquement : ajouter un module ne doit nécessiter aucune
@@ -9,10 +9,19 @@ GO_MODULES := $(shell find . -name go.mod -not -path './.git/*' -exec dirname {}
 build:
 	go build ./...
 
+# Tests unitaires : sans réseau ni démon de conteneurs.
 test:
 	@set -e; for m in $(GO_MODULES); do \
 		echo "==> go test ($$m)"; \
 		(cd $$m && go test ./...); \
+	done
+
+# Tests d'intégration contre de vrais conteneurs (build tag `docker`) :
+# nécessitent un démon docker ou podman et tirent des images.
+test-docker:
+	@set -e; for m in $(GO_MODULES); do \
+		echo "==> go test -tags docker ($$m)"; \
+		(cd $$m && go test -tags docker ./...); \
 	done
 
 # Chaque go.mod doit se suffire à lui-même (hors espace de travail go.work) et

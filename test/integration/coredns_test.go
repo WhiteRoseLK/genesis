@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: Apache-2.0
 
-package modulehost
+//go:build docker
+
+package integration
 
 import (
 	"context"
@@ -12,7 +14,9 @@ import (
 	"time"
 
 	"github.com/WhiteRoseLK/genesis/internal/broker"
+	"github.com/WhiteRoseLK/genesis/internal/modulehost"
 	"github.com/WhiteRoseLK/genesis/internal/runner"
+	"github.com/WhiteRoseLK/genesis/internal/testutil"
 	sdk "github.com/WhiteRoseLK/genesis/sdk/go"
 	dnszonev1 "github.com/WhiteRoseLK/genesis/sdk/go/gen/functions/dns/zone/v1"
 	modulev1 "github.com/WhiteRoseLK/genesis/sdk/go/gen/module/v1"
@@ -26,7 +30,7 @@ func buildCoreDNS(t *testing.T) (binaryPath string, manifest *sdk.ManifestFile) 
 	}
 	sourceDir := filepath.Join(wd, "..", "..", "modules", "coredns")
 
-	binaryPath = filepath.Join(t.TempDir(), BinaryName())
+	binaryPath = filepath.Join(t.TempDir(), modulehost.BinaryName())
 	build := exec.Command("go", "build", "-o", binaryPath, ".")
 	build.Dir = sourceDir
 	if out, err := build.CombinedOutput(); err != nil {
@@ -40,15 +44,16 @@ func buildCoreDNS(t *testing.T) (binaryPath string, manifest *sdk.ManifestFile) 
 }
 
 // resolveWith interroge le serveur DNS à ip:53 depuis un conteneur tiers
-// (nslookup, via bind-tools) : même limite d'environnement que les autres
-// tests J5/J6, pas de dial réseau direct vers un conteneur depuis ce process.
+// (nslookup de busybox, inclus dans alpine : aucun paquet à télécharger) :
+// même limite d'environnement que les autres tests J5/J6, pas de dial
+// réseau direct vers un conteneur depuis ce process.
 func resolveWith(t *testing.T, rt *runner.ContainerRuntime, ip, name string) string {
 	t.Helper()
 	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 	defer cancel()
 	result, err := rt.Run(ctx, runner.RunOptions{
-		Image:   "alpine:3",
-		Command: []string{"sh", "-c", "apk add -q --no-cache bind-tools >/dev/null 2>&1 && nslookup " + name + " " + ip},
+		Image:   "alpine:3.24.2@sha256:294b683cb724975bec92580e1e685676bd4b50bda910ddb8c51d4cabeaec77e6",
+		Command: []string{"nslookup", name, ip},
 	})
 	if err != nil {
 		t.Fatalf("nslookup %s @%s : %v", name, ip, err)
@@ -61,19 +66,16 @@ func resolveWith(t *testing.T, rt *runner.ContainerRuntime, ip, name string) str
 // après UpsertRecord, et le retrait après DeleteRecord est réel aussi —
 // vérifié par une vraie requête DNS, pas la parole du module.
 func TestCoreDNSResolvesUpsertedRecord(t *testing.T) {
-	rt, err := runner.DetectContainerRuntime("auto")
-	if err != nil {
-		t.Skipf("aucun runtime de conteneur disponible : %v", err)
-	}
+	rt := testutil.RequireRuntime(t)
 	registry := broker.NewRegistry()
 	registry.SetNative("core.container/v1", broker.NativeContainer(rt))
 
 	binaryPath, manifest := buildCoreDNS(t)
-	client, err := Launch(binaryPath, manifest)
+	client, err := modulehost.Launch(binaryPath, manifest)
 	if err != nil {
 		t.Fatalf("Launch : %v", err)
 	}
-	defer client.Close()
+	t.Cleanup(client.Close)
 	ctx := context.Background()
 
 	token := registry.OpenSession(client.Broker(), "coredns", []string{"core.container/v1"})
@@ -93,6 +95,12 @@ func TestCoreDNSResolvesUpsertedRecord(t *testing.T) {
 	if seedUpResp.GetStatus() != modulev1.StepResult_STATUS_OK {
 		t.Fatalf("SeedUp().Status = %v", seedUpResp.GetStatus())
 	}
+	// Arrête le conteneur CoreDNS même en cas d'échec : sinon son nom fixe
+	// bloque les exécutions suivantes (« container name already in use »).
+	t.Cleanup(func() {
+		downToken := registry.OpenSession(client.Broker(), "coredns", []string{"core.container/v1"})
+		_, _ = client.Module().Destroy(context.Background(), &modulev1.StepRequest{RunId: "test", BrokerToken: downToken})
+	})
 
 	conn, err := client.DispenseFunction("dns.zone/v1")
 	if err != nil {

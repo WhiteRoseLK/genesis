@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: Apache-2.0
 
-package modulehost
+//go:build docker
+
+package integration
 
 import (
 	"context"
@@ -15,7 +17,8 @@ import (
 	gossh "golang.org/x/crypto/ssh"
 
 	"github.com/WhiteRoseLK/genesis/internal/broker"
-	"github.com/WhiteRoseLK/genesis/internal/runner"
+	"github.com/WhiteRoseLK/genesis/internal/modulehost"
+	"github.com/WhiteRoseLK/genesis/internal/testutil"
 	sdk "github.com/WhiteRoseLK/genesis/sdk/go"
 	computevmv1 "github.com/WhiteRoseLK/genesis/sdk/go/gen/functions/compute/vm/v1"
 	modulev1 "github.com/WhiteRoseLK/genesis/sdk/go/gen/module/v1"
@@ -30,7 +33,7 @@ func buildFakeCompute(t *testing.T) (binaryPath string, manifest *sdk.ManifestFi
 	}
 	sourceDir := filepath.Join(wd, "..", "..", "modules", "fake-compute")
 
-	binaryPath = filepath.Join(t.TempDir(), BinaryName())
+	binaryPath = filepath.Join(t.TempDir(), modulehost.BinaryName())
 	build := exec.Command("go", "build", "-o", binaryPath, ".")
 	build.Dir = sourceDir
 	if out, err := build.CombinedOutput(); err != nil {
@@ -47,19 +50,16 @@ func buildFakeCompute(t *testing.T) (binaryPath string, manifest *sdk.ManifestFi
 // launchFakeComputeWithContainerSession lance fake-compute et lui ouvre une
 // session de broker vers core.container/v1 natif — exactement ce que ferait
 // internal/engine, reproduit ici pour tester le module isolément.
-func launchFakeComputeWithContainerSession(t *testing.T) (*Client, computevmv1.ComputeVMClient) {
+func launchFakeComputeWithContainerSession(t *testing.T) (*modulehost.Client, computevmv1.ComputeVMClient) {
 	t.Helper()
 	ctx := context.Background()
 
-	rt, err := runner.DetectContainerRuntime("auto")
-	if err != nil {
-		t.Skipf("aucun runtime de conteneur disponible : %v", err)
-	}
+	rt := testutil.RequireRuntime(t)
 	registry := broker.NewRegistry()
 	registry.SetNative("core.container/v1", broker.NativeContainer(rt))
 
 	binaryPath, manifest := buildFakeCompute(t)
-	client, err := Launch(binaryPath, manifest)
+	client, err := modulehost.Launch(binaryPath, manifest)
 	if err != nil {
 		t.Fatalf("Launch : %v", err)
 	}

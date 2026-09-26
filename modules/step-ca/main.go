@@ -40,7 +40,7 @@ import (
 var manifestYAML []byte
 
 const (
-	stepCAImage                = "smallstep/step-ca:latest"
+	stepCAImage                = "smallstep/step-ca:0.30.2@sha256:a2b17872915c193259b75a5474c398326f41bd199f0842093e52cf4182bc8270"
 	caPasswordRef              = "step-ca/ca-password"
 	rootCertRef                = "step-ca/root-cert"
 	rootKeyRef                 = "step-ca/root-key"

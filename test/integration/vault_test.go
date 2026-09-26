@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: Apache-2.0
 
-package modulehost
+//go:build docker
+
+package integration
 
 import (
 	"bytes"
@@ -23,8 +25,9 @@ import (
 	"google.golang.org/grpc"
 
 	"github.com/WhiteRoseLK/genesis/internal/broker"
-	"github.com/WhiteRoseLK/genesis/internal/runner"
+	"github.com/WhiteRoseLK/genesis/internal/modulehost"
 	"github.com/WhiteRoseLK/genesis/internal/secrets"
+	"github.com/WhiteRoseLK/genesis/internal/testutil"
 	computevmv1 "github.com/WhiteRoseLK/genesis/sdk/go/gen/functions/compute/vm/v1"
 	ansiblev1 "github.com/WhiteRoseLK/genesis/sdk/go/gen/functions/core/ansible/v1"
 	dnsresolverv1 "github.com/WhiteRoseLK/genesis/sdk/go/gen/functions/dns/resolver/v1"
@@ -206,7 +209,7 @@ disable_mlock = true
 		"-p", "127.0.0.1:"+vaultTestPort+":8200",
 		"-v", f.dir+":/vault/config",
 		"-v", f.dir+"/data:/vault/data",
-		"hashicorp/vault", "server")
+		"hashicorp/vault:2.1.1@sha256:47f14a6acb98f48d798a07df7c83f23a6e636e1cf724c5f8ff165cb32667a1e2", "server")
 	out, err := cmd.CombinedOutput()
 	if err != nil {
 		return string(out), fmt.Errorf("docker run vault : %w", err)
@@ -266,7 +269,7 @@ func (f *vaultFakeAnsibleServer) runVerification(vars map[string]any) (string, e
 }
 
 type vaultTestHandle struct {
-	client        *Client
+	client        *modulehost.Client
 	token         string
 	configured    *modulev1.StepResult
 	pki           pkiissuerv1.PkiIssuerClient
@@ -278,10 +281,7 @@ func launchVaultTest(t *testing.T) vaultTestHandle {
 	t.Helper()
 	ctx := context.Background()
 
-	rt, err := runner.DetectContainerRuntime("auto")
-	if err != nil {
-		t.Skipf("aucun runtime de conteneur disponible : %v", err)
-	}
+	rt := testutil.RequireRuntime(t)
 	store := newTestSecretsStore(t)
 	registry := broker.NewRegistry()
 	registry.SetNative("core.container/v1", broker.NativeContainer(rt))
@@ -290,9 +290,9 @@ func launchVaultTest(t *testing.T) vaultTestHandle {
 	// step-ca réel : seul fournisseur pki.issuer/v1@seed crédible pour ce
 	// test (le réimplémenter en fake reviendrait à réécrire step-ca).
 	stepCABinary, stepCAManifest := buildModule(t, "step-ca")
-	stepCAClient, err := Launch(stepCABinary, stepCAManifest)
+	stepCAClient, err := modulehost.Launch(stepCABinary, stepCAManifest)
 	if err != nil {
-		t.Fatalf("Launch(step-ca) : %v", err)
+		t.Fatalf("modulehost.Launch(step-ca) : %v", err)
 	}
 	t.Cleanup(stepCAClient.Close)
 	stepCAToken := registry.OpenSession(stepCAClient.Broker(), "step-ca", []string{"core.container/v1", "core.secrets/v1"})
@@ -309,9 +309,9 @@ func launchVaultTest(t *testing.T) vaultTestHandle {
 	}
 
 	binaryPath, manifest := buildModule(t, "vault")
-	client, err := Launch(binaryPath, manifest)
+	client, err := modulehost.Launch(binaryPath, manifest)
 	if err != nil {
-		t.Fatalf("Launch(vault) : %v", err)
+		t.Fatalf("modulehost.Launch(vault) : %v", err)
 	}
 	t.Cleanup(client.Close)
 

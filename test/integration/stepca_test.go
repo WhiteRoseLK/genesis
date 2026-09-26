@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: Apache-2.0
 
-package modulehost
+//go:build docker
+
+package integration
 
 import (
 	"context"
@@ -14,8 +16,10 @@ import (
 	"testing"
 
 	"github.com/WhiteRoseLK/genesis/internal/broker"
+	"github.com/WhiteRoseLK/genesis/internal/modulehost"
 	"github.com/WhiteRoseLK/genesis/internal/runner"
 	"github.com/WhiteRoseLK/genesis/internal/secrets"
+	"github.com/WhiteRoseLK/genesis/internal/testutil"
 	pkiissuerv1 "github.com/WhiteRoseLK/genesis/sdk/go/gen/functions/pki/issuer/v1"
 	modulev1 "github.com/WhiteRoseLK/genesis/sdk/go/gen/module/v1"
 )
@@ -25,10 +29,7 @@ import (
 // modules/coredns, reproduit ici pour tester le module isolément.
 func launchStepCA(t *testing.T) pkiissuerv1.PkiIssuerClient {
 	t.Helper()
-	rt, err := runner.DetectContainerRuntime("auto")
-	if err != nil {
-		t.Skipf("aucun runtime de conteneur disponible : %v", err)
-	}
+	rt := testutil.RequireRuntime(t)
 	return launchStepCAWithStore(t, rt, newTestSecretsStore(t))
 }
 
@@ -44,7 +45,7 @@ func launchStepCAWithStore(t *testing.T, rt *runner.ContainerRuntime, store *sec
 	registry.SetNative("core.secrets/v1", broker.NativeSecrets(store))
 
 	binaryPath, manifest := buildModule(t, "step-ca")
-	client, err := Launch(binaryPath, manifest)
+	client, err := modulehost.Launch(binaryPath, manifest)
 	if err != nil {
 		t.Fatalf("Launch : %v", err)
 	}
@@ -197,10 +198,7 @@ func TestStepCAIssuesAndSignsRealCertificates(t *testing.T) {
 // instance doit retrouver la MÊME racine, stockée par la première via
 // core.secrets, pas en générer une nouvelle.
 func TestStepCAReusesRootAcrossRestarts(t *testing.T) {
-	rt, err := runner.DetectContainerRuntime("auto")
-	if err != nil {
-		t.Skipf("aucun runtime de conteneur disponible : %v", err)
-	}
+	rt := testutil.RequireRuntime(t)
 	store := newTestSecretsStore(t)
 	ctx := context.Background()
 

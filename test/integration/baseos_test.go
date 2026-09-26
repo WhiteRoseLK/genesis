@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 
-package modulehost
+package integration
 
 import (
 	"context"
@@ -14,6 +14,7 @@ import (
 
 	"google.golang.org/grpc"
 
+	"github.com/WhiteRoseLK/genesis/internal/modulehost"
 	sdk "github.com/WhiteRoseLK/genesis/sdk/go"
 	ansiblev1 "github.com/WhiteRoseLK/genesis/sdk/go/gen/functions/core/ansible/v1"
 	osbasev1 "github.com/WhiteRoseLK/genesis/sdk/go/gen/functions/os/base/v1"
@@ -28,7 +29,7 @@ func buildModule(t *testing.T, name string) (binaryPath string, manifest *sdk.Ma
 	}
 	sourceDir := filepath.Join(wd, "..", "..", "modules", name)
 
-	binaryPath = filepath.Join(t.TempDir(), BinaryName())
+	binaryPath = filepath.Join(t.TempDir(), modulehost.BinaryName())
 	build := exec.Command("go", "build", "-o", binaryPath, ".")
 	build.Dir = sourceDir
 	if out, err := build.CombinedOutput(); err != nil {
@@ -73,7 +74,7 @@ func (f *fakeAnsibleServer) lastCall() *ansiblev1.RunPlaybookRequest {
 func TestBaseOSCallsAnsibleWithExpectedPlaybooks(t *testing.T) {
 	binaryPath, manifest := buildModule(t, "base-os")
 
-	client, err := Launch(binaryPath, manifest)
+	client, err := modulehost.Launch(binaryPath, manifest)
 	if err != nil {
 		t.Fatalf("Launch : %v", err)
 	}

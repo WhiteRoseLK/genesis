@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 
-package modulehost
+package integration
 
 import (
 	"context"
@@ -15,6 +15,7 @@ import (
 
 	"google.golang.org/protobuf/types/known/structpb"
 
+	"github.com/WhiteRoseLK/genesis/internal/modulehost"
 	computevmv1 "github.com/WhiteRoseLK/genesis/sdk/go/gen/functions/compute/vm/v1"
 	modulev1 "github.com/WhiteRoseLK/genesis/sdk/go/gen/module/v1"
 )
@@ -163,7 +164,7 @@ func TestProxmoxEnsureVMIsIdempotentAndLifecycleWorks(t *testing.T) {
 	t.Cleanup(srv.Close)
 
 	binaryPath, manifest := buildModule(t, "proxmox")
-	client, err := Launch(binaryPath, manifest)
+	client, err := modulehost.Launch(binaryPath, manifest)
 	if err != nil {
 		t.Fatalf("Launch : %v", err)
 	}

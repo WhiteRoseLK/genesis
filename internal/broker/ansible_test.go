@@ -1,5 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
+//go:build docker
+
 package broker
 
 import (
@@ -15,17 +17,9 @@ import (
 	gossh "golang.org/x/crypto/ssh"
 
 	"github.com/WhiteRoseLK/genesis/internal/runner"
+	"github.com/WhiteRoseLK/genesis/internal/testutil"
 	ansiblev1 "github.com/WhiteRoseLK/genesis/sdk/go/gen/functions/core/ansible/v1"
 )
-
-func requireContainerRuntime(t *testing.T) *runner.ContainerRuntime {
-	t.Helper()
-	rt, err := runner.DetectContainerRuntime("auto")
-	if err != nil {
-		t.Skipf("aucun runtime de conteneur disponible : %v", err)
-	}
-	return rt
-}
 
 // sshTarget est un conteneur SSH jetable faisant office de VM cible, pour
 // tester réellement core.ansible/v1 sans hyperviseur (docs/08-jalons.md, J5).
@@ -62,7 +56,7 @@ func startSSHTarget(t *testing.T, rt *runner.ContainerRuntime) *sshTarget {
 	}
 
 	result, err := rt.Run(ctx, runner.RunOptions{
-		Image: "lscr.io/linuxserver/openssh-server:latest",
+		Image: "lscr.io/linuxserver/openssh-server:10.3_p1-r1-ls237@sha256:946fa26105e0ec212fdf821b9ddc59aab65f2c2d07c02b25ff0f5001fc332ff0",
 		Env: map[string]string{
 			"PUBLIC_KEY":      string(gossh.MarshalAuthorizedKey(sshPub)),
 			"USER_NAME":       "genesis",
@@ -143,7 +137,7 @@ func runPlaybookWithRetry(t *testing.T, server *ansibleServer, req *ansiblev1.Ru
 // réellement en SSH à la cible et y exécute réellement la tâche — vérifié via
 // `docker exec` sur la cible, pas en croyant la réponse d'ansible sur parole.
 func TestRunPlaybookActuallyConfiguresTarget(t *testing.T) {
-	rt := requireContainerRuntime(t)
+	rt := testutil.RequireRuntime(t)
 	target := startSSHTarget(t, rt)
 
 	// ansible.builtin.raw plutôt que copy/template : l'image SSH jetable de
