@@ -114,3 +114,28 @@ func TestRunMountsHostDirectory(t *testing.T) {
 		t.Errorf("contenu du fichier = %q, attendu contenu", data)
 	}
 }
+
+func TestRunWithFilesExchangesThroughContainerLayer(t *testing.T) {
+	rt := testutil.RequireRuntime(t)
+	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
+	defer cancel()
+
+	result, err := rt.Run(ctx, runner.RunOptions{
+		Image: "alpine:3.24.2@sha256:294b683cb724975bec92580e1e685676bd4b50bda910ddb8c51d4cabeaec77e6",
+		Command: []string{"sh", "-c", "tr a-z A-Z < /work/in.txt > /work/out.txt && echo fini"},
+		Files:   map[string][]byte{"/work/in.txt": []byte("secret")},
+		Collect: []string{"/work/out.txt"},
+	})
+	if err != nil {
+		t.Fatalf("Run : %v", err)
+	}
+	if result.ExitCode != 0 {
+		t.Fatalf("ExitCode = %d : %s", result.ExitCode, result.Stderr)
+	}
+	if !strings.Contains(result.Stdout, "fini") {
+		t.Errorf("Stdout = %q, attendu « fini »", result.Stdout)
+	}
+	if got := string(result.Collected["/work/out.txt"]); got != "SECRET" {
+		t.Errorf("fichier collecté = %q, attendu SECRET", got)
+	}
+}

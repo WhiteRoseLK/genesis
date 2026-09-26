@@ -32,16 +32,31 @@ func (c *containerServer) Run(ctx context.Context, req *containerv1.RunRequest) 
 	for i, m := range req.GetMounts() {
 		mounts[i] = runner.Mount{HostPath: m.GetHostPath(), ContainerPath: m.GetContainerPath(), ReadOnly: m.GetReadOnly()}
 	}
+	var files map[string][]byte
+	if len(req.GetFiles()) > 0 {
+		files = make(map[string][]byte, len(req.GetFiles()))
+		for _, f := range req.GetFiles() {
+			files[f.GetPath()] = f.GetContent()
+		}
+	}
 	result, err := c.runtime.Run(ctx, runner.RunOptions{
 		Name:    req.GetName(),
 		Image:   req.GetImage(),
 		Command: req.GetCommand(),
 		Env:     req.GetEnv(),
 		Mounts:  mounts,
+		Files:   files,
+		Collect: req.GetCollect(),
 		Detach:  req.GetDetach(),
 	})
 	if err != nil {
 		return nil, err
+	}
+	collected := make([]*containerv1.File, 0, len(result.Collected))
+	for _, p := range req.GetCollect() {
+		if content, ok := result.Collected[p]; ok {
+			collected = append(collected, &containerv1.File{Path: p, Content: content})
+		}
 	}
 
 	var ip string
@@ -58,6 +73,7 @@ func (c *containerServer) Run(ctx context.Context, req *containerv1.RunRequest) 
 		Stdout:      result.Stdout,
 		Stderr:      result.Stderr,
 		Ip:          ip,
+		Collected:   collected,
 	}, nil
 }
 
