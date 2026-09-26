@@ -7,13 +7,13 @@ import (
 	"fmt"
 	"regexp"
 
-	sdk "genesis/sdk/go"
-	ansiblev1 "genesis/sdk/go/gen/functions/core/ansible/v1"
-	dnsresolverv1 "genesis/sdk/go/gen/functions/dns/resolver/v1"
-	osbasev1 "genesis/sdk/go/gen/functions/os/base/v1"
-	pkiissuerv1 "genesis/sdk/go/gen/functions/pki/issuer/v1"
-	timentpv1 "genesis/sdk/go/gen/functions/time/ntp/v1"
-	modulev1 "genesis/sdk/go/gen/module/v1"
+	sdk "github.com/WhiteRoseLK/genesis/sdk/go"
+	ansiblev1 "github.com/WhiteRoseLK/genesis/sdk/go/gen/functions/core/ansible/v1"
+	dnsresolverv1 "github.com/WhiteRoseLK/genesis/sdk/go/gen/functions/dns/resolver/v1"
+	osbasev1 "github.com/WhiteRoseLK/genesis/sdk/go/gen/functions/os/base/v1"
+	pkiissuerv1 "github.com/WhiteRoseLK/genesis/sdk/go/gen/functions/pki/issuer/v1"
+	timentpv1 "github.com/WhiteRoseLK/genesis/sdk/go/gen/functions/time/ntp/v1"
+	modulev1 "github.com/WhiteRoseLK/genesis/sdk/go/gen/module/v1"
 )
 
 var caPinRe = regexp.MustCompile(`sha256:[0-9a-f]{64}`)

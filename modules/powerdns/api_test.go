@@ -9,7 +9,7 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	dnszonev1 "genesis/sdk/go/gen/functions/dns/zone/v1"
+	dnszonev1 "github.com/WhiteRoseLK/genesis/sdk/go/gen/functions/dns/zone/v1"
 )
 
 // newTestPDNSServer simule l'API REST de PowerDNS Authoritative sur les

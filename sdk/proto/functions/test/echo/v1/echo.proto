@@ -5,7 +5,7 @@ syntax = "proto3";
 // résolveur/planificateur/broker sans logique métier (docs/08-jalons.md, J4).
 package functions.test.echo.v1;
 
-option go_package = "genesis/sdk/go/gen/functions/test/echo/v1;echov1";
+option go_package = "github.com/WhiteRoseLK/genesis/sdk/go/gen/functions/test/echo/v1;echov1";
 
 service Echo {
   rpc Call(CallRequest) returns (CallResponse);

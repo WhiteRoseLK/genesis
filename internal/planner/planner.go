@@ -12,7 +12,7 @@ import (
 	"sort"
 	"strings"
 
-	"genesis/internal/resolver"
+	"github.com/WhiteRoseLK/genesis/internal/resolver"
 )
 
 // Edge documente pourquoi To dépend de From : la fonction concernée. Utile

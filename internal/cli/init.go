@@ -8,8 +8,8 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"genesis/internal/secrets"
-	"genesis/internal/state"
+	"github.com/WhiteRoseLK/genesis/internal/secrets"
+	"github.com/WhiteRoseLK/genesis/internal/state"
 )
 
 func newInitCmd() *cobra.Command {

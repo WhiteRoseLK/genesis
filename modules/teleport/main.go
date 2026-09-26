@@ -26,17 +26,17 @@ import (
 
 	"google.golang.org/grpc"
 
-	sdk "genesis/sdk/go"
-	accesssshv1 "genesis/sdk/go/gen/functions/access/ssh/v1"
-	computevmv1 "genesis/sdk/go/gen/functions/compute/vm/v1"
-	ansiblev1 "genesis/sdk/go/gen/functions/core/ansible/v1"
-	secretsv1 "genesis/sdk/go/gen/functions/core/secrets/v1"
-	dnsresolverv1 "genesis/sdk/go/gen/functions/dns/resolver/v1"
-	fleetagentv1 "genesis/sdk/go/gen/functions/fleet/agent/v1"
-	osbasev1 "genesis/sdk/go/gen/functions/os/base/v1"
-	pkiissuerv1 "genesis/sdk/go/gen/functions/pki/issuer/v1"
-	timentpv1 "genesis/sdk/go/gen/functions/time/ntp/v1"
-	modulev1 "genesis/sdk/go/gen/module/v1"
+	sdk "github.com/WhiteRoseLK/genesis/sdk/go"
+	accesssshv1 "github.com/WhiteRoseLK/genesis/sdk/go/gen/functions/access/ssh/v1"
+	computevmv1 "github.com/WhiteRoseLK/genesis/sdk/go/gen/functions/compute/vm/v1"
+	ansiblev1 "github.com/WhiteRoseLK/genesis/sdk/go/gen/functions/core/ansible/v1"
+	secretsv1 "github.com/WhiteRoseLK/genesis/sdk/go/gen/functions/core/secrets/v1"
+	dnsresolverv1 "github.com/WhiteRoseLK/genesis/sdk/go/gen/functions/dns/resolver/v1"
+	fleetagentv1 "github.com/WhiteRoseLK/genesis/sdk/go/gen/functions/fleet/agent/v1"
+	osbasev1 "github.com/WhiteRoseLK/genesis/sdk/go/gen/functions/os/base/v1"
+	pkiissuerv1 "github.com/WhiteRoseLK/genesis/sdk/go/gen/functions/pki/issuer/v1"
+	timentpv1 "github.com/WhiteRoseLK/genesis/sdk/go/gen/functions/time/ntp/v1"
+	modulev1 "github.com/WhiteRoseLK/genesis/sdk/go/gen/module/v1"
 )
 
 //go:embed module.yaml

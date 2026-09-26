@@ -10,7 +10,7 @@ import (
 
 	"filippo.io/age"
 
-	"genesis/internal/atomicfile"
+	"github.com/WhiteRoseLK/genesis/internal/atomicfile"
 )
 
 // MasterKeyProvider fournit la clé maîtresse qui chiffre le backend `file`

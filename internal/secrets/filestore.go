@@ -15,7 +15,7 @@ import (
 
 	"filippo.io/age"
 
-	"genesis/internal/atomicfile"
+	"github.com/WhiteRoseLK/genesis/internal/atomicfile"
 )
 
 // FileStore est le backend `file` de l'itération 1 (docs/06-secrets-etat.md) :

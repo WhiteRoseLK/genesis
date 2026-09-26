@@ -5,7 +5,7 @@ syntax = "proto3";
 // docs/04-spec.md : seed.container_runtime) piloté en ligne de commande.
 package functions.core.container.v1;
 
-option go_package = "genesis/sdk/go/gen/functions/core/container/v1;containerv1";
+option go_package = "github.com/WhiteRoseLK/genesis/sdk/go/gen/functions/core/container/v1;containerv1";
 
 service Container {
   rpc Run(RunRequest) returns (RunResponse);

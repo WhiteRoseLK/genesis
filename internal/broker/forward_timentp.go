@@ -7,7 +7,7 @@ import (
 
 	"google.golang.org/grpc"
 
-	timentpv1 "genesis/sdk/go/gen/functions/time/ntp/v1"
+	timentpv1 "github.com/WhiteRoseLK/genesis/sdk/go/gen/functions/time/ntp/v1"
 )
 
 // ForwardTimeNTP enregistre un TimeNTPServer qui relaie chaque appel vers

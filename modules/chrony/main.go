@@ -21,13 +21,13 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
-	sdk "genesis/sdk/go"
-	computevmv1 "genesis/sdk/go/gen/functions/compute/vm/v1"
-	ansiblev1 "genesis/sdk/go/gen/functions/core/ansible/v1"
-	secretsv1 "genesis/sdk/go/gen/functions/core/secrets/v1"
-	fleetagentv1 "genesis/sdk/go/gen/functions/fleet/agent/v1"
-	timentpv1 "genesis/sdk/go/gen/functions/time/ntp/v1"
-	modulev1 "genesis/sdk/go/gen/module/v1"
+	sdk "github.com/WhiteRoseLK/genesis/sdk/go"
+	computevmv1 "github.com/WhiteRoseLK/genesis/sdk/go/gen/functions/compute/vm/v1"
+	ansiblev1 "github.com/WhiteRoseLK/genesis/sdk/go/gen/functions/core/ansible/v1"
+	secretsv1 "github.com/WhiteRoseLK/genesis/sdk/go/gen/functions/core/secrets/v1"
+	fleetagentv1 "github.com/WhiteRoseLK/genesis/sdk/go/gen/functions/fleet/agent/v1"
+	timentpv1 "github.com/WhiteRoseLK/genesis/sdk/go/gen/functions/time/ntp/v1"
+	modulev1 "github.com/WhiteRoseLK/genesis/sdk/go/gen/module/v1"
 )
 
 // sshKeyPair reflète la valeur JSON produite par le générateur

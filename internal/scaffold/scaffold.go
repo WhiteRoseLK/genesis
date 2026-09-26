@@ -38,7 +38,8 @@ func Generate(repoRoot, name string, provides []string) (dir string, err error) 
 
 	data := templateData{
 		Name:       name,
-		ModulePath: "genesis-module-" + name,
+		ModulePath: RepoModulePath + "/modules/" + name,
+		SDKPath:    RepoModulePath + "/sdk",
 		Provides:   provides,
 	}
 
@@ -58,11 +59,11 @@ func Generate(repoRoot, name string, provides []string) (dir string, err error) 
 	if err := runIn(repoRoot, "go", "work", "use", filepath.Join(".", "modules", name)); err != nil {
 		return "", fmt.Errorf("ajout au workspace Go (go work use) : %w", err)
 	}
-	// Pas de `go mod tidy` : sous go.work, les paquets des modules du
-	// monorepo (genesis/sdk) sont résolus par la substitution d'espace de
-	// travail sans avoir besoin d'apparaître dans le go.mod du module généré
-	// (comportement documenté de go.work) ; `go build` valide la compilation,
-	// qui est le critère d'acceptation du jalon J3 (doc 08).
+	// Hors espace de travail : le go.mod généré doit se suffire à lui-même
+	// (dépendances tierces du squelette et go.sum), comme vérifié en CI.
+	if err := runIn(dir, "go", "mod", "tidy"); err != nil {
+		return "", fmt.Errorf("résolution des dépendances (go mod tidy) : %w", err)
+	}
 	if err := runIn(dir, "go", "build", "./..."); err != nil {
 		return "", fmt.Errorf("le module généré ne compile pas : %w", err)
 	}
@@ -70,9 +71,13 @@ func Generate(repoRoot, name string, provides []string) (dir string, err error) 
 	return dir, nil
 }
 
+// RepoModulePath est le chemin de module Go du dépôt.
+const RepoModulePath = "github.com/WhiteRoseLK/genesis"
+
 type templateData struct {
 	Name       string
 	ModulePath string
+	SDKPath    string
 	Provides   []string
 }
 
@@ -90,6 +95,9 @@ func renderFile(path string, tmpl *template.Template, data templateData) error {
 func runIn(dir string, name string, args ...string) error {
 	cmd := exec.Command(name, args...)
 	cmd.Dir = dir
+	if len(args) > 0 && args[0] == "mod" {
+		cmd.Env = append(os.Environ(), "GOWORK=off")
+	}
 	out, err := cmd.CombinedOutput()
 	if err != nil {
 		return fmt.Errorf("%s %s (dans %s) : %w\n%s", name, args, dir, err, out)

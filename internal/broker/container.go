@@ -7,8 +7,8 @@ import (
 
 	"google.golang.org/grpc"
 
-	"genesis/internal/runner"
-	containerv1 "genesis/sdk/go/gen/functions/core/container/v1"
+	"github.com/WhiteRoseLK/genesis/internal/runner"
+	containerv1 "github.com/WhiteRoseLK/genesis/sdk/go/gen/functions/core/container/v1"
 )
 
 // NativeContainer construit le fournisseur core.container/v1, natif au cœur

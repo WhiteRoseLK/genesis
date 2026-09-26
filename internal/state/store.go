@@ -9,7 +9,7 @@ import (
 	"os"
 	"path/filepath"
 
-	"genesis/internal/atomicfile"
+	"github.com/WhiteRoseLK/genesis/internal/atomicfile"
 )
 
 // ErrNotInitialized signale l'absence de state_dir/state.json : `genesis

@@ -121,7 +121,7 @@ const file_functions_time_ntp_v1_ntp_proto_rawDesc = "" +
 	"\aaddress\x18\x01 \x01(\tR\aaddress\x12\x12\n" +
 	"\x04port\x18\x02 \x01(\x05R\x04port2X\n" +
 	"\aTimeNTP\x12M\n" +
-	"\bEndpoint\x12\x1c.functions.time.ntp.v1.Empty\x1a#.functions.time.ntp.v1.EndpointInfoB4Z2genesis/sdk/go/gen/functions/time/ntp/v1;timentpv1b\x06proto3"
+	"\bEndpoint\x12\x1c.functions.time.ntp.v1.Empty\x1a#.functions.time.ntp.v1.EndpointInfoBKZIgithub.com/WhiteRoseLK/genesis/sdk/go/gen/functions/time/ntp/v1;timentpv1b\x06proto3"
 
 var (
 	file_functions_time_ntp_v1_ntp_proto_rawDescOnce sync.Once

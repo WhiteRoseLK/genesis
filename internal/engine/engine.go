@@ -42,15 +42,15 @@ import (
 	"google.golang.org/grpc"
 	"google.golang.org/protobuf/types/known/structpb"
 
-	"genesis/internal/broker"
-	"genesis/internal/modulehost"
-	"genesis/internal/planner"
-	"genesis/internal/resolver"
-	"genesis/internal/secrets"
-	"genesis/internal/state"
-	sdk "genesis/sdk/go"
-	secretskvv1 "genesis/sdk/go/gen/functions/secrets/kv/v1"
-	modulev1 "genesis/sdk/go/gen/module/v1"
+	"github.com/WhiteRoseLK/genesis/internal/broker"
+	"github.com/WhiteRoseLK/genesis/internal/modulehost"
+	"github.com/WhiteRoseLK/genesis/internal/planner"
+	"github.com/WhiteRoseLK/genesis/internal/resolver"
+	"github.com/WhiteRoseLK/genesis/internal/secrets"
+	"github.com/WhiteRoseLK/genesis/internal/state"
+	sdk "github.com/WhiteRoseLK/genesis/sdk/go"
+	secretskvv1 "github.com/WhiteRoseLK/genesis/sdk/go/gen/functions/secrets/kv/v1"
+	modulev1 "github.com/WhiteRoseLK/genesis/sdk/go/gen/module/v1"
 )
 
 // providerConn est la connexion dispensée d'un module pour une fonction

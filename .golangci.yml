@@ -12,24 +12,24 @@ linters:
             - "**/internal/**"
             - "**/cmd/**"
           deny:
-            - pkg: "genesis/modules"
+            - pkg: "github.com/WhiteRoseLK/genesis/modules"
               desc: "le cœur (internal/, cmd/) ne doit jamais importer modules/ (docs/02-architecture.md)"
         sdk-must-not-import-core:
           files:
             - "**/sdk/**"
           deny:
-            - pkg: "genesis/internal"
+            - pkg: "github.com/WhiteRoseLK/genesis/internal"
               desc: "le SDK ne dépend jamais de internal/ (docs/03-contrat-module.md, .claude/rules/sdk.md)"
-            - pkg: "genesis/cmd"
+            - pkg: "github.com/WhiteRoseLK/genesis/cmd"
               desc: "le SDK ne dépend jamais de cmd/ (docs/03-contrat-module.md)"
         modules-must-not-import-core:
           files:
             - "**/modules/**"
             - "**/test/modules/**"
           deny:
-            - pkg: "genesis/internal"
+            - pkg: "github.com/WhiteRoseLK/genesis/internal"
               desc: "un module n'importe que sdk/ et des bibliothèques tierces, jamais internal/ (docs/03-contrat-module.md, .claude/rules/modules.md)"
-            - pkg: "genesis/cmd"
+            - pkg: "github.com/WhiteRoseLK/genesis/cmd"
               desc: "un module n'importe que sdk/ et des bibliothèques tierces, jamais cmd/ (docs/03-contrat-module.md)"
 
 run:

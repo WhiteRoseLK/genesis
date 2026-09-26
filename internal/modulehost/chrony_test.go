@@ -12,11 +12,11 @@ import (
 	"filippo.io/age"
 	"google.golang.org/grpc"
 
-	"genesis/internal/broker"
-	"genesis/internal/secrets"
-	computevmv1 "genesis/sdk/go/gen/functions/compute/vm/v1"
-	ansiblev1 "genesis/sdk/go/gen/functions/core/ansible/v1"
-	modulev1 "genesis/sdk/go/gen/module/v1"
+	"github.com/WhiteRoseLK/genesis/internal/broker"
+	"github.com/WhiteRoseLK/genesis/internal/secrets"
+	computevmv1 "github.com/WhiteRoseLK/genesis/sdk/go/gen/functions/compute/vm/v1"
+	ansiblev1 "github.com/WhiteRoseLK/genesis/sdk/go/gen/functions/core/ansible/v1"
+	modulev1 "github.com/WhiteRoseLK/genesis/sdk/go/gen/module/v1"
 )
 
 // chronyFakeComputeVMServer simule compute.vm/v1 : le mécanisme réel de

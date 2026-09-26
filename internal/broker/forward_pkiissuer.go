@@ -7,7 +7,7 @@ import (
 
 	"google.golang.org/grpc"
 
-	pkiissuerv1 "genesis/sdk/go/gen/functions/pki/issuer/v1"
+	pkiissuerv1 "github.com/WhiteRoseLK/genesis/sdk/go/gen/functions/pki/issuer/v1"
 )
 
 // ForwardPkiIssuer enregistre un PkiIssuerServer qui relaie chaque appel

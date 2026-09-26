@@ -503,7 +503,7 @@ const file_functions_pki_issuer_v1_issuer_proto_rawDesc = "" +
 	"\tIssueCert\x12).functions.pki.issuer.v1.IssueCertRequest\x1a$.functions.pki.issuer.v1.Certificate\x12X\n" +
 	"\aSignCSR\x12'.functions.pki.issuer.v1.SignCSRRequest\x1a$.functions.pki.issuer.v1.Certificate\x12[\n" +
 	"\aSignSSH\x12'.functions.pki.issuer.v1.SignSSHRequest\x1a'.functions.pki.issuer.v1.SSHCertificate\x12S\n" +
-	"\aCAChain\x12\x1e.functions.pki.issuer.v1.Empty\x1a(.functions.pki.issuer.v1.CAChainResponseB8Z6genesis/sdk/go/gen/functions/pki/issuer/v1;pkiissuerv1b\x06proto3"
+	"\aCAChain\x12\x1e.functions.pki.issuer.v1.Empty\x1a(.functions.pki.issuer.v1.CAChainResponseBOZMgithub.com/WhiteRoseLK/genesis/sdk/go/gen/functions/pki/issuer/v1;pkiissuerv1b\x06proto3"
 
 var (
 	file_functions_pki_issuer_v1_issuer_proto_rawDescOnce sync.Once

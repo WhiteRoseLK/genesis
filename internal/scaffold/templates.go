@@ -4,16 +4,17 @@ package scaffold
 
 import "text/template"
 
-// Pas de "require genesis/sdk" explicite ici : sous go.work, un require
-// versionné vers un module du monorepo (sans domaine réel) pousse
-// `go mod tidy`/`go build` à tenter une résolution réseau plutôt que d'utiliser
-// la substitution d'espace de travail. go build résout l'import correctement
-// sans aucune ligne require (vérifié empiriquement) ; genesis/sdk reste la
-// seule dépendance du module (docs/03-contrat-module.md).
+// go.mod complet : le module se construit aussi hors de l'espace de travail
+// (GOWORK=off), comme tous les modules du dépôt (ADR-022). Le replace pointe
+// vers le SDK du dépôt tant qu'il n'est pas publié en version taguée.
 var goModTemplate = template.Must(template.New("go.mod").Parse(
 	`module {{.ModulePath}}
 
 go 1.27.1
+
+require {{.SDKPath}} v0.0.0-00010101000000-000000000000
+
+replace {{.SDKPath}} => ../../sdk
 `))
 
 var moduleYAMLTemplate = template.Must(template.New("module.yaml").Parse(
@@ -64,8 +65,8 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
-	sdk "genesis/sdk/go"
-	modulev1 "genesis/sdk/go/gen/module/v1"
+	sdk "github.com/WhiteRoseLK/genesis/sdk/go"
+	modulev1 "github.com/WhiteRoseLK/genesis/sdk/go/gen/module/v1"
 )
 
 //go:embed module.yaml
@@ -143,8 +144,8 @@ package main
 import (
 	"testing"
 
-	sdk "genesis/sdk/go"
-	"genesis/sdk/go/moduletest"
+	sdk "github.com/WhiteRoseLK/genesis/sdk/go"
+	"github.com/WhiteRoseLK/genesis/sdk/go/moduletest"
 )
 
 // TestConformance : suite de conformité du SDK (docs/10-ajouter-un-module.md,

@@ -9,7 +9,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"genesis/internal/modulehost"
+	"github.com/WhiteRoseLK/genesis/internal/modulehost"
 )
 
 // TestScaffoldInstallDiscoverDescribe est le critère d'acceptation du

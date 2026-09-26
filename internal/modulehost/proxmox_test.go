@@ -15,8 +15,8 @@ import (
 
 	"google.golang.org/protobuf/types/known/structpb"
 
-	computevmv1 "genesis/sdk/go/gen/functions/compute/vm/v1"
-	modulev1 "genesis/sdk/go/gen/module/v1"
+	computevmv1 "github.com/WhiteRoseLK/genesis/sdk/go/gen/functions/compute/vm/v1"
+	modulev1 "github.com/WhiteRoseLK/genesis/sdk/go/gen/module/v1"
 )
 
 // fakeProxmoxServer simule juste assez de l'API Proxmox VE pour exercer

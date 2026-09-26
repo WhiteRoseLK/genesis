@@ -14,8 +14,8 @@ import (
 
 	gossh "golang.org/x/crypto/ssh"
 
-	"genesis/internal/runner"
-	ansiblev1 "genesis/sdk/go/gen/functions/core/ansible/v1"
+	"github.com/WhiteRoseLK/genesis/internal/runner"
+	ansiblev1 "github.com/WhiteRoseLK/genesis/sdk/go/gen/functions/core/ansible/v1"
 )
 
 func requireContainerRuntime(t *testing.T) *runner.ContainerRuntime {

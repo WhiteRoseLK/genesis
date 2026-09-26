@@ -9,8 +9,8 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
-	pkiissuerv1 "genesis/sdk/go/gen/functions/pki/issuer/v1"
-	secretskvv1 "genesis/sdk/go/gen/functions/secrets/kv/v1"
+	pkiissuerv1 "github.com/WhiteRoseLK/genesis/sdk/go/gen/functions/pki/issuer/v1"
+	secretskvv1 "github.com/WhiteRoseLK/genesis/sdk/go/gen/functions/secrets/kv/v1"
 )
 
 func (m *vaultModule) ready() (*vaultClient, string, error) {

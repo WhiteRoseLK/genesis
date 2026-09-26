@@ -6,7 +6,7 @@ package functions.compute.vm.v1;
 
 import "google/protobuf/timestamp.proto";
 
-option go_package = "genesis/sdk/go/gen/functions/compute/vm/v1;computevmv1";
+option go_package = "github.com/WhiteRoseLK/genesis/sdk/go/gen/functions/compute/vm/v1;computevmv1";
 
 service ComputeVM {
   rpc EnsureImage(EnsureImageRequest) returns (EnsureImageResponse);

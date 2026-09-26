@@ -5,8 +5,8 @@ package main
 import (
 	"testing"
 
-	sdk "genesis/sdk/go"
-	"genesis/sdk/go/moduletest"
+	sdk "github.com/WhiteRoseLK/genesis/sdk/go"
+	"github.com/WhiteRoseLK/genesis/sdk/go/moduletest"
 )
 
 // TestConformance : suite de conformité du SDK (docs/10-ajouter-un-module.md,

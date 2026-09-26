@@ -7,7 +7,7 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"genesis/internal/spec"
+	"github.com/WhiteRoseLK/genesis/internal/spec"
 )
 
 func newValidateCmd() *cobra.Command {

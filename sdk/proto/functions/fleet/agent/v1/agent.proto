@@ -6,7 +6,7 @@ syntax = "proto3";
 // fonctions. Fournisseur MVP : teleport (J8).
 package functions.fleet.agent.v1;
 
-option go_package = "genesis/sdk/go/gen/functions/fleet/agent/v1;fleetagentv1";
+option go_package = "github.com/WhiteRoseLK/genesis/sdk/go/gen/functions/fleet/agent/v1;fleetagentv1";
 
 service FleetAgent {
   rpc Install(InstallRequest) returns (InstallResponse);

@@ -9,11 +9,11 @@ import (
 	"regexp"
 	"strings"
 
-	sdk "genesis/sdk/go"
-	computevmv1 "genesis/sdk/go/gen/functions/compute/vm/v1"
-	ansiblev1 "genesis/sdk/go/gen/functions/core/ansible/v1"
-	fleetagentv1 "genesis/sdk/go/gen/functions/fleet/agent/v1"
-	modulev1 "genesis/sdk/go/gen/module/v1"
+	sdk "github.com/WhiteRoseLK/genesis/sdk/go"
+	computevmv1 "github.com/WhiteRoseLK/genesis/sdk/go/gen/functions/compute/vm/v1"
+	ansiblev1 "github.com/WhiteRoseLK/genesis/sdk/go/gen/functions/core/ansible/v1"
+	fleetagentv1 "github.com/WhiteRoseLK/genesis/sdk/go/gen/functions/fleet/agent/v1"
+	modulev1 "github.com/WhiteRoseLK/genesis/sdk/go/gen/module/v1"
 )
 
 var (

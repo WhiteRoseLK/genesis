@@ -477,7 +477,7 @@ const file_functions_os_base_v1_base_proto_rawDesc = "" +
 	"\x06Harden\x12#.functions.os.base.v1.HardenRequest\x1a$.functions.os.base.v1.HardenResponse\x12V\n" +
 	"\aTrustCA\x12$.functions.os.base.v1.TrustCARequest\x1a%.functions.os.base.v1.TrustCAResponse\x12b\n" +
 	"\vSetResolver\x12(.functions.os.base.v1.SetResolverRequest\x1a).functions.os.base.v1.SetResolverResponse\x12S\n" +
-	"\x06SetNTP\x12#.functions.os.base.v1.SetNTPRequest\x1a$.functions.os.base.v1.SetNTPResponseB2Z0genesis/sdk/go/gen/functions/os/base/v1;osbasev1b\x06proto3"
+	"\x06SetNTP\x12#.functions.os.base.v1.SetNTPRequest\x1a$.functions.os.base.v1.SetNTPResponseBIZGgithub.com/WhiteRoseLK/genesis/sdk/go/gen/functions/os/base/v1;osbasev1b\x06proto3"
 
 var (
 	file_functions_os_base_v1_base_proto_rawDescOnce sync.Once

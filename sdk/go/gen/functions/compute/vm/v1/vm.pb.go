@@ -531,7 +531,7 @@ const file_functions_compute_vm_v1_vm_proto_rawDesc = "" +
 	"\bEnsureVM\x12(.functions.compute.vm.v1.EnsureVMRequest\x1a\x1b.functions.compute.vm.v1.VM\x12K\n" +
 	"\x05GetVM\x12%.functions.compute.vm.v1.GetVMRequest\x1a\x1b.functions.compute.vm.v1.VM\x12_\n" +
 	"\bDeleteVM\x12(.functions.compute.vm.v1.DeleteVMRequest\x1a).functions.compute.vm.v1.DeleteVMResponse\x12P\n" +
-	"\x03Now\x12#.functions.compute.vm.v1.NowRequest\x1a$.functions.compute.vm.v1.NowResponseB8Z6genesis/sdk/go/gen/functions/compute/vm/v1;computevmv1b\x06proto3"
+	"\x03Now\x12#.functions.compute.vm.v1.NowRequest\x1a$.functions.compute.vm.v1.NowResponseBOZMgithub.com/WhiteRoseLK/genesis/sdk/go/gen/functions/compute/vm/v1;computevmv1b\x06proto3"
 
 var (
 	file_functions_compute_vm_v1_vm_proto_rawDescOnce sync.Once

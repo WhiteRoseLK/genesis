@@ -122,7 +122,7 @@ const file_functions_dns_resolver_v1_resolver_proto_rawDesc = "" +
 	"\aaddress\x18\x01 \x01(\tR\aaddress\x12\x12\n" +
 	"\x04port\x18\x02 \x01(\x05R\x04port2d\n" +
 	"\vDnsResolver\x12U\n" +
-	"\bEndpoint\x12 .functions.dns.resolver.v1.Empty\x1a'.functions.dns.resolver.v1.EndpointInfoB<Z:genesis/sdk/go/gen/functions/dns/resolver/v1;dnsresolverv1b\x06proto3"
+	"\bEndpoint\x12 .functions.dns.resolver.v1.Empty\x1a'.functions.dns.resolver.v1.EndpointInfoBSZQgithub.com/WhiteRoseLK/genesis/sdk/go/gen/functions/dns/resolver/v1;dnsresolverv1b\x06proto3"
 
 var (
 	file_functions_dns_resolver_v1_resolver_proto_rawDescOnce sync.Once

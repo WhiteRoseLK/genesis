@@ -10,7 +10,7 @@ import (
 	"path/filepath"
 	"runtime"
 
-	sdk "genesis/sdk/go"
+	sdk "github.com/WhiteRoseLK/genesis/sdk/go"
 )
 
 // SearchPaths retourne les répertoires de recherche des modules, dans

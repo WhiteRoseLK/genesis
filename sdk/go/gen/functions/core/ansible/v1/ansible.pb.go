@@ -239,7 +239,7 @@ const file_functions_core_ansible_v1_ansible_proto_rawDesc = "" +
 	"\x02ok\x18\x01 \x01(\bR\x02ok\x12\x16\n" +
 	"\x06output\x18\x02 \x01(\tR\x06output2w\n" +
 	"\aAnsible\x12l\n" +
-	"\vRunPlaybook\x12-.functions.core.ansible.v1.RunPlaybookRequest\x1a..functions.core.ansible.v1.RunPlaybookResponseB8Z6genesis/sdk/go/gen/functions/core/ansible/v1;ansiblev1b\x06proto3"
+	"\vRunPlaybook\x12-.functions.core.ansible.v1.RunPlaybookRequest\x1a..functions.core.ansible.v1.RunPlaybookResponseBOZMgithub.com/WhiteRoseLK/genesis/sdk/go/gen/functions/core/ansible/v1;ansiblev1b\x06proto3"
 
 var (
 	file_functions_core_ansible_v1_ansible_proto_rawDescOnce sync.Once

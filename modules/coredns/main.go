@@ -26,11 +26,11 @@ import (
 
 	"google.golang.org/grpc"
 
-	sdk "genesis/sdk/go"
-	containerv1 "genesis/sdk/go/gen/functions/core/container/v1"
-	dnsresolverv1 "genesis/sdk/go/gen/functions/dns/resolver/v1"
-	dnszonev1 "genesis/sdk/go/gen/functions/dns/zone/v1"
-	modulev1 "genesis/sdk/go/gen/module/v1"
+	sdk "github.com/WhiteRoseLK/genesis/sdk/go"
+	containerv1 "github.com/WhiteRoseLK/genesis/sdk/go/gen/functions/core/container/v1"
+	dnsresolverv1 "github.com/WhiteRoseLK/genesis/sdk/go/gen/functions/dns/resolver/v1"
+	dnszonev1 "github.com/WhiteRoseLK/genesis/sdk/go/gen/functions/dns/zone/v1"
+	modulev1 "github.com/WhiteRoseLK/genesis/sdk/go/gen/module/v1"
 )
 
 //go:embed module.yaml

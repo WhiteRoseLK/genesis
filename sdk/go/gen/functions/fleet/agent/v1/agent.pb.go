@@ -189,7 +189,7 @@ const file_functions_fleet_agent_v1_agent_proto_rawDesc = "" +
 	"\x0fInstallResponse2l\n" +
 	"\n" +
 	"FleetAgent\x12^\n" +
-	"\aInstall\x12(.functions.fleet.agent.v1.InstallRequest\x1a).functions.fleet.agent.v1.InstallResponseB:Z8genesis/sdk/go/gen/functions/fleet/agent/v1;fleetagentv1b\x06proto3"
+	"\aInstall\x12(.functions.fleet.agent.v1.InstallRequest\x1a).functions.fleet.agent.v1.InstallResponseBQZOgithub.com/WhiteRoseLK/genesis/sdk/go/gen/functions/fleet/agent/v1;fleetagentv1b\x06proto3"
 
 var (
 	file_functions_fleet_agent_v1_agent_proto_rawDescOnce sync.Once

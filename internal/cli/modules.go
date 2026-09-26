@@ -12,10 +12,10 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"genesis/internal/modulehost"
-	"genesis/internal/modulelock"
-	"genesis/internal/scaffold"
-	sdk "genesis/sdk/go"
+	"github.com/WhiteRoseLK/genesis/internal/modulehost"
+	"github.com/WhiteRoseLK/genesis/internal/modulelock"
+	"github.com/WhiteRoseLK/genesis/internal/scaffold"
+	sdk "github.com/WhiteRoseLK/genesis/sdk/go"
 )
 
 func newModulesCmd() *cobra.Command {

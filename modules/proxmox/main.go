@@ -26,11 +26,11 @@ import (
 	"google.golang.org/protobuf/types/known/structpb"
 	"google.golang.org/protobuf/types/known/timestamppb"
 
-	sdk "genesis/sdk/go"
-	computevmv1 "genesis/sdk/go/gen/functions/compute/vm/v1"
-	modulev1 "genesis/sdk/go/gen/module/v1"
+	sdk "github.com/WhiteRoseLK/genesis/sdk/go"
+	computevmv1 "github.com/WhiteRoseLK/genesis/sdk/go/gen/functions/compute/vm/v1"
+	modulev1 "github.com/WhiteRoseLK/genesis/sdk/go/gen/module/v1"
 
-	"genesis-module-proxmox/proxmoxapi"
+	"github.com/WhiteRoseLK/genesis/modules/proxmox/proxmoxapi"
 )
 
 //go:embed module.yaml

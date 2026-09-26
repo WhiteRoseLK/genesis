@@ -3,7 +3,7 @@
 // Command genesis est le binaire du cœur : la seule app à lancer.
 package main
 
-import "genesis/internal/cli"
+import "github.com/WhiteRoseLK/genesis/internal/cli"
 
 func main() {
 	cli.Execute()

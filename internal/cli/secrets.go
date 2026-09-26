@@ -7,7 +7,7 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"genesis/internal/secrets"
+	"github.com/WhiteRoseLK/genesis/internal/secrets"
 )
 
 func newSecretsCmd() *cobra.Command {

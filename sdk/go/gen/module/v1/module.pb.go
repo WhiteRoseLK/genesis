@@ -1143,7 +1143,7 @@ const file_module_v1_module_proto_rawDesc = "" +
 	"\x06Verify\x12\x16.module.v1.StepRequest\x1a\x15.module.v1.StepResult\x129\n" +
 	"\bHandover\x12\x16.module.v1.StepRequest\x1a\x15.module.v1.StepResult\x12;\n" +
 	"\aRepoint\x12\x19.module.v1.RepointRequest\x1a\x15.module.v1.StepResult\x128\n" +
-	"\aDestroy\x12\x16.module.v1.StepRequest\x1a\x15.module.v1.StepResultB'Z%genesis/sdk/go/gen/module/v1;modulev1b\x06proto3"
+	"\aDestroy\x12\x16.module.v1.StepRequest\x1a\x15.module.v1.StepResultB>Z<github.com/WhiteRoseLK/genesis/sdk/go/gen/module/v1;modulev1b\x06proto3"
 
 var (
 	file_module_v1_module_proto_rawDescOnce sync.Once

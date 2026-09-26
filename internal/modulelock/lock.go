@@ -11,7 +11,7 @@ import (
 
 	"gopkg.in/yaml.v3"
 
-	"genesis/internal/atomicfile"
+	"github.com/WhiteRoseLK/genesis/internal/atomicfile"
 )
 
 // Entry fige la version et l'empreinte d'un module.
