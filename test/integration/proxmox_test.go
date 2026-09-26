@@ -226,6 +226,13 @@ func TestProxmoxEnsureVMIsIdempotentAndLifecycleWorks(t *testing.T) {
 	if got.GetId() != first.GetId() {
 		t.Errorf("GetVM = %+v, attendu id=%s", got, first.GetId())
 	}
+	// Les consommateurs (chrony, powerdns, teleport…) se connectent en SSH sur
+	// VM.ssh_port : 0 produirait `ansible_port=0` sur une vraie VM.
+	for _, vm := range []*computevmv1.VM{first, second, got} {
+		if vm.GetSshPort() != 22 {
+			t.Errorf("VM %s : ssh_port = %d, attendu 22", vm.GetId(), vm.GetSshPort())
+		}
+	}
 
 	now, err := vmClient.Now(ctx, &computevmv1.NowRequest{})
 	if err != nil {
