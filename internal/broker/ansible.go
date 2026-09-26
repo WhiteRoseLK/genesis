@@ -3,11 +3,13 @@
 package broker
 
 import (
+	"archive/tar"
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
-	"os"
-	"path/filepath"
+	"sort"
+	"strings"
 
 	"google.golang.org/grpc"
 
@@ -35,66 +37,47 @@ type ansibleServer struct {
 }
 
 func (a *ansibleServer) RunPlaybook(ctx context.Context, req *ansiblev1.RunPlaybookRequest) (*ansiblev1.RunPlaybookResponse, error) {
-	dir, err := os.MkdirTemp("", "genesis-ansible-*")
-	if err != nil {
-		return nil, fmt.Errorf("préparation du répertoire de travail : %w", err)
-	}
-	defer func() { _ = os.RemoveAll(dir) }()
-	// MkdirTemp crée en 0700 : le conteneur ansible tourne sous son propre
-	// UID interne (généralement distinct du nôtre, parfois par un décalage
-	// d'espace de noms utilisateur), qui ne pourrait pas lire un répertoire
-	// 0700 appartenant à un autre UID. Lisible par tous plutôt que de
-	// deviner l'UID effectif du conteneur.
-	if err := os.Chmod(dir, 0o755); err != nil {
-		return nil, fmt.Errorf("permissions du répertoire de travail : %w", err)
-	}
-
 	target := req.GetTarget()
-
-	if err := os.WriteFile(filepath.Join(dir, "playbook.yml"), req.GetPlaybookYaml(), 0o644); err != nil {
-		return nil, fmt.Errorf("écriture du playbook : %w", err)
+	files := map[string][]byte{
+		"playbook.yml": req.GetPlaybookYaml(),
+		"id_target":    []byte(target.GetSshPrivateKey()),
+		"inventory.ini": []byte(fmt.Sprintf(
+			"target ansible_host=%s ansible_port=%d ansible_user=%s ansible_ssh_private_key_file=/work/id_target ansible_ssh_common_args='-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null'\n",
+			target.GetHost(), target.GetPort(), target.GetUser(),
+		)),
 	}
 
-	keyPath := filepath.Join(dir, "id_target")
-	if err := os.WriteFile(keyPath, []byte(target.GetSshPrivateKey()), 0o644); err != nil {
-		return nil, fmt.Errorf("écriture de la clé privée : %w", err)
-	}
-	// ssh_certificate_pem (ADR-018) : authentification par certificat (ex.
-	// signé par la CA Teleport) plutôt que par la seule clé nue — le nom
-	// "<clé>-cert.pub" est la convention qu'OpenSSH reconnaît
-	// automatiquement à côté de la clé privée, aucune option
-	// supplémentaire nécessaire côté client.
-	if cert := target.GetSshCertificatePem(); cert != "" {
-		if err := os.WriteFile(keyPath+"-cert.pub", []byte(cert), 0o644); err != nil {
-			return nil, fmt.Errorf("écriture du certificat SSH : %w", err)
-		}
-	}
-
-	inventory := fmt.Sprintf(
-		"target ansible_host=%s ansible_port=%d ansible_user=%s ansible_ssh_private_key_file=/work/id_target ansible_ssh_common_args='-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null'\n",
-		target.GetHost(), target.GetPort(), target.GetUser(),
-	)
-	if err := os.WriteFile(filepath.Join(dir, "inventory.ini"), []byte(inventory), 0o644); err != nil {
-		return nil, fmt.Errorf("écriture de l'inventaire : %w", err)
-	}
-
-	command := []string{"ansible-playbook", "-i", "/work/inventory.ini", "/work/playbook.yml"}
+	playbookCmd := "ansible-playbook -i /work/inventory.ini /work/playbook.yml"
+	var sensitive []string
 	if vars := req.GetVars(); vars != nil {
 		varsJSON, err := json.Marshal(vars.AsMap())
 		if err != nil {
 			return nil, fmt.Errorf("encodage des extra-vars : %w", err)
 		}
-		if err := os.WriteFile(filepath.Join(dir, "vars.json"), varsJSON, 0o644); err != nil {
-			return nil, fmt.Errorf("écriture des extra-vars : %w", err)
-		}
-		command = append(command, "--extra-vars", "@/work/vars.json")
+		files["vars.json"] = varsJSON
+		playbookCmd += " --extra-vars @/work/vars.json"
+		sensitive = collectStrings(vars.AsMap())
+	}
+	sensitive = append(sensitive, target.GetSshPrivateKey())
+
+	// Les fichiers (clé privée, extra-vars contenant des secrets) ne
+	// touchent jamais le disque de la graine : ils transitent par l'entrée
+	// standard, sous forme d'archive tar, vers un tmpfs du conteneur. Aucun
+	// autre utilisateur de la graine ne peut les lire, quel que soit l'UID
+	// effectif du conteneur.
+	archive, err := tarFiles(files)
+	if err != nil {
+		return nil, fmt.Errorf("préparation des fichiers du playbook : %w", err)
 	}
 
 	result, err := a.runtime.Run(ctx, runner.RunOptions{
 		Image:   ansibleImage,
-		Command: command,
-		Mounts:  []runner.Mount{{HostPath: dir, ContainerPath: "/work", ReadOnly: false}},
-		Env:     map[string]string{"ANSIBLE_HOST_KEY_CHECKING": "False"},
+		Command: []string{"sh", "-c", "tar -xf - -C /work && exec " + playbookCmd},
+		// 1777 : l'image n'exécute pas ansible en root ; le tmpfs est privé
+		// au conteneur et les fichiers y sont extraits en 0600.
+		Tmpfs: []string{"/work:rw,mode=1777"},
+		Stdin: archive,
+		Env:   map[string]string{"ANSIBLE_HOST_KEY_CHECKING": "False"},
 	})
 	if err != nil {
 		return nil, fmt.Errorf("exécution du conteneur ansible : %w", err)
@@ -102,6 +85,76 @@ func (a *ansibleServer) RunPlaybook(ctx context.Context, req *ansiblev1.RunPlayb
 
 	return &ansiblev1.RunPlaybookResponse{
 		Ok:     result.ExitCode == 0,
-		Output: result.Stdout + result.Stderr,
+		Output: redactValues(result.Stdout+result.Stderr, sensitive),
 	}, nil
+}
+
+// tarFiles construit une archive tar en mémoire, chaque fichier en 0600.
+func tarFiles(files map[string][]byte) ([]byte, error) {
+	names := make([]string, 0, len(files))
+	for name := range files {
+		names = append(names, name)
+	}
+	sort.Strings(names)
+
+	var buf bytes.Buffer
+	tw := tar.NewWriter(&buf)
+	for _, name := range names {
+		content := files[name]
+		if err := tw.WriteHeader(&tar.Header{Name: name, Mode: 0o600, Size: int64(len(content))}); err != nil {
+			return nil, err
+		}
+		if _, err := tw.Write(content); err != nil {
+			return nil, err
+		}
+	}
+	if err := tw.Close(); err != nil {
+		return nil, err
+	}
+	return buf.Bytes(), nil
+}
+
+// minRedactLen évite de masquer des valeurs courtes et banales (ports,
+// booléens, noms d'utilisateur) qui rendraient la sortie illisible.
+const minRedactLen = 8
+
+// collectStrings renvoie toutes les chaînes contenues dans v, récursivement.
+func collectStrings(v any) []string {
+	var out []string
+	switch t := v.(type) {
+	case string:
+		out = append(out, t)
+	case map[string]any:
+		for _, e := range t {
+			out = append(out, collectStrings(e)...)
+		}
+	case []any:
+		for _, e := range t {
+			out = append(out, collectStrings(e)...)
+		}
+	}
+	return out
+}
+
+// redactValues masque dans out chaque valeur de values (et chacune de ses
+// lignes, Ansible pouvant réafficher un bloc PEM ligne par ligne). Les
+// extra-vars transportent des secrets (certificats, role_id/secret_id) :
+// la sortie du playbook remonte jusqu'aux erreurs et journaux du moteur et
+// ne doit jamais les contenir (règle « aucun secret en clair »).
+func redactValues(out string, values []string) string {
+	var needles []string
+	for _, v := range values {
+		for _, line := range strings.Split(v, "\n") {
+			if line = strings.TrimSpace(line); len(line) >= minRedactLen {
+				needles = append(needles, line)
+			}
+		}
+	}
+	// Les plus longues d'abord : une valeur contenue dans une autre ne doit
+	// pas empêcher de masquer la plus longue.
+	sort.Slice(needles, func(i, j int) bool { return len(needles[i]) > len(needles[j]) })
+	for _, n := range needles {
+		out = strings.ReplaceAll(out, n, "***")
+	}
+	return out
 }
