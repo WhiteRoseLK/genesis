@@ -4,18 +4,22 @@ Les règles d'architecture et les règles non négociables sont dans [`CLAUDE.md
 
 ## Environnement
 
-- Go (version de `go.mod`), `make`, `golangci-lint` v2, `buf` (protobuf), Docker ou Podman (tests d'intégration).
+- Go (version de `go.mod`), `make`, Docker ou Podman (tests d'intégration). Les autres outils (`golangci-lint`, `buf`, générateurs protobuf, `govulncheck`, `go-licenses`) sont installés aux versions épinglées par `make tools`, dans `.bin/`.
 - Monorepo : chaque module a son propre `go.mod`, complet et utilisable hors du dépôt (ADR-022). L'espace de travail `go.work` sert au développement quotidien. Passez par le `Makefile`, qui parcourt tous les `go.mod`.
 
 | Commande | Rôle |
 |---|---|
-| `make build` | Compile tous les modules |
+| `make tools` | Installe les outils de développement épinglés dans `.bin/` |
+| `make build` | Compile tous les modules (`CGO_ENABLED=0`, `GOARCH=amd64` ou `arm64`) |
 | `make test` | Tests unitaires de chaque `go.mod` : sans réseau ni démon de conteneurs |
 | `make test-race` | Mêmes tests avec le détecteur de concurrence (CGO requis pour les tests seulement) |
 | `make test-docker` | Tests d'intégration contre de vrais conteneurs (build tag `docker`) |
 | `make lint` | `golangci-lint`, règles d'import `depguard` comprises |
 | `make mod-check` | Chaque `go.mod` est à jour et compile hors de `go.work` |
 | `make proto` | Régénère le code protobuf (`buf generate`) : le code généré est commité |
+| `make proto-check` | `buf lint` et code généré à jour (la CI vérifie aussi `buf breaking` contre la branche de base) |
+| `make vuln` | Vulnérabilités connues atteignables (`govulncheck`) |
+| `make licenses` | Licences des dépendances compatibles avec Apache-2.0 |
 | `make e2e` | Bout en bout sur Proxmox : **jamais sans demande explicite** |
 
 ## Issues

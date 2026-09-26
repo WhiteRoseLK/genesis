@@ -1,4 +1,4 @@
-.PHONY: build test test-race test-docker lint proto e2e mod-check
+.PHONY: build test test-race test-docker lint proto proto-check e2e mod-check vuln licenses tools
 
 # Modules Go du monorepo, un par go.mod (cœur, sdk, modules/*, test/modules/*).
 # Découverts automatiquement : ajouter un module ne doit nécessiter aucune
@@ -6,8 +6,44 @@
 # liste codée en dur ici — voir genesis modules scaffold (docs/10).
 GO_MODULES := $(shell find . -name go.mod -not -path './.git/*' -exec dirname {} \; | sed 's|^\./||' | sort)
 
+# Outils de développement, versions épinglées (installés par `make tools`
+# dans .bin/, prioritaire sur le PATH).
+GOLANGCI_LINT_VERSION   := v2.13.2
+BUF_VERSION             := v1.73.0
+PROTOC_GEN_GO_VERSION   := v1.36.12
+PROTOC_GEN_GRPC_VERSION := v1.6.2
+GOVULNCHECK_VERSION     := v1.8.0
+GO_LICENSES_VERSION     := v2.0.1
+TOOLS_BIN := $(CURDIR)/.bin
+# Outils compilés avec la chaîne Go du projet (go.mod), pas celle du système :
+# golangci-lint et govulncheck doivent comprendre la version de Go ciblée.
+GO_TOOLCHAIN := $(shell go env GOVERSION)
+export PATH := $(TOOLS_BIN):$(PATH)
+
+# Licences de dépendances compatibles avec Apache-2.0 (docs/09-decisions.md, ADR-009).
+ALLOWED_LICENSES := Apache-2.0,BSD-2-Clause,BSD-3-Clause,MIT,ISC,MPL-2.0
+
+# Binaires livrés : CGO_ENABLED=0, linux/amd64 et linux/arm64
+# (ex. `make build GOARCH=arm64`).
+GOOS   ?= linux
+GOARCH ?= amd64
+
+tools:
+	GOTOOLCHAIN=$(GO_TOOLCHAIN) GOBIN=$(TOOLS_BIN) go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@$(GOLANGCI_LINT_VERSION)
+	GOTOOLCHAIN=$(GO_TOOLCHAIN) GOBIN=$(TOOLS_BIN) go install github.com/bufbuild/buf/cmd/buf@$(BUF_VERSION)
+	GOTOOLCHAIN=$(GO_TOOLCHAIN) GOBIN=$(TOOLS_BIN) go install google.golang.org/protobuf/cmd/protoc-gen-go@$(PROTOC_GEN_GO_VERSION)
+	GOTOOLCHAIN=$(GO_TOOLCHAIN) GOBIN=$(TOOLS_BIN) go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@$(PROTOC_GEN_GRPC_VERSION)
+	GOTOOLCHAIN=$(GO_TOOLCHAIN) GOBIN=$(TOOLS_BIN) go install golang.org/x/vuln/cmd/govulncheck@$(GOVULNCHECK_VERSION)
+	GOTOOLCHAIN=$(GO_TOOLCHAIN) GOBIN=$(TOOLS_BIN) go install github.com/google/go-licenses/v2@$(GO_LICENSES_VERSION)
+
+# -o /dev/null : vérifie la compilation sans déposer de binaire dans le
+# répertoire du module (un module = un paquet main, que `go build ./...`
+# écrirait sous le nom du module).
 build:
-	go build ./...
+	@set -e; for m in $(GO_MODULES); do \
+		echo "==> go build $(GOOS)/$(GOARCH) ($$m)"; \
+		(cd $$m && CGO_ENABLED=0 GOOS=$(GOOS) GOARCH=$(GOARCH) go build -o /dev/null ./...); \
+	done
 
 # Tests unitaires : sans réseau ni démon de conteneurs.
 test:
@@ -53,6 +89,27 @@ proto:
 	else \
 		cd sdk/proto && buf generate; \
 	fi
+
+# Le code généré est commité : il doit correspondre aux .proto (buf lint +
+# régénération sans écart).
+proto-check: proto
+	cd sdk/proto && buf lint
+	git diff --exit-code -- sdk/go/gen
+
+# Vulnérabilités connues atteignables depuis le code (base de données Go).
+vuln:
+	@set -e; for m in $(GO_MODULES); do \
+		echo "==> govulncheck ($$m)"; \
+		(cd $$m && GOWORK=off govulncheck ./...); \
+	done
+
+# Licences des dépendances tierces (les paquets du dépôt sont ignorés).
+licenses:
+	@set -e; for m in $(GO_MODULES); do \
+		echo "==> go-licenses ($$m)"; \
+		out=$$(cd $$m && GOWORK=off go-licenses check ./... --ignore github.com/WhiteRoseLK/genesis \
+			--allowed_licenses=$(ALLOWED_LICENSES) 2>&1) || { echo "$$out" | grep -v '^W0\|\.s$$'; exit 1; }; \
+	done
 
 # Nécessite un Proxmox : ne jamais lancer sans demande explicite (CLAUDE.md).
 e2e:

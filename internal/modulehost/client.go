@@ -35,9 +35,11 @@ func Launch(binaryPath string, manifest *sdk.ManifestFile) (*Client, error) {
 	}
 
 	pc := goplugin.NewClient(&goplugin.ClientConfig{
-		HandshakeConfig:  sdk.Handshake,
-		Plugins:          plugins,
-		Cmd:              exec.Command(binaryPath),
+		HandshakeConfig: sdk.Handshake,
+		Plugins:         plugins,
+		// Pas de contexte : go-plugin gère la durée de vie du processus
+		// (Client.Close le termine), qui dépasse l'appel à Launch.
+		Cmd:              exec.Command(binaryPath), //nolint:noctx // voir ci-dessus
 		AllowedProtocols: []goplugin.Protocol{goplugin.ProtocolGRPC},
 		// Par défaut go-plugin journalise en DEBUG/TRACE sur stderr ; Warn
 		// évite de noyer la sortie du cœur avec le détail du transport gRPC.

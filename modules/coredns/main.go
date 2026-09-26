@@ -248,7 +248,8 @@ func (s *dnsZoneServer) reload(ctx context.Context) error {
 	}
 	// Chmod : le conteneur coredns tourne sous son propre UID interne
 	// (même précaution que core.ansible/v1, docs/PROGRESS.md J5).
-	if err := os.Chmod(dir, 0o755); err != nil {
+	// Données de zone publiques par nature (servies par DNS), pas un secret.
+	if err := os.Chmod(dir, 0o755); err != nil { //nolint:gosec // G302 : voir ci-dessus
 		return fmt.Errorf("permissions du répertoire de zone : %w", err)
 	}
 
@@ -262,7 +263,7 @@ func (s *dnsZoneServer) reload(ctx context.Context) error {
 	for _, zone := range zoneNames {
 		fmt.Fprintf(&corefile, "%s:53 {\n    file /zones/db.%s\n    log\n}\n", zone, zone)
 		content := zoneFileContent(zone, zones[zone])
-		if err := os.WriteFile(filepath.Join(dir, "db."+zone), []byte(content), 0o644); err != nil {
+		if err := os.WriteFile(filepath.Join(dir, "db."+zone), []byte(content), 0o644); err != nil { //nolint:gosec // G306 : zone DNS, publique
 			return fmt.Errorf("écriture de la zone %q : %w", zone, err)
 		}
 	}
@@ -271,7 +272,7 @@ func (s *dnsZoneServer) reload(ctx context.Context) error {
 		// enregistrement (premier appel possible avant tout UpsertRecord).
 		corefile.WriteString(".:53 {\n    health\n}\n")
 	}
-	if err := os.WriteFile(filepath.Join(dir, "Corefile"), []byte(corefile.String()), 0o644); err != nil {
+	if err := os.WriteFile(filepath.Join(dir, "Corefile"), []byte(corefile.String()), 0o644); err != nil { //nolint:gosec // G306 : configuration sans secret
 		return fmt.Errorf("écriture du Corefile : %w", err)
 	}
 

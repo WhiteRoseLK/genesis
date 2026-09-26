@@ -205,7 +205,7 @@ func (m *chronyModule) Provision(ctx context.Context, req *modulev1.StepRequest)
 	return &modulev1.StepResult{Status: modulev1.StepResult_STATUS_OK, State: s}, nil
 }
 
-func targetFromState(req *modulev1.StepRequest, pair sshKeyPair) *ansiblev1.Target {
+func targetFromState(req *modulev1.StepRequest, pair sshKeyPair) (*ansiblev1.Target, error) {
 	state := sdk.StateMap(req.GetState())
 	port, _ := state["vm_ssh_port"].(int64)
 	if port == 0 {
@@ -213,12 +213,15 @@ func targetFromState(req *modulev1.StepRequest, pair sshKeyPair) *ansiblev1.Targ
 			port = int64(f)
 		}
 	}
+	if port < 1 || port > 65535 {
+		return nil, fmt.Errorf("configure : port SSH %d invalide dans l'état du module (attendu 1-65535), relancer provision", port)
+	}
 	return &ansiblev1.Target{
 		Host:          fmt.Sprint(state["vm_ip"]),
 		Port:          int32(port),
 		User:          sshUser,
 		SshPrivateKey: pair.PrivateKeyOpenSSH,
-	}
+	}, nil
 }
 
 // Configure installe et configure chronyd en serveur sur la VM de chrony
@@ -232,7 +235,10 @@ func (m *chronyModule) Configure(ctx context.Context, req *modulev1.StepRequest)
 	if err != nil {
 		return nil, err
 	}
-	target := targetFromState(req, pair)
+	target, err := targetFromState(req, pair)
+	if err != nil {
+		return nil, err
+	}
 
 	vars, err := sdk.NewState(map[string]any{
 		"ntp_pools":  toAnySlice(ntpPools(req)),

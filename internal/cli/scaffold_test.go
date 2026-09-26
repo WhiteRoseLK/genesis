@@ -4,10 +4,11 @@ package cli
 
 import (
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/WhiteRoseLK/genesis/internal/testutil"
 )
 
 // TestModulesScaffoldGeneratesBuildableModule est le critère d'acceptation
@@ -15,19 +16,9 @@ import (
 // la commande CLI plutôt que directement le paquet internal/scaffold
 // (internal/scaffold/scaffold_test.go couvre déjà découverte/Describe).
 func TestModulesScaffoldGeneratesBuildableModule(t *testing.T) {
-	wd, err := os.Getwd()
-	if err != nil {
-		t.Fatal(err)
-	}
-	root := filepath.Join(wd, "..", "..")
+	root := testutil.SandboxRepo(t)
 	name := "cliscaffoldtest"
 	dir := filepath.Join(root, "modules", name)
-	t.Cleanup(func() {
-		_ = os.RemoveAll(dir)
-		cmd := exec.Command("go", "work", "edit", "-dropuse=./modules/"+name)
-		cmd.Dir = root
-		_, _ = cmd.CombinedOutput()
-	})
 
 	origWD, err := os.Getwd()
 	if err != nil {

@@ -26,3 +26,4 @@ module-darwin-*
 .vscode/
 .idea/
 *.swp
+/.bin/

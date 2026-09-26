@@ -81,7 +81,7 @@ func newModulesInstallCmd() *cobra.Command {
 			return err
 		}
 		destDir := filepath.Join(installRoot, manifest.Name, manifest.Version)
-		if err := os.MkdirAll(destDir, 0o755); err != nil {
+		if err := os.MkdirAll(destDir, 0o750); err != nil {
 			return fmt.Errorf("création de %s : %w", destDir, err)
 		}
 
@@ -209,7 +209,7 @@ func copyFile(src, dst string) error {
 	}
 	defer func() { _ = in.Close() }()
 
-	if err := os.MkdirAll(filepath.Dir(dst), 0o755); err != nil {
+	if err := os.MkdirAll(filepath.Dir(dst), 0o750); err != nil {
 		return fmt.Errorf("création de %s : %w", filepath.Dir(dst), err)
 	}
 	out, err := os.Create(dst)
@@ -235,7 +235,7 @@ func copyDir(src, dst string) error {
 		}
 		target := filepath.Join(dst, rel)
 		if info.IsDir() {
-			return os.MkdirAll(target, 0o755)
+			return os.MkdirAll(target, 0o750)
 		}
 		return copyFile(path, target)
 	})

@@ -4,7 +4,33 @@ linters:
   default: standard
   enable:
     - depguard
+    - bodyclose
+    - errorlint
+    - gosec
+    - noctx
+    - nolintlint
+    - unconvert
+    - usestdlibvars
+  exclusions:
+    rules:
+      # Tests : fixtures en clair, fichiers et sous-processus de test.
+      - path: _test\.go
+        linters: [gosec, noctx]
+      # Noms de références core.secrets (ex. rootTokenRef = "vault/root-token") :
+      # des chemins, pas des valeurs secrètes.
+      - linters: [gosec]
+        text: G101
+        source: 'Ref(Fmt)?\s+=\s+"'
   settings:
+    gosec:
+      excludes:
+        # Piloter des outils existants en ligne de commande (docker/podman,
+        # go, step…) est un choix d'architecture (ADR-002) : les arguments
+        # viennent du cœur ou du module, jamais d'une entrée non contrôlée.
+        - G204
+        # Chemins de fichiers issus des options de la CLI ou de la spec :
+        # lire le fichier désigné par l'opérateur est le comportement voulu.
+        - G304
     depguard:
       rules:
         core-must-not-import-modules:
@@ -37,3 +63,12 @@ run:
   # Analyse aussi les tests d'intégration (make test-docker).
   build-tags:
     - docker
+
+formatters:
+  enable:
+    - gofmt
+    - goimports
+  settings:
+    goimports:
+      local-prefixes:
+        - github.com/WhiteRoseLK/genesis
