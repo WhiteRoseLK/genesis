@@ -8,6 +8,8 @@ import (
 	"os"
 
 	"github.com/spf13/cobra"
+
+	"github.com/WhiteRoseLK/genesis/internal/version"
 )
 
 // Execute construit l'arbre de commandes et l'exécute.
@@ -27,6 +29,7 @@ func NewRootCmd() *cobra.Command {
 	root := &cobra.Command{
 		Use:           "genesis",
 		Short:         "Construit un socle d'environnement autonome à partir d'une spec YAML",
+		Version:       version.Version,
 		SilenceUsage:  true,
 		SilenceErrors: false,
 	}

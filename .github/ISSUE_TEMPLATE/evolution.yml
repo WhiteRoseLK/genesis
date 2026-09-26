@@ -1,0 +1,35 @@
+name: "💡 Évolution"
+description: Proposer une fonctionnalité, un module ou une amélioration.
+title: "feat: "
+labels: ["enhancement", "needs-triage"]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: Besoin
+      description: Le problème à résoudre, du point de vue de l'utilisateur de Genesis.
+    validations:
+      required: true
+
+  - type: textarea
+    id: solution
+    attributes:
+      label: Proposition
+      description: Comportement attendu, et pour un module les fonctions `provides` / `requires` envisagées.
+    validations:
+      required: true
+
+  - type: checkboxes
+    id: architecture
+    attributes:
+      label: Impact architectural
+      options:
+        - label: Nécessite une modification du cœur (`internal/`) ou du contrat module (`sdk/`) — ADR probable.
+        - label: Hors périmètre de l'itération 1 (docs/01-vision-perimetre.md).
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives envisagées
+    validations:
+      required: false
