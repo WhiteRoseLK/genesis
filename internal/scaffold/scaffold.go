@@ -32,7 +32,7 @@ func Generate(repoRoot, name string, provides []string) (dir string, err error) 
 	if _, statErr := os.Stat(dir); statErr == nil {
 		return "", fmt.Errorf("%s existe déjà", dir)
 	}
-	if err := os.MkdirAll(filepath.Join(dir, "assets"), 0o755); err != nil {
+	if err := os.MkdirAll(filepath.Join(dir, "assets"), 0o755); err != nil { //nolint:gosec // G301 : sources du dépôt, pas des données sensibles
 		return "", fmt.Errorf("création de %s : %w", dir, err)
 	}
 
@@ -86,14 +86,14 @@ func renderFile(path string, tmpl *template.Template, data templateData) error {
 	if err := tmpl.Execute(&buf, data); err != nil {
 		return fmt.Errorf("génération de %s : %w", path, err)
 	}
-	if err := os.WriteFile(path, buf.Bytes(), 0o644); err != nil {
+	if err := os.WriteFile(path, buf.Bytes(), 0o644); err != nil { //nolint:gosec // G306 : fichier source du dépôt
 		return fmt.Errorf("écriture de %s : %w", path, err)
 	}
 	return nil
 }
 
 func runIn(dir string, name string, args ...string) error {
-	cmd := exec.Command(name, args...)
+	cmd := exec.Command(name, args...) //nolint:noctx // commande courte lancée par la CLI, sans contexte d'appel
 	cmd.Dir = dir
 	if len(args) > 0 && args[0] == "mod" {
 		cmd.Env = append(os.Environ(), "GOWORK=off")

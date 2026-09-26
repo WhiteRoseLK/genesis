@@ -12,9 +12,9 @@ import (
 // fuiter dans un message de log sans passer par le type Secret
 // (docs/06-secrets-etat.md "Redaction") : tokens Vault et blocs PEM.
 var knownSecretPatterns = []*regexp.Regexp{
-	regexp.MustCompile(`\bhvs\.[A-Za-z0-9_-]+\b`),   // token Vault (service)
-	regexp.MustCompile(`\bhvb\.[A-Za-z0-9_-]+\b`),   // token Vault (batch)
-	regexp.MustCompile(`\bs\.[A-Za-z0-9]{20,}\b`),   // ancien format de token Vault
+	regexp.MustCompile(`\bhvs\.[A-Za-z0-9_-]+\b`),                                   // token Vault (service)
+	regexp.MustCompile(`\bhvb\.[A-Za-z0-9_-]+\b`),                                   // token Vault (batch)
+	regexp.MustCompile(`\bs\.[A-Za-z0-9]{20,}\b`),                                   // ancien format de token Vault
 	regexp.MustCompile(`(?s)-----BEGIN [A-Z0-9 ]+-----.*?-----END [A-Z0-9 ]+-----`), // bloc PEM
 }
 

@@ -6,9 +6,12 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
+	"io/fs"
 	"os"
+	"path"
 	"path/filepath"
 	"strings"
 	"time"
@@ -133,38 +136,43 @@ func (s *FileStore) GetMeta(_ context.Context, ref Ref) (Meta, error) {
 }
 
 func (s *FileStore) List(_ context.Context, prefix string) ([]Entry, error) {
-	root := s.secretsDir()
-	searchRoot := root
+	// os.Root : le parcours ne peut pas sortir du répertoire des secrets,
+	// ni par un lien symbolique ni par un préfixe contenant « .. ».
+	root, err := os.OpenRoot(s.secretsDir())
+	if errors.Is(err, fs.ErrNotExist) {
+		return nil, nil // rien à lister
+	}
+	if err != nil {
+		return nil, fmt.Errorf("liste des secrets : %w", err)
+	}
+	defer func() { _ = root.Close() }()
+	fsys := root.FS()
+
+	start := "."
 	if prefix != "" {
-		searchRoot = filepath.Join(root, filepath.FromSlash(prefix))
+		start = path.Clean(prefix)
 	}
 
 	var entries []Entry
-	err := filepath.WalkDir(searchRoot, func(path string, d os.DirEntry, err error) error {
+	err = fs.WalkDir(fsys, start, func(p string, d fs.DirEntry, err error) error {
 		if err != nil {
-			if os.IsNotExist(err) && path == searchRoot {
+			if errors.Is(err, fs.ErrNotExist) && p == start {
 				return nil // rien à lister
 			}
 			return err
 		}
-		if d.IsDir() || !strings.HasSuffix(path, ".meta.json") {
+		if d.IsDir() || !strings.HasSuffix(p, ".meta.json") {
 			return nil
 		}
-		rel, err := filepath.Rel(root, path)
+		raw, err := fs.ReadFile(fsys, p)
 		if err != nil {
-			return err
-		}
-		refStr := strings.TrimSuffix(filepath.ToSlash(rel), ".meta.json")
-
-		raw, err := os.ReadFile(path)
-		if err != nil {
-			return fmt.Errorf("lecture de %s : %w", path, err)
+			return fmt.Errorf("lecture de %s : %w", p, err)
 		}
 		var meta Meta
 		if err := json.Unmarshal(raw, &meta); err != nil {
-			return fmt.Errorf("métadonnées invalides dans %s : %w", path, err)
+			return fmt.Errorf("métadonnées invalides dans %s : %w", p, err)
 		}
-		entries = append(entries, Entry{Ref: Ref(refStr), Meta: meta})
+		entries = append(entries, Entry{Ref: Ref(strings.TrimSuffix(p, ".meta.json")), Meta: meta})
 		return nil
 	})
 	if err != nil {

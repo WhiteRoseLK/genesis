@@ -4,6 +4,7 @@ package spec
 
 import (
 	_ "embed"
+	"errors"
 	"fmt"
 	"regexp"
 	"strings"
@@ -40,8 +41,8 @@ func validateSchema(doc any) []error {
 	if err == nil {
 		return nil
 	}
-	ve, ok := err.(*jsonschema.ValidationError)
-	if !ok {
+	var ve *jsonschema.ValidationError
+	if !errors.As(err, &ve) {
 		return []error{&ValidationError{Message: err.Error()}}
 	}
 	return flattenValidationError(ve)

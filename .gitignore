@@ -7,6 +7,16 @@ genesis-module-*
 genesis-test-module-*
 module-linux-*
 module-darwin-*
+# `go build` sans -o dans un module écrit un binaire sans extension portant
+# le nom du module : tout fichier sans extension à la racine d'un module est
+# ignoré (les sources ont toutes une extension ; les sous-répertoires restent
+# suivis).
+/modules/*/*
+/test/modules/*/*
+!/modules/*/*.*
+!/test/modules/*/*.*
+!/modules/*/*/
+!/test/modules/*/*/
 
 # Artefacts de build Go
 *.test
@@ -16,3 +26,4 @@ module-darwin-*
 .vscode/
 .idea/
 *.swp
+/.bin/

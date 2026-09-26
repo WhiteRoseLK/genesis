@@ -5,11 +5,11 @@ package cli
 import (
 	"context"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"testing"
 
 	"github.com/WhiteRoseLK/genesis/internal/modulehost"
+	"github.com/WhiteRoseLK/genesis/internal/testutil"
 )
 
 // TestScaffoldInstallDiscoverDescribe est le critère d'acceptation du
@@ -19,19 +19,9 @@ import (
 // plutôt que vérifié par des tests séparés qui ne couvrent chacun qu'un
 // maillon.
 func TestScaffoldInstallDiscoverDescribe(t *testing.T) {
-	wd, err := os.Getwd()
-	if err != nil {
-		t.Fatal(err)
-	}
-	root := filepath.Join(wd, "..", "..")
+	root := testutil.SandboxRepo(t)
 	name := "e2escaffoldtest"
 	sourceDir := filepath.Join(root, "modules", name)
-	t.Cleanup(func() {
-		_ = os.RemoveAll(sourceDir)
-		cmd := exec.Command("go", "work", "edit", "-dropuse=./modules/"+name)
-		cmd.Dir = root
-		_, _ = cmd.CombinedOutput()
-	})
 
 	origWD, err := os.Getwd()
 	if err != nil {

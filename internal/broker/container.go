@@ -69,7 +69,7 @@ func (c *containerServer) Run(ctx context.Context, req *containerv1.RunRequest) 
 
 	return &containerv1.RunResponse{
 		ContainerId: result.ContainerID,
-		ExitCode:    int32(result.ExitCode),
+		ExitCode:    int32(result.ExitCode), //nolint:gosec // G115 : code de sortie d'un processus, dans [0, 255]
 		Stdout:      result.Stdout,
 		Stderr:      result.Stderr,
 		Ip:          ip,
@@ -89,5 +89,5 @@ func (c *containerServer) Status(ctx context.Context, req *containerv1.StatusReq
 	if err != nil {
 		return nil, err
 	}
-	return &containerv1.StatusResponse{State: state, ExitCode: int32(exitCode)}, nil
+	return &containerv1.StatusResponse{State: state, ExitCode: int32(exitCode)}, nil //nolint:gosec // G115 : code de sortie, dans [0, 255]
 }

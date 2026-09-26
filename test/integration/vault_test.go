@@ -263,7 +263,7 @@ func (f *vaultFakeAnsibleServer) runVerification(vars map[string]any) (string, e
 	}
 	got, found, err := api.kvRead(context.Background(), token, kvMount, kvPath)
 	if err != nil || !found {
-		return "", fmt.Errorf("kv read : found=%v err=%v", found, err)
+		return "", fmt.Errorf("kv read : found=%v err=%w", found, err)
 	}
 	return fmt.Sprintf("CHAIN_OK\nKV_VALUE=%s", got), nil
 }

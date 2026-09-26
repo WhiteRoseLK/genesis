@@ -121,7 +121,7 @@ func TestRunWithFilesExchangesThroughContainerLayer(t *testing.T) {
 	defer cancel()
 
 	result, err := rt.Run(ctx, runner.RunOptions{
-		Image: "alpine:3.24.2@sha256:294b683cb724975bec92580e1e685676bd4b50bda910ddb8c51d4cabeaec77e6",
+		Image:   "alpine:3.24.2@sha256:294b683cb724975bec92580e1e685676bd4b50bda910ddb8c51d4cabeaec77e6",
 		Command: []string{"sh", "-c", "tr a-z A-Z < /work/in.txt > /work/out.txt && echo fini"},
 		Files:   map[string][]byte{"/work/in.txt": []byte("secret")},
 		Collect: []string{"/work/out.txt"},
