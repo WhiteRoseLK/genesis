@@ -52,7 +52,11 @@ Le titre de la PR devient le commit sur `main` : il est validé par la CI et ali
 
 - `docs/09-decisions.md` : une ADR pour toute décision structurante ou nouvelle dépendance lourde.
 - Documents de conception concernés (`docs/0x-*.md`) si le contrat, la spec ou le cycle changent ; `docs/10-ajouter-un-module.md` si la procédure d'ajout de module change.
-- `docs/PROGRESS.md` n'est mis à jour qu'en fin de jalon (état du jalon, décisions) : le détail de chaque changement vit dans la description de sa PR et dans le CHANGELOG.
+- `docs/PROGRESS.md` et `docs/journal.md` ne sont mis à jour qu'en fin de jalon : le détail de chaque changement vit dans la description de sa PR et dans le CHANGELOG.
+
+## Sécurité
+
+Ne signalez jamais une vulnérabilité dans une issue publique : voir [`SECURITY.md`](SECURITY.md).
 
 ## Releases
 

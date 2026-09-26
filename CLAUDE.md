@@ -14,7 +14,9 @@ Ne pas tout charger d'emblée : lire le document utile à la tâche en cours.
 - `docs/08-jalons.md` — jalons et critères d'acceptation
 - `docs/09-decisions.md` — ADR
 - `docs/10-ajouter-un-module.md` — procédure d'ajout de module
-- `docs/PROGRESS.md` — **avancement : à lire en début de session, à mettre à jour en fin de tâche**
+- `docs/PROGRESS.md` — **avancement : à lire en début de session** (état des jalons, prochaine étape) ; mis à jour en fin de jalon
+- `docs/journal.md` — historique détaillé des jalons passés (à consulter au besoin, pas à charger d'emblée)
+- Dette technique : issues GitHub `dette-technique` (seule source de vérité)
 
 ## Méthode de travail
 - Implémenter **un jalon à la fois**, dans l'ordre du doc 08. Ne pas anticiper les jalons suivants.
@@ -22,7 +24,7 @@ Ne pas tout charger d'emblée : lire le document utile à la tâche en cours.
 - Si un document est ambigu ou contradictoire : poser la question plutôt que deviner ; si une décision structurante est prise, l'ajouter en ADR dans `docs/09-decisions.md`.
 - **Une PR atomique par sujet**, fusionnée en squash (ADR-021) : un jalon = plusieurs PR successives. Branche `<type>/<sujet>` depuis `main`, titre de PR en Conventional Commits (scope facultatif : couche du cœur, `sdk`, `proto` ou nom du module), modèle de PR rempli, `Closes #N`. Détail dans `CONTRIBUTING.md`.
 - Chaque PR : `make lint test` vert, ADR et documents de conception à jour dans la même PR. Dette nouvelle → issue `dette-technique`.
-- Fin de jalon : critères d'acceptation vérifiés un par un, `docs/PROGRESS.md` à jour.
+- Fin de jalon : critères d'acceptation vérifiés un par un, `docs/PROGRESS.md` (statut, prochaine étape) et `docs/journal.md` (entrée du jalon) à jour.
 - Ne jamais fusionner une PR sans validation de l'utilisateur.
 
 ## Règles non négociables
