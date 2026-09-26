@@ -1,4 +1,4 @@
-.PHONY: build test lint proto e2e
+.PHONY: build test test-race lint proto e2e
 
 # Modules Go du monorepo, un par go.mod (cœur, sdk, modules/*, test/modules/*).
 # Découverts automatiquement : ajouter un module ne doit nécessiter aucune
@@ -13,6 +13,14 @@ test:
 	@set -e; for m in $(GO_MODULES); do \
 		echo "==> go test ($$m)"; \
 		(cd $$m && go test ./...); \
+	done
+
+# Détecteur de concurrence : exige CGO, contrairement aux binaires livrés
+# (CGO_ENABLED=0) ; ne concerne que l'exécution des tests.
+test-race:
+	@set -e; for m in $(GO_MODULES); do \
+		echo "==> go test -race ($$m)"; \
+		(cd $$m && CGO_ENABLED=1 go test -race ./...); \
 	done
 
 lint:

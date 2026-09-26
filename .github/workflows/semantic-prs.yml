@@ -1,0 +1,57 @@
+name: Semantic PRs
+
+# Les PR sont fusionnées en squash (ADR-021) : le titre devient le commit sur
+# main, lu par Release Please. Il doit donc suivre Conventional Commits.
+on:
+  pull_request_target:
+    types: [opened, edited, reopened, synchronize]
+
+permissions:
+  pull-requests: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.number }}
+  cancel-in-progress: true
+
+jobs:
+  validate_title:
+    name: Validate Title
+    runs-on: ubuntu-latest
+    steps:
+      - uses: amannn/action-semantic-pull-request@v6.1.1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          types: |
+            feat
+            fix
+            perf
+            refactor
+            revert
+            test
+            docs
+            ci
+            build
+            chore
+          # Couches du cœur + `modules` générique : aucun nom de module ici,
+          # sinon chaque nouveau module imposerait de modifier ce fichier.
+          scopes: |
+            cli
+            spec
+            secrets
+            state
+            resolver
+            planner
+            engine
+            broker
+            runner
+            modulehost
+            scaffold
+            sdk
+            proto
+            modules
+            deps
+            ci
+            release
+            main
+          requireScope: false

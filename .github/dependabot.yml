@@ -1,0 +1,26 @@
+version: 2
+updates:
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    commit-message:
+      prefix: "ci"
+      include: "scope"
+
+  # Motifs glob : un nouveau module (modules/<nom>/go.mod) est couvert sans
+  # modifier ce fichier (règle d'extensibilité, docs/02-architecture.md).
+  - package-ecosystem: "gomod"
+    directories:
+      - "/"
+      - "/sdk"
+      - "/modules/*"
+      - "/test/modules/*"
+    schedule:
+      interval: "weekly"
+    groups:
+      go-deps:
+        patterns: ["*"]
+    commit-message:
+      prefix: "chore"
+      include: "scope"

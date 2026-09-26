@@ -1,0 +1,52 @@
+name: "🐞 Bug"
+description: Un comportement de Genesis ou d'un module ne correspond pas à la conception.
+title: "bug: "
+labels: ["bug", "needs-triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        ⚠️ Ne collez **aucun secret** (jeton, mot de passe, clé, contenu de `genesis.secrets`) : masquez-les avant envoi.
+
+  - type: input
+    id: version
+    attributes:
+      label: Version / commit
+      placeholder: ex. v0.3.0 ou 0cbb6c9
+    validations:
+      required: true
+
+  - type: input
+    id: scope
+    attributes:
+      label: Composant concerné
+      description: Couche du cœur (engine, broker, spec…) ou module (teleport, vault…).
+      placeholder: ex. engine / module vault
+    validations:
+      required: true
+
+  - type: textarea
+    id: description
+    attributes:
+      label: Description
+      description: Ce qui se passe, et le comportement attendu (référence au document de conception si possible).
+    validations:
+      required: true
+
+  - type: textarea
+    id: steps
+    attributes:
+      label: Reproduction
+      description: Spec minimale (secrets masqués), commande lancée, étape en échec.
+      render: shell
+    validations:
+      required: true
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: Sortie / journaux
+      description: Erreur retournée (module, étape, cause) et extrait de journal utile.
+      render: text
+    validations:
+      required: false

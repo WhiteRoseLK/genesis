@@ -213,6 +213,16 @@ Le jalon le plus lourd du projet à ce jour, découpé en deux étapes validées
 
 **Prochaine étape** : J8 — Module `teleport` et retrait de la graine (doc 07, ADR-017 : teleport remplace le bastion OpenSSH prévu initialement).
 
+### 2026-09-26 — Processus de développement (hors jalon, ADR-021)
+**Fait**
+- Processus repris de neossh et adapté : modèles de PR (checklist des règles non négociables) et d'issue (bug, évolution, dette technique) ; `semantic-prs.yml` (titre de PR en Conventional Commits, scopes par couche + `modules`) ; `issue-triage.yml` (`needs-triage` ↔ `priorite:*`) ; `release-please.yml` (CHANGELOG, version 0.x) ; `dependabot.yml` (actions + tous les `go.mod` par motifs glob).
+- `make test-race` + job CI `tests (détecteur de concurrence)` : vert sur tout le monorepo, aucune data race.
+- `CONTRIBUTING.md`, `AGENTS.md` (renvoi vers `CLAUDE.md`), `CLAUDE.md` et `/jalon` : une PR atomique par sujet, fusion en squash.
+
+**Décisions** : ADR-021 (PR atomiques + squash, pas de nom de module dans les scopes, GoReleaser différé).
+
+**Prochaine étape** : inchangée (voir jalon en cours).
+
 ## Dette technique connue
 - Clé maîtresse en fichier local (ADR-007)
 - Profil connected uniquement (ADR-008)

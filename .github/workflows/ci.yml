@@ -23,6 +23,19 @@ jobs:
       - run: make build
       - run: make test
 
+  race:
+    name: tests (détecteur de concurrence)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache-dependency-path: |
+            go.sum
+            sdk/go.sum
+      - run: make test-race
+
   lint:
     name: lint (règles d'import comprises)
     runs-on: ubuntu-latest

@@ -20,7 +20,9 @@ Ne pas tout charger d'emblée : lire le document utile à la tâche en cours.
 - Implémenter **un jalon à la fois**, dans l'ordre du doc 08. Ne pas anticiper les jalons suivants.
 - Avant de coder un jalon : proposer un plan court (fichiers, interfaces, tests) et attendre validation.
 - Si un document est ambigu ou contradictoire : poser la question plutôt que deviner ; si une décision structurante est prise, l'ajouter en ADR dans `docs/09-decisions.md`.
-- Fin de jalon : critères d'acceptation vérifiés, `make lint test` vert, `docs/PROGRESS.md` à jour, commit par étape logique (Conventional Commits).
+- **Une PR atomique par sujet**, fusionnée en squash (ADR-021) : un jalon = plusieurs PR successives. Branche `<type>/<sujet>` depuis `main`, titre de PR en Conventional Commits (scopes : couches du cœur, `sdk`, `proto`, `modules`… — jamais un nom de module), modèle de PR rempli, `Closes #N`. Détail dans `CONTRIBUTING.md`.
+- Chaque PR : `make lint test` vert, `docs/PROGRESS.md` et ADR à jour dans la même PR. Fin de jalon : critères d'acceptation vérifiés un par un.
+- Ne jamais fusionner une PR sans validation de l'utilisateur.
 
 ## Règles non négociables
 - **Aucun secret en clair** dans logs, sorties, état, erreurs, fixtures ou commits. Type `Secret` avec redaction.
@@ -33,7 +35,7 @@ Ne pas tout charger d'emblée : lire le document utile à la tâche en cours.
 
 ## Stack et commandes
 - Go stable, `CGO_ENABLED=0`, cibles linux/amd64 et linux/arm64. `cobra`, `yaml.v3`, `log/slog`, `buf` pour protobuf, `hashicorp/go-plugin`, `filippo.io/age`.
-- `make build` · `make test` · `make lint` · `make proto` · `make e2e` (build tag `integration`, nécessite un Proxmox : ne jamais lancer sans demande explicite).
+- `make build` · `make test` · `make test-race` · `make lint` · `make proto` · `make e2e` (build tag `integration`, nécessite un Proxmox : ne jamais lancer sans demande explicite).
 - Tests unitaires sans réseau ; module `fake-compute` pour le bout en bout ; suite de conformité SDK obligatoire pour chaque module.
 
 ## Pièges connus
