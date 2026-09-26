@@ -1,0 +1,8 @@
+# Normalisation des fins de ligne.
+* text=auto eol=lf
+
+# Code généré (make proto) et sommes de contrôle : repliés dans les diffs de
+# PR et exclus des statistiques de langage.
+sdk/go/gen/** linguist-generated=true
+**/go.sum linguist-generated=true
+go.work.sum linguist-generated=true
