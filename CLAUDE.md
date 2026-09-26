@@ -20,7 +20,10 @@ Ne pas tout charger d'emblée : lire le document utile à la tâche en cours.
 - Implémenter **un jalon à la fois**, dans l'ordre du doc 08. Ne pas anticiper les jalons suivants.
 - Avant de coder un jalon : proposer un plan court (fichiers, interfaces, tests) et attendre validation.
 - Si un document est ambigu ou contradictoire : poser la question plutôt que deviner ; si une décision structurante est prise, l'ajouter en ADR dans `docs/09-decisions.md`.
-- Fin de jalon : critères d'acceptation vérifiés, `make lint test` vert, `docs/PROGRESS.md` à jour, commit par étape logique (Conventional Commits).
+- **Une PR atomique par sujet**, fusionnée en squash (ADR-021) : un jalon = plusieurs PR successives. Branche `<type>/<sujet>` depuis `main`, titre de PR en Conventional Commits (scope facultatif : couche du cœur, `sdk`, `proto` ou nom du module), modèle de PR rempli, `Closes #N`. Détail dans `CONTRIBUTING.md`.
+- Chaque PR : `make lint test` vert, ADR et documents de conception à jour dans la même PR. Dette nouvelle → issue `dette-technique`.
+- Fin de jalon : critères d'acceptation vérifiés un par un, `docs/PROGRESS.md` à jour.
+- Ne jamais fusionner une PR sans validation de l'utilisateur.
 
 ## Règles non négociables
 - **Aucun secret en clair** dans logs, sorties, état, erreurs, fixtures ou commits. Type `Secret` avec redaction.
@@ -33,7 +36,7 @@ Ne pas tout charger d'emblée : lire le document utile à la tâche en cours.
 
 ## Stack et commandes
 - Go stable, `CGO_ENABLED=0`, cibles linux/amd64 et linux/arm64. `cobra`, `yaml.v3`, `log/slog`, `buf` pour protobuf, `hashicorp/go-plugin`, `filippo.io/age`.
-- `make build` · `make test` · `make test-docker` · `make lint` · `make mod-check` · `make proto` · `make e2e` (build tag `integration`, nécessite un Proxmox : ne jamais lancer sans demande explicite).
+- `make build` · `make test` · `make test-race` · `make test-docker` · `make lint` · `make mod-check` · `make proto` · `make e2e` (build tag `integration`, nécessite un Proxmox : ne jamais lancer sans demande explicite).
 - Tests unitaires sans réseau ni démon de conteneurs (`make test`) ; tests contre de vrais conteneurs sous build tag `docker` (`make test-docker`), images épinglées par version et empreinte ; tests d'un module à travers le cœur dans `test/integration/` ; module `fake-compute` pour le bout en bout ; suite de conformité SDK obligatoire pour chaque module.
 
 ## Pièges connus

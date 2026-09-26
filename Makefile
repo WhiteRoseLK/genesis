@@ -1,4 +1,4 @@
-.PHONY: build test test-docker lint proto e2e mod-check
+.PHONY: build test test-race test-docker lint proto e2e mod-check
 
 # Modules Go du monorepo, un par go.mod (cœur, sdk, modules/*, test/modules/*).
 # Découverts automatiquement : ajouter un module ne doit nécessiter aucune
@@ -14,6 +14,14 @@ test:
 	@set -e; for m in $(GO_MODULES); do \
 		echo "==> go test ($$m)"; \
 		(cd $$m && go test ./...); \
+	done
+
+# Mêmes tests avec le détecteur de concurrence : exige CGO, contrairement aux
+# binaires livrés (CGO_ENABLED=0) ; ne concerne que l'exécution des tests.
+test-race:
+	@set -e; for m in $(GO_MODULES); do \
+		echo "==> go test -race ($$m)"; \
+		(cd $$m && CGO_ENABLED=1 go test -race ./...); \
 	done
 
 # Tests d'intégration contre de vrais conteneurs (build tag `docker`) :

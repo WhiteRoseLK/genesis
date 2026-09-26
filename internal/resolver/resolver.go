@@ -9,14 +9,15 @@ import (
 	"sort"
 	"strings"
 
-	sdk "github.com/WhiteRoseLK/genesis/sdk/go"
 	"github.com/WhiteRoseLK/genesis/internal/modulehost"
 	"github.com/WhiteRoseLK/genesis/internal/spec"
+	coreversion "github.com/WhiteRoseLK/genesis/internal/version"
+	sdk "github.com/WhiteRoseLK/genesis/sdk/go"
 )
 
 // CoreVersion est la version courante du cœur, comparée à la contrainte
-// `core` de chaque manifest (docs/03-contrat-module.md §1).
-const CoreVersion = "0.1.0"
+// `core` de chaque manifest (source unique : internal/version).
+const CoreVersion = coreversion.Version
 
 // Module est un module retenu par la résolution.
 type Module struct {

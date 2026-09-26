@@ -1,0 +1,26 @@
+name: Release Please
+
+# Tient à jour une PR de release par paquet (cœur `vX.Y.Z`, SDK `sdk/vX.Y.Z`)
+# à partir des commits de main. GoReleaser (binaires du cœur et des modules)
+# viendra plus tard (ADR-021).
+#
+# Une PR ouverte avec GITHUB_TOKEN ne déclenche pas la CI : définir le secret
+# RELEASE_PLEASE_TOKEN (jeton à granularité fine, droits contents + pull
+# requests sur ce dépôt) pour que la PR de release passe les checks requis.
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  release-please:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: googleapis/release-please-action@v5
+        with:
+          token: ${{ secrets.RELEASE_PLEASE_TOKEN || secrets.GITHUB_TOKEN }}
+          config-file: release-please-config.json
+          manifest-file: .release-please-manifest.json
