@@ -12,6 +12,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"os"
 	"os/exec"
 	"strings"
 )
@@ -51,6 +52,12 @@ type RunOptions struct {
 	Command []string
 	Env     map[string]string
 	Mounts  []Mount
+	// Tmpfs : points de montage en mémoire (option `--tmpfs`), pour les
+	// fichiers qui ne doivent jamais toucher le disque de la graine.
+	Tmpfs []string
+	// Stdin : envoyé sur l'entrée standard du conteneur (option `-i`),
+	// seulement en mode bloquant.
+	Stdin []byte
 	// Detach : voir docs/proto core.container/v1 RunRequest.
 	Detach bool
 }
@@ -75,8 +82,19 @@ func (r *ContainerRuntime) Run(ctx context.Context, opts RunOptions) (*RunResult
 	if opts.Name != "" {
 		args = append(args, "--name", opts.Name)
 	}
+	if opts.Stdin != nil && !opts.Detach {
+		args = append(args, "-i")
+	}
+	// `-e NOM` sans valeur : le runtime lit la valeur dans son propre
+	// environnement. Les valeurs (potentiellement secrètes) n'apparaissent
+	// ainsi jamais dans la ligne de commande, visible de tous via ps.
+	env := os.Environ()
 	for k, v := range opts.Env {
-		args = append(args, "-e", fmt.Sprintf("%s=%s", k, v))
+		args = append(args, "-e", k)
+		env = append(env, k+"="+v)
+	}
+	for _, t := range opts.Tmpfs {
+		args = append(args, "--tmpfs", t)
 	}
 	for _, m := range opts.Mounts {
 		spec := fmt.Sprintf("%s:%s", m.HostPath, m.ContainerPath)
@@ -89,6 +107,10 @@ func (r *ContainerRuntime) Run(ctx context.Context, opts RunOptions) (*RunResult
 	args = append(args, opts.Command...)
 
 	cmd := exec.CommandContext(ctx, r.binary, args...)
+	cmd.Env = env
+	if opts.Stdin != nil && !opts.Detach {
+		cmd.Stdin = bytes.NewReader(opts.Stdin)
+	}
 	var stdout, stderr bytes.Buffer
 	cmd.Stdout = &stdout
 	cmd.Stderr = &stderr
