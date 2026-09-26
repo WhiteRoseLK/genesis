@@ -20,7 +20,7 @@ test:
 mod-check:
 	@set -e; for m in $(GO_MODULES); do \
 		echo "==> go mod tidy -diff + build hors workspace ($$m)"; \
-		(cd $$m && GOWORK=off go mod tidy -diff && GOWORK=off go build ./...); \
+		(cd $$m && GOWORK=off go mod tidy -diff && GOWORK=off go build -o /dev/null ./...); \
 	done
 
 lint:
