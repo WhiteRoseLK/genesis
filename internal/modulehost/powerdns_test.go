@@ -15,14 +15,14 @@ import (
 
 	"google.golang.org/grpc"
 
-	"genesis/internal/broker"
-	computevmv1 "genesis/sdk/go/gen/functions/compute/vm/v1"
-	ansiblev1 "genesis/sdk/go/gen/functions/core/ansible/v1"
-	dnsresolverv1 "genesis/sdk/go/gen/functions/dns/resolver/v1"
-	dnszonev1 "genesis/sdk/go/gen/functions/dns/zone/v1"
-	osbasev1 "genesis/sdk/go/gen/functions/os/base/v1"
-	timentpv1 "genesis/sdk/go/gen/functions/time/ntp/v1"
-	modulev1 "genesis/sdk/go/gen/module/v1"
+	"github.com/WhiteRoseLK/genesis/internal/broker"
+	computevmv1 "github.com/WhiteRoseLK/genesis/sdk/go/gen/functions/compute/vm/v1"
+	ansiblev1 "github.com/WhiteRoseLK/genesis/sdk/go/gen/functions/core/ansible/v1"
+	dnsresolverv1 "github.com/WhiteRoseLK/genesis/sdk/go/gen/functions/dns/resolver/v1"
+	dnszonev1 "github.com/WhiteRoseLK/genesis/sdk/go/gen/functions/dns/zone/v1"
+	osbasev1 "github.com/WhiteRoseLK/genesis/sdk/go/gen/functions/os/base/v1"
+	timentpv1 "github.com/WhiteRoseLK/genesis/sdk/go/gen/functions/time/ntp/v1"
+	modulev1 "github.com/WhiteRoseLK/genesis/sdk/go/gen/module/v1"
 )
 
 // powerdnsAPIPort doit correspondre à la constante non exportée

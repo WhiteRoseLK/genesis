@@ -320,7 +320,7 @@ const file_functions_secrets_kv_v1_kv_proto_rawDesc = "" +
 	"\tSecretsKV\x12S\n" +
 	"\x04Read\x12$.functions.secrets.kv.v1.ReadRequest\x1a%.functions.secrets.kv.v1.ReadResponse\x12V\n" +
 	"\x05Write\x12%.functions.secrets.kv.v1.WriteRequest\x1a&.functions.secrets.kv.v1.WriteResponse\x12S\n" +
-	"\x04List\x12$.functions.secrets.kv.v1.ListRequest\x1a%.functions.secrets.kv.v1.ListResponseB8Z6genesis/sdk/go/gen/functions/secrets/kv/v1;secretskvv1b\x06proto3"
+	"\x04List\x12$.functions.secrets.kv.v1.ListRequest\x1a%.functions.secrets.kv.v1.ListResponseBOZMgithub.com/WhiteRoseLK/genesis/sdk/go/gen/functions/secrets/kv/v1;secretskvv1b\x06proto3"
 
 var (
 	file_functions_secrets_kv_v1_kv_proto_rawDescOnce sync.Once

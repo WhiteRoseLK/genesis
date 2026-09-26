@@ -12,8 +12,8 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"genesis/internal/engine"
-	"genesis/internal/state"
+	"github.com/WhiteRoseLK/genesis/internal/engine"
+	"github.com/WhiteRoseLK/genesis/internal/state"
 )
 
 func newApplyCmd() *cobra.Command {

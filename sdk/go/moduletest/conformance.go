@@ -18,8 +18,8 @@ import (
 
 	"google.golang.org/protobuf/types/known/structpb"
 
-	sdk "genesis/sdk/go"
-	modulev1 "genesis/sdk/go/gen/module/v1"
+	sdk "github.com/WhiteRoseLK/genesis/sdk/go"
+	modulev1 "github.com/WhiteRoseLK/genesis/sdk/go/gen/module/v1"
 )
 
 // RunConformance exécute la suite de conformité minimale sur impl, dont le

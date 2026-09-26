@@ -9,7 +9,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	modulev1 "genesis/sdk/go/gen/module/v1"
+	modulev1 "github.com/WhiteRoseLK/genesis/sdk/go/gen/module/v1"
 )
 
 // buildPanickingModule compile test/modules/panicking (docs/02-architecture.md :

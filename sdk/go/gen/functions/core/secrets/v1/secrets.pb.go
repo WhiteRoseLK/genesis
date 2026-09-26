@@ -626,7 +626,7 @@ const file_functions_core_secrets_v1_secrets_proto_rawDesc = "" +
 	"\x06Ensure\x12(.functions.core.secrets.v1.EnsureRequest\x1a).functions.core.secrets.v1.EnsureResponse\x12T\n" +
 	"\x03Get\x12%.functions.core.secrets.v1.GetRequest\x1a&.functions.core.secrets.v1.GetResponse\x12T\n" +
 	"\x03Put\x12%.functions.core.secrets.v1.PutRequest\x1a&.functions.core.secrets.v1.PutResponse\x12W\n" +
-	"\x04List\x12&.functions.core.secrets.v1.ListRequest\x1a'.functions.core.secrets.v1.ListResponseB8Z6genesis/sdk/go/gen/functions/core/secrets/v1;secretsv1b\x06proto3"
+	"\x04List\x12&.functions.core.secrets.v1.ListRequest\x1a'.functions.core.secrets.v1.ListResponseBOZMgithub.com/WhiteRoseLK/genesis/sdk/go/gen/functions/core/secrets/v1;secretsv1b\x06proto3"
 
 var (
 	file_functions_core_secrets_v1_secrets_proto_rawDescOnce sync.Once

@@ -7,9 +7,9 @@ import (
 	"fmt"
 	"regexp"
 
-	sdk "genesis/sdk/go"
-	ansiblev1 "genesis/sdk/go/gen/functions/core/ansible/v1"
-	fleetagentv1 "genesis/sdk/go/gen/functions/fleet/agent/v1"
+	sdk "github.com/WhiteRoseLK/genesis/sdk/go"
+	ansiblev1 "github.com/WhiteRoseLK/genesis/sdk/go/gen/functions/core/ansible/v1"
+	fleetagentv1 "github.com/WhiteRoseLK/genesis/sdk/go/gen/functions/fleet/agent/v1"
 )
 
 var joinTokenRe = regexp.MustCompile(`[a-f0-9]{32}`)

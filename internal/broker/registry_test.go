@@ -13,7 +13,7 @@ import (
 	"google.golang.org/grpc/status"
 	"google.golang.org/grpc/test/bufconn"
 
-	echov1 "genesis/sdk/go/gen/functions/test/echo/v1"
+	echov1 "github.com/WhiteRoseLK/genesis/sdk/go/gen/functions/test/echo/v1"
 )
 
 // serveInMemory démarre s sur un listener en mémoire (bufconn) et retourne

@@ -239,7 +239,7 @@ const file_functions_access_ssh_v1_ssh_proto_rawDesc = "" +
 	"\x13certificate_openssh\x18\x01 \x01(\tR\x12certificateOpenssh2\xc8\x01\n" +
 	"\tAccessSSH\x12Q\n" +
 	"\bJumpHost\x12\x1e.functions.access.ssh.v1.Empty\x1a%.functions.access.ssh.v1.JumpHostInfo\x12h\n" +
-	"\vSignUserKey\x12+.functions.access.ssh.v1.SignUserKeyRequest\x1a,.functions.access.ssh.v1.SignUserKeyResponseB8Z6genesis/sdk/go/gen/functions/access/ssh/v1;accesssshv1b\x06proto3"
+	"\vSignUserKey\x12+.functions.access.ssh.v1.SignUserKeyRequest\x1a,.functions.access.ssh.v1.SignUserKeyResponseBOZMgithub.com/WhiteRoseLK/genesis/sdk/go/gen/functions/access/ssh/v1;accesssshv1b\x06proto3"
 
 var (
 	file_functions_access_ssh_v1_ssh_proto_rawDescOnce sync.Once

@@ -8,7 +8,7 @@ import (
 
 	"gopkg.in/yaml.v3"
 
-	modulev1 "genesis/sdk/go/gen/module/v1"
+	modulev1 "github.com/WhiteRoseLK/genesis/sdk/go/gen/module/v1"
 )
 
 // ManifestFile est la forme YAML de module.yaml (docs/03-contrat-module.md §1).

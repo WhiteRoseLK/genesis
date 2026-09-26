@@ -7,9 +7,9 @@ import (
 	"testing"
 	"time"
 
-	sdk "genesis/sdk/go"
-	"genesis/internal/modulehost"
-	"genesis/internal/spec"
+	sdk "github.com/WhiteRoseLK/genesis/sdk/go"
+	"github.com/WhiteRoseLK/genesis/internal/modulehost"
+	"github.com/WhiteRoseLK/genesis/internal/spec"
 )
 
 func timeout() <-chan time.Time {

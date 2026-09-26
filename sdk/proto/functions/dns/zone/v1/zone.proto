@@ -4,7 +4,7 @@ syntax = "proto3";
 // coredns (seed) et powerdns (target).
 package functions.dns.zone.v1;
 
-option go_package = "genesis/sdk/go/gen/functions/dns/zone/v1;dnszonev1";
+option go_package = "github.com/WhiteRoseLK/genesis/sdk/go/gen/functions/dns/zone/v1;dnszonev1";
 
 service DnsZone {
   rpc UpsertRecord(Record) returns (Empty);

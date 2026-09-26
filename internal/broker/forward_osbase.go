@@ -7,7 +7,7 @@ import (
 
 	"google.golang.org/grpc"
 
-	osbasev1 "genesis/sdk/go/gen/functions/os/base/v1"
+	osbasev1 "github.com/WhiteRoseLK/genesis/sdk/go/gen/functions/os/base/v1"
 )
 
 // ForwardOSBase enregistre un BaseServer qui relaie chaque appel vers conn,

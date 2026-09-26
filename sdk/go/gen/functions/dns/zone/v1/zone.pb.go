@@ -363,7 +363,7 @@ const file_functions_dns_zone_v1_zone_proto_rawDesc = "" +
 	"\fUpsertRecord\x12\x1d.functions.dns.zone.v1.Record\x1a\x1c.functions.dns.zone.v1.Empty\x12N\n" +
 	"\fDeleteRecord\x12 .functions.dns.zone.v1.RecordKey\x1a\x1c.functions.dns.zone.v1.Empty\x12J\n" +
 	"\vListRecords\x12\x1b.functions.dns.zone.v1.Zone\x1a\x1e.functions.dns.zone.v1.Records\x12M\n" +
-	"\bEndpoint\x12\x1c.functions.dns.zone.v1.Empty\x1a#.functions.dns.zone.v1.EndpointInfoB4Z2genesis/sdk/go/gen/functions/dns/zone/v1;dnszonev1b\x06proto3"
+	"\bEndpoint\x12\x1c.functions.dns.zone.v1.Empty\x1a#.functions.dns.zone.v1.EndpointInfoBKZIgithub.com/WhiteRoseLK/genesis/sdk/go/gen/functions/dns/zone/v1;dnszonev1b\x06proto3"
 
 var (
 	file_functions_dns_zone_v1_zone_proto_rawDescOnce sync.Once

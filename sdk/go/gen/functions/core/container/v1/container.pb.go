@@ -462,7 +462,7 @@ const file_functions_core_container_v1_container_proto_rawDesc = "" +
 	"\tContainer\x12X\n" +
 	"\x03Run\x12'.functions.core.container.v1.RunRequest\x1a(.functions.core.container.v1.RunResponse\x12[\n" +
 	"\x04Stop\x12(.functions.core.container.v1.StopRequest\x1a).functions.core.container.v1.StopResponse\x12a\n" +
-	"\x06Status\x12*.functions.core.container.v1.StatusRequest\x1a+.functions.core.container.v1.StatusResponseB<Z:genesis/sdk/go/gen/functions/core/container/v1;containerv1b\x06proto3"
+	"\x06Status\x12*.functions.core.container.v1.StatusRequest\x1a+.functions.core.container.v1.StatusResponseBSZQgithub.com/WhiteRoseLK/genesis/sdk/go/gen/functions/core/container/v1;containerv1b\x06proto3"
 
 var (
 	file_functions_core_container_v1_container_proto_rawDescOnce sync.Once

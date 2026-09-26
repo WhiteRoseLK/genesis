@@ -8,7 +8,7 @@ import (
 	"strings"
 	"testing"
 
-	"genesis/internal/secrets"
+	"github.com/WhiteRoseLK/genesis/internal/secrets"
 )
 
 func TestSecretsListAndGetRoundTrip(t *testing.T) {

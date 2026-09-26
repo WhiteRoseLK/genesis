@@ -12,9 +12,9 @@ import (
 
 	"google.golang.org/grpc"
 
-	sdk "genesis/sdk/go"
-	echov1 "genesis/sdk/go/gen/functions/test/echo/v1"
-	modulev1 "genesis/sdk/go/gen/module/v1"
+	sdk "github.com/WhiteRoseLK/genesis/sdk/go"
+	echov1 "github.com/WhiteRoseLK/genesis/sdk/go/gen/functions/test/echo/v1"
+	modulev1 "github.com/WhiteRoseLK/genesis/sdk/go/gen/module/v1"
 )
 
 //go:embed module.yaml

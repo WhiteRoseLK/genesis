@@ -11,8 +11,8 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
-	"genesis/internal/secrets"
-	secretsv1 "genesis/sdk/go/gen/functions/core/secrets/v1"
+	"github.com/WhiteRoseLK/genesis/internal/secrets"
+	secretsv1 "github.com/WhiteRoseLK/genesis/sdk/go/gen/functions/core/secrets/v1"
 )
 
 // NativeSecrets construit le fournisseur core.secrets/v1, natif au cœur

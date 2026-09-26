@@ -7,10 +7,10 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"genesis/internal/modulehost"
-	"genesis/internal/planner"
-	"genesis/internal/resolver"
-	"genesis/internal/spec"
+	"github.com/WhiteRoseLK/genesis/internal/modulehost"
+	"github.com/WhiteRoseLK/genesis/internal/planner"
+	"github.com/WhiteRoseLK/genesis/internal/resolver"
+	"github.com/WhiteRoseLK/genesis/internal/spec"
 )
 
 func newPlanCmd() *cobra.Command {

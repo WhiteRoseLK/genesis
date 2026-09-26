@@ -13,8 +13,8 @@ import (
 
 	"google.golang.org/grpc"
 
-	"genesis/internal/runner"
-	ansiblev1 "genesis/sdk/go/gen/functions/core/ansible/v1"
+	"github.com/WhiteRoseLK/genesis/internal/runner"
+	ansiblev1 "github.com/WhiteRoseLK/genesis/sdk/go/gen/functions/core/ansible/v1"
 )
 
 // ansibleImage exécute les playbooks sans rien installer sur la graine

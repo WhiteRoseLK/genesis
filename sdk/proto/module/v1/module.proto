@@ -7,7 +7,7 @@ package module.v1;
 
 import "google/protobuf/struct.proto";
 
-option go_package = "genesis/sdk/go/gen/module/v1;modulev1";
+option go_package = "github.com/WhiteRoseLK/genesis/sdk/go/gen/module/v1;modulev1";
 
 service Module {
   rpc Describe(Empty) returns (Manifest);

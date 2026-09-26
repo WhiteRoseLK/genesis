@@ -5,10 +5,10 @@ package planner
 import (
 	"testing"
 
-	sdk "genesis/sdk/go"
-	"genesis/internal/modulehost"
-	"genesis/internal/resolver"
-	"genesis/internal/spec"
+	sdk "github.com/WhiteRoseLK/genesis/sdk/go"
+	"github.com/WhiteRoseLK/genesis/internal/modulehost"
+	"github.com/WhiteRoseLK/genesis/internal/resolver"
+	"github.com/WhiteRoseLK/genesis/internal/spec"
 )
 
 func installedModule(name string, opts ...func(*sdk.ManifestFile)) modulehost.Installed {

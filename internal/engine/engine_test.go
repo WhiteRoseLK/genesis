@@ -15,12 +15,12 @@ import (
 
 	"filippo.io/age"
 
-	"genesis/internal/modulehost"
-	"genesis/internal/planner"
-	"genesis/internal/resolver"
-	"genesis/internal/secrets"
-	"genesis/internal/spec"
-	"genesis/internal/state"
+	"github.com/WhiteRoseLK/genesis/internal/modulehost"
+	"github.com/WhiteRoseLK/genesis/internal/planner"
+	"github.com/WhiteRoseLK/genesis/internal/resolver"
+	"github.com/WhiteRoseLK/genesis/internal/secrets"
+	"github.com/WhiteRoseLK/genesis/internal/spec"
+	"github.com/WhiteRoseLK/genesis/internal/state"
 )
 
 // buildAndInstall compile le module source sous test/modules/<name> et

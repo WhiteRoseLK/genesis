@@ -7,7 +7,7 @@ import (
 
 	"google.golang.org/grpc"
 
-	computevmv1 "genesis/sdk/go/gen/functions/compute/vm/v1"
+	computevmv1 "github.com/WhiteRoseLK/genesis/sdk/go/gen/functions/compute/vm/v1"
 )
 
 // ForwardComputeVM enregistre un ComputeVMServer qui relaie chaque appel

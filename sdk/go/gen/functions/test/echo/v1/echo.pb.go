@@ -141,7 +141,7 @@ const file_functions_test_echo_v1_echo_proto_rawDesc = "" +
 	"\x04from\x18\x02 \x01(\tR\x04from\x12\x14\n" +
 	"\x05phase\x18\x03 \x01(\tR\x05phase2Y\n" +
 	"\x04Echo\x12Q\n" +
-	"\x04Call\x12#.functions.test.echo.v1.CallRequest\x1a$.functions.test.echo.v1.CallResponseB2Z0genesis/sdk/go/gen/functions/test/echo/v1;echov1b\x06proto3"
+	"\x04Call\x12#.functions.test.echo.v1.CallRequest\x1a$.functions.test.echo.v1.CallResponseBIZGgithub.com/WhiteRoseLK/genesis/sdk/go/gen/functions/test/echo/v1;echov1b\x06proto3"
 
 var (
 	file_functions_test_echo_v1_echo_proto_rawDescOnce sync.Once

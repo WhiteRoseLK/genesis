@@ -9,7 +9,7 @@ import (
 
 	"google.golang.org/grpc"
 
-	fleetagentv1 "genesis/sdk/go/gen/functions/fleet/agent/v1"
+	fleetagentv1 "github.com/WhiteRoseLK/genesis/sdk/go/gen/functions/fleet/agent/v1"
 )
 
 // fakeFleetAgentServer capture les appels Install reçus — joue le rôle d'un

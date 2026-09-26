@@ -7,7 +7,7 @@ import (
 
 	"google.golang.org/grpc"
 
-	echov1 "genesis/sdk/go/gen/functions/test/echo/v1"
+	echov1 "github.com/WhiteRoseLK/genesis/sdk/go/gen/functions/test/echo/v1"
 )
 
 // ForwardEcho enregistre un EchoServer qui relaie chaque appel vers conn —

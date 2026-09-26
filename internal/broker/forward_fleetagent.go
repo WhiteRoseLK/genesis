@@ -8,7 +8,7 @@ import (
 
 	"google.golang.org/grpc"
 
-	fleetagentv1 "genesis/sdk/go/gen/functions/fleet/agent/v1"
+	fleetagentv1 "github.com/WhiteRoseLK/genesis/sdk/go/gen/functions/fleet/agent/v1"
 )
 
 // ForwardFleetAgent enregistre un FleetAgentServer qui relaie chaque appel

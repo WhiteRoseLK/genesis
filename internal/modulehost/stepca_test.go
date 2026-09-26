@@ -13,11 +13,11 @@ import (
 	"math/big"
 	"testing"
 
-	"genesis/internal/broker"
-	"genesis/internal/runner"
-	"genesis/internal/secrets"
-	pkiissuerv1 "genesis/sdk/go/gen/functions/pki/issuer/v1"
-	modulev1 "genesis/sdk/go/gen/module/v1"
+	"github.com/WhiteRoseLK/genesis/internal/broker"
+	"github.com/WhiteRoseLK/genesis/internal/runner"
+	"github.com/WhiteRoseLK/genesis/internal/secrets"
+	pkiissuerv1 "github.com/WhiteRoseLK/genesis/sdk/go/gen/functions/pki/issuer/v1"
+	modulev1 "github.com/WhiteRoseLK/genesis/sdk/go/gen/module/v1"
 )
 
 // launchStepCA lance step-ca avec une session de broker vers core.container/v1

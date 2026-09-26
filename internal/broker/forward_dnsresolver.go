@@ -7,7 +7,7 @@ import (
 
 	"google.golang.org/grpc"
 
-	dnsresolverv1 "genesis/sdk/go/gen/functions/dns/resolver/v1"
+	dnsresolverv1 "github.com/WhiteRoseLK/genesis/sdk/go/gen/functions/dns/resolver/v1"
 )
 
 // ForwardDNSResolver enregistre un DnsResolverServer qui relaie chaque appel

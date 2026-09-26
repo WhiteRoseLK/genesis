@@ -7,7 +7,7 @@ import (
 
 	"google.golang.org/grpc"
 
-	dnszonev1 "genesis/sdk/go/gen/functions/dns/zone/v1"
+	dnszonev1 "github.com/WhiteRoseLK/genesis/sdk/go/gen/functions/dns/zone/v1"
 )
 
 // ForwardDNSZone enregistre un DnsZoneServer qui relaie chaque appel vers

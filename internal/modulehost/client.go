@@ -11,8 +11,8 @@ import (
 	goplugin "github.com/hashicorp/go-plugin"
 	"google.golang.org/grpc"
 
-	sdk "genesis/sdk/go"
-	modulev1 "genesis/sdk/go/gen/module/v1"
+	sdk "github.com/WhiteRoseLK/genesis/sdk/go"
+	modulev1 "github.com/WhiteRoseLK/genesis/sdk/go/gen/module/v1"
 )
 
 // Client est une connexion vivante à un module lancé en process séparé.

@@ -10,11 +10,11 @@ import (
 	"strings"
 	"testing"
 
-	"genesis/internal/modulehost"
-	"genesis/internal/planner"
-	"genesis/internal/resolver"
-	"genesis/internal/spec"
-	"genesis/internal/state"
+	"github.com/WhiteRoseLK/genesis/internal/modulehost"
+	"github.com/WhiteRoseLK/genesis/internal/planner"
+	"github.com/WhiteRoseLK/genesis/internal/resolver"
+	"github.com/WhiteRoseLK/genesis/internal/spec"
+	"github.com/WhiteRoseLK/genesis/internal/state"
 )
 
 // TestHandoverRetiresCrossModuleSeedProvider prouve la passation croisée

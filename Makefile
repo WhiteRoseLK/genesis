@@ -1,4 +1,4 @@
-.PHONY: build test lint proto e2e
+.PHONY: build test lint proto e2e mod-check
 
 # Modules Go du monorepo, un par go.mod (cœur, sdk, modules/*, test/modules/*).
 # Découverts automatiquement : ajouter un module ne doit nécessiter aucune
@@ -13,6 +13,14 @@ test:
 	@set -e; for m in $(GO_MODULES); do \
 		echo "==> go test ($$m)"; \
 		(cd $$m && go test ./...); \
+	done
+
+# Chaque go.mod doit se suffire à lui-même (hors espace de travail go.work) et
+# être à jour (go mod tidy) : un module tiers ou `go install` n'a pas go.work.
+mod-check:
+	@set -e; for m in $(GO_MODULES); do \
+		echo "==> go mod tidy -diff + build hors workspace ($$m)"; \
+		(cd $$m && GOWORK=off go mod tidy -diff && GOWORK=off go build -o /dev/null ./...); \
 	done
 
 lint:

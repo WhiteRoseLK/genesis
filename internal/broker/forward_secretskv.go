@@ -7,7 +7,7 @@ import (
 
 	"google.golang.org/grpc"
 
-	secretskvv1 "genesis/sdk/go/gen/functions/secrets/kv/v1"
+	secretskvv1 "github.com/WhiteRoseLK/genesis/sdk/go/gen/functions/secrets/kv/v1"
 )
 
 // ForwardSecretsKV enregistre un SecretsKVServer qui relaie chaque appel

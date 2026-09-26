@@ -3,7 +3,7 @@ syntax = "proto3";
 // Fonction time.ntp/v1 (docs/03-contrat-module.md) : fournisseur MVP chrony (target).
 package functions.time.ntp.v1;
 
-option go_package = "genesis/sdk/go/gen/functions/time/ntp/v1;timentpv1";
+option go_package = "github.com/WhiteRoseLK/genesis/sdk/go/gen/functions/time/ntp/v1;timentpv1";
 
 service TimeNTP {
   rpc Endpoint(Empty) returns (EndpointInfo);

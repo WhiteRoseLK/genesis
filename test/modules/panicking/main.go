@@ -9,8 +9,8 @@ import (
 	"context"
 	_ "embed"
 
-	sdk "genesis/sdk/go"
-	modulev1 "genesis/sdk/go/gen/module/v1"
+	sdk "github.com/WhiteRoseLK/genesis/sdk/go"
+	modulev1 "github.com/WhiteRoseLK/genesis/sdk/go/gen/module/v1"
 )
 
 //go:embed module.yaml

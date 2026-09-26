@@ -11,11 +11,11 @@ import (
 	"testing"
 	"time"
 
-	"genesis/internal/broker"
-	"genesis/internal/runner"
-	sdk "genesis/sdk/go"
-	dnszonev1 "genesis/sdk/go/gen/functions/dns/zone/v1"
-	modulev1 "genesis/sdk/go/gen/module/v1"
+	"github.com/WhiteRoseLK/genesis/internal/broker"
+	"github.com/WhiteRoseLK/genesis/internal/runner"
+	sdk "github.com/WhiteRoseLK/genesis/sdk/go"
+	dnszonev1 "github.com/WhiteRoseLK/genesis/sdk/go/gen/functions/dns/zone/v1"
+	modulev1 "github.com/WhiteRoseLK/genesis/sdk/go/gen/module/v1"
 )
 
 func buildCoreDNS(t *testing.T) (binaryPath string, manifest *sdk.ManifestFile) {

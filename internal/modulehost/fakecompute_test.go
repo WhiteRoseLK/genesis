@@ -14,11 +14,11 @@ import (
 
 	gossh "golang.org/x/crypto/ssh"
 
-	"genesis/internal/broker"
-	"genesis/internal/runner"
-	sdk "genesis/sdk/go"
-	computevmv1 "genesis/sdk/go/gen/functions/compute/vm/v1"
-	modulev1 "genesis/sdk/go/gen/module/v1"
+	"github.com/WhiteRoseLK/genesis/internal/broker"
+	"github.com/WhiteRoseLK/genesis/internal/runner"
+	sdk "github.com/WhiteRoseLK/genesis/sdk/go"
+	computevmv1 "github.com/WhiteRoseLK/genesis/sdk/go/gen/functions/compute/vm/v1"
+	modulev1 "github.com/WhiteRoseLK/genesis/sdk/go/gen/module/v1"
 )
 
 func buildFakeCompute(t *testing.T) (binaryPath string, manifest *sdk.ManifestFile) {

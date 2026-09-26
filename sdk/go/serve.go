@@ -10,7 +10,7 @@ import (
 	"github.com/hashicorp/go-plugin"
 	"google.golang.org/grpc"
 
-	modulev1 "genesis/sdk/go/gen/module/v1"
+	modulev1 "github.com/WhiteRoseLK/genesis/sdk/go/gen/module/v1"
 )
 
 // Handshake est le handshake go-plugin partagé par le cœur (client, voir

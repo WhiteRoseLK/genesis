@@ -9,9 +9,9 @@ import (
 	"sort"
 	"strings"
 
-	sdk "genesis/sdk/go"
-	"genesis/internal/modulehost"
-	"genesis/internal/spec"
+	sdk "github.com/WhiteRoseLK/genesis/sdk/go"
+	"github.com/WhiteRoseLK/genesis/internal/modulehost"
+	"github.com/WhiteRoseLK/genesis/internal/spec"
 )
 
 // CoreVersion est la version courante du cœur, comparée à la contrainte

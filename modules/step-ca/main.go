@@ -29,11 +29,11 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
-	sdk "genesis/sdk/go"
-	containerv1 "genesis/sdk/go/gen/functions/core/container/v1"
-	secretsv1 "genesis/sdk/go/gen/functions/core/secrets/v1"
-	pkiissuerv1 "genesis/sdk/go/gen/functions/pki/issuer/v1"
-	modulev1 "genesis/sdk/go/gen/module/v1"
+	sdk "github.com/WhiteRoseLK/genesis/sdk/go"
+	containerv1 "github.com/WhiteRoseLK/genesis/sdk/go/gen/functions/core/container/v1"
+	secretsv1 "github.com/WhiteRoseLK/genesis/sdk/go/gen/functions/core/secrets/v1"
+	pkiissuerv1 "github.com/WhiteRoseLK/genesis/sdk/go/gen/functions/pki/issuer/v1"
+	modulev1 "github.com/WhiteRoseLK/genesis/sdk/go/gen/module/v1"
 )
 
 //go:embed module.yaml
