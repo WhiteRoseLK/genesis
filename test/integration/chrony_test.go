@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 
-package modulehost
+package integration
 
 import (
 	"context"
@@ -13,6 +13,7 @@ import (
 	"google.golang.org/grpc"
 
 	"github.com/WhiteRoseLK/genesis/internal/broker"
+	"github.com/WhiteRoseLK/genesis/internal/modulehost"
 	"github.com/WhiteRoseLK/genesis/internal/secrets"
 	computevmv1 "github.com/WhiteRoseLK/genesis/sdk/go/gen/functions/compute/vm/v1"
 	ansiblev1 "github.com/WhiteRoseLK/genesis/sdk/go/gen/functions/core/ansible/v1"
@@ -108,7 +109,7 @@ func newTestSecretsStore(t *testing.T) *secrets.FileStore {
 func TestChronyProvisionsConfiguresAndVerifies(t *testing.T) {
 	binaryPath, manifest := buildModule(t, "chrony")
 
-	client, err := Launch(binaryPath, manifest)
+	client, err := modulehost.Launch(binaryPath, manifest)
 	if err != nil {
 		t.Fatalf("Launch : %v", err)
 	}
@@ -202,7 +203,7 @@ func TestChronyProvisionsConfiguresAndVerifies(t *testing.T) {
 func TestChronyRejectsHighOffset(t *testing.T) {
 	binaryPath, manifest := buildModule(t, "chrony")
 
-	client, err := Launch(binaryPath, manifest)
+	client, err := modulehost.Launch(binaryPath, manifest)
 	if err != nil {
 		t.Fatalf("Launch : %v", err)
 	}

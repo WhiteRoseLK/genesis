@@ -38,6 +38,18 @@ func DetectContainerRuntime(preferred string) (*ContainerRuntime, error) {
 	return nil, fmt.Errorf("aucun runtime de conteneur trouvé parmi %v (installer docker ou podman)", candidates)
 }
 
+// Ping vérifie que le démon du runtime répond (le binaire seul ne suffit pas :
+// le client docker peut être installé sans démon joignable).
+func (r *ContainerRuntime) Ping(ctx context.Context) error {
+	cmd := exec.CommandContext(ctx, r.binary, "info")
+	var stderr bytes.Buffer
+	cmd.Stderr = &stderr
+	if err := cmd.Run(); err != nil {
+		return fmt.Errorf("%s info : %w\n%s", r.binary, err, stderr.String())
+	}
+	return nil
+}
+
 // Mount est un montage bind host -> conteneur.
 type Mount struct {
 	HostPath      string

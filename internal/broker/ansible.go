@@ -18,9 +18,10 @@ import (
 )
 
 // ansibleImage exécute les playbooks sans rien installer sur la graine
-// (ADR-002). TODO(J6+) : rendre configurable (image épinglée par digest,
-// miroir privé pour le profil air-gap de l'ADR-008).
-const ansibleImage = "willhallonline/ansible:2.16-alpine-3.19"
+// (ADR-002). Épinglée par version et empreinte (reproductibilité, chaîne
+// d'approvisionnement). TODO : rendre configurable (miroir privé pour le
+// profil air-gap de l'ADR-008).
+const ansibleImage = "willhallonline/ansible:2.16-alpine-3.19@sha256:6f9d1ec5bdb30f0a06d7293e8cd9eb3a41ad4521c05b2a94ccf1604e0946b7b6"
 
 // NativeAnsible construit le fournisseur core.ansible/v1, natif au cœur.
 func NativeAnsible(rt *runner.ContainerRuntime) nativeFactory {

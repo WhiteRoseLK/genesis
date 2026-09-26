@@ -21,6 +21,17 @@ jobs:
       - run: make build
       - run: make test
 
+  docker:
+    name: tests d'intégration (conteneurs)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache-dependency-path: "**/go.sum"
+      - run: make test-docker
+
   modules:
     name: go.mod autonomes (hors go.work)
     runs-on: ubuntu-latest

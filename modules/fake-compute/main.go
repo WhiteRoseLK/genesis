@@ -30,7 +30,7 @@ var manifestYAML []byte
 // sshTargetImage et le port interne sont fixés : le point de fake-compute
 // est d'être une cible SSH prévisible, pas configurable (docs/08-jalons.md, J4/J6).
 const (
-	sshTargetImage = "lscr.io/linuxserver/openssh-server:latest"
+	sshTargetImage = "lscr.io/linuxserver/openssh-server:10.3_p1-r1-ls237@sha256:946fa26105e0ec212fdf821b9ddc59aab65f2c2d07c02b25ff0f5001fc332ff0"
 	sshTargetPort  = 22
 )
 

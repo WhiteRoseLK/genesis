@@ -33,8 +33,8 @@ Ne pas tout charger d'emblée : lire le document utile à la tâche en cours.
 
 ## Stack et commandes
 - Go stable, `CGO_ENABLED=0`, cibles linux/amd64 et linux/arm64. `cobra`, `yaml.v3`, `log/slog`, `buf` pour protobuf, `hashicorp/go-plugin`, `filippo.io/age`.
-- `make build` · `make test` · `make lint` · `make mod-check` · `make proto` · `make e2e` (build tag `integration`, nécessite un Proxmox : ne jamais lancer sans demande explicite).
-- Tests unitaires sans réseau ; module `fake-compute` pour le bout en bout ; suite de conformité SDK obligatoire pour chaque module.
+- `make build` · `make test` · `make test-docker` · `make lint` · `make mod-check` · `make proto` · `make e2e` (build tag `integration`, nécessite un Proxmox : ne jamais lancer sans demande explicite).
+- Tests unitaires sans réseau ni démon de conteneurs (`make test`) ; tests contre de vrais conteneurs sous build tag `docker` (`make test-docker`), images épinglées par version et empreinte ; tests d'un module à travers le cœur dans `test/integration/` ; module `fake-compute` pour le bout en bout ; suite de conformité SDK obligatoire pour chaque module.
 
 ## Pièges connus
 - Ne jamais tester contre un vrai Proxmox ou exécuter `genesis apply`/`destroy` sur une infra réelle sans demande explicite.

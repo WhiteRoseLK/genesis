@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: Apache-2.0
 
-package runner
+//go:build docker
+
+package runner_test
 
 import (
 	"context"
@@ -8,24 +10,18 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/WhiteRoseLK/genesis/internal/runner"
+	"github.com/WhiteRoseLK/genesis/internal/testutil"
 )
 
-func requireRuntime(t *testing.T) *ContainerRuntime {
-	t.Helper()
-	rt, err := DetectContainerRuntime("auto")
-	if err != nil {
-		t.Skipf("aucun runtime de conteneur disponible : %v", err)
-	}
-	return rt
-}
-
 func TestRunBlockingReturnsOutputAndExitCode(t *testing.T) {
-	rt := requireRuntime(t)
+	rt := testutil.RequireRuntime(t)
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
-	result, err := rt.Run(ctx, RunOptions{
-		Image:   "alpine:3",
+	result, err := rt.Run(ctx, runner.RunOptions{
+		Image:   "alpine:3.24.2@sha256:294b683cb724975bec92580e1e685676bd4b50bda910ddb8c51d4cabeaec77e6",
 		Command: []string{"echo", "bonjour"},
 	})
 	if err != nil {
@@ -40,12 +36,12 @@ func TestRunBlockingReturnsOutputAndExitCode(t *testing.T) {
 }
 
 func TestRunBlockingCapturesNonZeroExitCode(t *testing.T) {
-	rt := requireRuntime(t)
+	rt := testutil.RequireRuntime(t)
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
-	result, err := rt.Run(ctx, RunOptions{
-		Image:   "alpine:3",
+	result, err := rt.Run(ctx, runner.RunOptions{
+		Image:   "alpine:3.24.2@sha256:294b683cb724975bec92580e1e685676bd4b50bda910ddb8c51d4cabeaec77e6",
 		Command: []string{"sh", "-c", "exit 7"},
 	})
 	if err != nil {
@@ -57,12 +53,12 @@ func TestRunBlockingCapturesNonZeroExitCode(t *testing.T) {
 }
 
 func TestRunDetachedStopAndStatus(t *testing.T) {
-	rt := requireRuntime(t)
+	rt := testutil.RequireRuntime(t)
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
-	result, err := rt.Run(ctx, RunOptions{
-		Image:   "alpine:3",
+	result, err := rt.Run(ctx, runner.RunOptions{
+		Image:   "alpine:3.24.2@sha256:294b683cb724975bec92580e1e685676bd4b50bda910ddb8c51d4cabeaec77e6",
 		Command: []string{"sleep", "60"},
 		Detach:  true,
 	})
@@ -93,15 +89,15 @@ func TestRunDetachedStopAndStatus(t *testing.T) {
 }
 
 func TestRunMountsHostDirectory(t *testing.T) {
-	rt := requireRuntime(t)
+	rt := testutil.RequireRuntime(t)
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
 	dir := t.TempDir()
-	result, err := rt.Run(ctx, RunOptions{
-		Image:   "alpine:3",
+	result, err := rt.Run(ctx, runner.RunOptions{
+		Image:   "alpine:3.24.2@sha256:294b683cb724975bec92580e1e685676bd4b50bda910ddb8c51d4cabeaec77e6",
 		Command: []string{"sh", "-c", "echo contenu > /work/fichier.txt"},
-		Mounts:  []Mount{{HostPath: dir, ContainerPath: "/work"}},
+		Mounts:  []runner.Mount{{HostPath: dir, ContainerPath: "/work"}},
 	})
 	if err != nil {
 		t.Fatalf("Run : %v", err)

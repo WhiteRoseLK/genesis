@@ -108,7 +108,12 @@ modules/                      chaque module = go.mod propre + binaire propre
   powerdns/  coredns/  chrony/  vault/  step-ca/  teleport/  base-os/
   fake-compute/               module de test
 docs/
-test/e2e/
+test/
+  modules/                    modules de test (panicking, test-a…test-kv)
+  integration/                chaque module à travers le vrai hôte de modules,
+                              fonctions requises simulées (tag `docker` si
+                              de vrais conteneurs sont pilotés)
+  e2e/                        bout en bout sur Proxmox (tag `integration`)
 ```
 
 Règle vérifiée en CI : `internal/` n'importe jamais `modules/`, et `modules/*` n'importe que `sdk/` (plus ses dépendances tierces).
