@@ -85,6 +85,60 @@ func (x *Mount) GetReadOnly() bool {
 	return false
 }
 
+// File est un fichier échangé avec un conteneur bloquant, par la couche du
+// conteneur : jamais écrit sur le disque de la graine (clés, mots de passe).
+type File struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Path          string                 `protobuf:"bytes,1,opt,name=path,proto3" json:"path,omitempty"` // chemin absolu dans le conteneur
+	Content       []byte                 `protobuf:"bytes,2,opt,name=content,proto3" json:"content,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *File) Reset() {
+	*x = File{}
+	mi := &file_functions_core_container_v1_container_proto_msgTypes[1]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *File) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*File) ProtoMessage() {}
+
+func (x *File) ProtoReflect() protoreflect.Message {
+	mi := &file_functions_core_container_v1_container_proto_msgTypes[1]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use File.ProtoReflect.Descriptor instead.
+func (*File) Descriptor() ([]byte, []int) {
+	return file_functions_core_container_v1_container_proto_rawDescGZIP(), []int{1}
+}
+
+func (x *File) GetPath() string {
+	if x != nil {
+		return x.Path
+	}
+	return ""
+}
+
+func (x *File) GetContent() []byte {
+	if x != nil {
+		return x.Content
+	}
+	return nil
+}
+
 type RunRequest struct {
 	state   protoimpl.MessageState `protogen:"open.v1"`
 	Name    string                 `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"` // optionnel, généré si absent
@@ -96,14 +150,19 @@ type RunRequest struct {
 	// renvoie sa sortie (ex. exécuter ansible-playbook). detach=true : Run
 	// démarre un service et rend la main immédiatement (ex. CoreDNS en J6),
 	// à piloter ensuite avec Stop/Status.
-	Detach        bool `protobuf:"varint,6,opt,name=detach,proto3" json:"detach,omitempty"`
+	Detach bool `protobuf:"varint,6,opt,name=detach,proto3" json:"detach,omitempty"`
+	// files : déposés dans le conteneur avant son démarrage. collect : relus
+	// après sa fin, renvoyés dans RunResponse.collected si exit_code == 0.
+	// Mode bloquant (detach=false) seulement.
+	Files         []*File  `protobuf:"bytes,7,rep,name=files,proto3" json:"files,omitempty"`
+	Collect       []string `protobuf:"bytes,8,rep,name=collect,proto3" json:"collect,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
 func (x *RunRequest) Reset() {
 	*x = RunRequest{}
-	mi := &file_functions_core_container_v1_container_proto_msgTypes[1]
+	mi := &file_functions_core_container_v1_container_proto_msgTypes[2]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -115,7 +174,7 @@ func (x *RunRequest) String() string {
 func (*RunRequest) ProtoMessage() {}
 
 func (x *RunRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_functions_core_container_v1_container_proto_msgTypes[1]
+	mi := &file_functions_core_container_v1_container_proto_msgTypes[2]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -128,7 +187,7 @@ func (x *RunRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RunRequest.ProtoReflect.Descriptor instead.
 func (*RunRequest) Descriptor() ([]byte, []int) {
-	return file_functions_core_container_v1_container_proto_rawDescGZIP(), []int{1}
+	return file_functions_core_container_v1_container_proto_rawDescGZIP(), []int{2}
 }
 
 func (x *RunRequest) GetName() string {
@@ -173,6 +232,20 @@ func (x *RunRequest) GetDetach() bool {
 	return false
 }
 
+func (x *RunRequest) GetFiles() []*File {
+	if x != nil {
+		return x.Files
+	}
+	return nil
+}
+
+func (x *RunRequest) GetCollect() []string {
+	if x != nil {
+		return x.Collect
+	}
+	return nil
+}
+
 type RunResponse struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	ContainerId   string                 `protobuf:"bytes,1,opt,name=container_id,json=containerId,proto3" json:"container_id,omitempty"`
@@ -180,13 +253,14 @@ type RunResponse struct {
 	Stdout        string                 `protobuf:"bytes,3,opt,name=stdout,proto3" json:"stdout,omitempty"`
 	Stderr        string                 `protobuf:"bytes,4,opt,name=stderr,proto3" json:"stderr,omitempty"`
 	Ip            string                 `protobuf:"bytes,5,opt,name=ip,proto3" json:"ip,omitempty"` // adresse IP du conteneur sur son réseau, valide si detach=true
+	Collected     []*File                `protobuf:"bytes,6,rep,name=collected,proto3" json:"collected,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
 func (x *RunResponse) Reset() {
 	*x = RunResponse{}
-	mi := &file_functions_core_container_v1_container_proto_msgTypes[2]
+	mi := &file_functions_core_container_v1_container_proto_msgTypes[3]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -198,7 +272,7 @@ func (x *RunResponse) String() string {
 func (*RunResponse) ProtoMessage() {}
 
 func (x *RunResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_functions_core_container_v1_container_proto_msgTypes[2]
+	mi := &file_functions_core_container_v1_container_proto_msgTypes[3]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -211,7 +285,7 @@ func (x *RunResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RunResponse.ProtoReflect.Descriptor instead.
 func (*RunResponse) Descriptor() ([]byte, []int) {
-	return file_functions_core_container_v1_container_proto_rawDescGZIP(), []int{2}
+	return file_functions_core_container_v1_container_proto_rawDescGZIP(), []int{3}
 }
 
 func (x *RunResponse) GetContainerId() string {
@@ -249,6 +323,13 @@ func (x *RunResponse) GetIp() string {
 	return ""
 }
 
+func (x *RunResponse) GetCollected() []*File {
+	if x != nil {
+		return x.Collected
+	}
+	return nil
+}
+
 type StopRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	ContainerId   string                 `protobuf:"bytes,1,opt,name=container_id,json=containerId,proto3" json:"container_id,omitempty"`
@@ -258,7 +339,7 @@ type StopRequest struct {
 
 func (x *StopRequest) Reset() {
 	*x = StopRequest{}
-	mi := &file_functions_core_container_v1_container_proto_msgTypes[3]
+	mi := &file_functions_core_container_v1_container_proto_msgTypes[4]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -270,7 +351,7 @@ func (x *StopRequest) String() string {
 func (*StopRequest) ProtoMessage() {}
 
 func (x *StopRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_functions_core_container_v1_container_proto_msgTypes[3]
+	mi := &file_functions_core_container_v1_container_proto_msgTypes[4]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -283,7 +364,7 @@ func (x *StopRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use StopRequest.ProtoReflect.Descriptor instead.
 func (*StopRequest) Descriptor() ([]byte, []int) {
-	return file_functions_core_container_v1_container_proto_rawDescGZIP(), []int{3}
+	return file_functions_core_container_v1_container_proto_rawDescGZIP(), []int{4}
 }
 
 func (x *StopRequest) GetContainerId() string {
@@ -301,7 +382,7 @@ type StopResponse struct {
 
 func (x *StopResponse) Reset() {
 	*x = StopResponse{}
-	mi := &file_functions_core_container_v1_container_proto_msgTypes[4]
+	mi := &file_functions_core_container_v1_container_proto_msgTypes[5]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -313,7 +394,7 @@ func (x *StopResponse) String() string {
 func (*StopResponse) ProtoMessage() {}
 
 func (x *StopResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_functions_core_container_v1_container_proto_msgTypes[4]
+	mi := &file_functions_core_container_v1_container_proto_msgTypes[5]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -326,7 +407,7 @@ func (x *StopResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use StopResponse.ProtoReflect.Descriptor instead.
 func (*StopResponse) Descriptor() ([]byte, []int) {
-	return file_functions_core_container_v1_container_proto_rawDescGZIP(), []int{4}
+	return file_functions_core_container_v1_container_proto_rawDescGZIP(), []int{5}
 }
 
 type StatusRequest struct {
@@ -338,7 +419,7 @@ type StatusRequest struct {
 
 func (x *StatusRequest) Reset() {
 	*x = StatusRequest{}
-	mi := &file_functions_core_container_v1_container_proto_msgTypes[5]
+	mi := &file_functions_core_container_v1_container_proto_msgTypes[6]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -350,7 +431,7 @@ func (x *StatusRequest) String() string {
 func (*StatusRequest) ProtoMessage() {}
 
 func (x *StatusRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_functions_core_container_v1_container_proto_msgTypes[5]
+	mi := &file_functions_core_container_v1_container_proto_msgTypes[6]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -363,7 +444,7 @@ func (x *StatusRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use StatusRequest.ProtoReflect.Descriptor instead.
 func (*StatusRequest) Descriptor() ([]byte, []int) {
-	return file_functions_core_container_v1_container_proto_rawDescGZIP(), []int{5}
+	return file_functions_core_container_v1_container_proto_rawDescGZIP(), []int{6}
 }
 
 func (x *StatusRequest) GetContainerId() string {
@@ -383,7 +464,7 @@ type StatusResponse struct {
 
 func (x *StatusResponse) Reset() {
 	*x = StatusResponse{}
-	mi := &file_functions_core_container_v1_container_proto_msgTypes[6]
+	mi := &file_functions_core_container_v1_container_proto_msgTypes[7]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -395,7 +476,7 @@ func (x *StatusResponse) String() string {
 func (*StatusResponse) ProtoMessage() {}
 
 func (x *StatusResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_functions_core_container_v1_container_proto_msgTypes[6]
+	mi := &file_functions_core_container_v1_container_proto_msgTypes[7]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -408,7 +489,7 @@ func (x *StatusResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use StatusResponse.ProtoReflect.Descriptor instead.
 func (*StatusResponse) Descriptor() ([]byte, []int) {
-	return file_functions_core_container_v1_container_proto_rawDescGZIP(), []int{6}
+	return file_functions_core_container_v1_container_proto_rawDescGZIP(), []int{7}
 }
 
 func (x *StatusResponse) GetState() string {
@@ -433,7 +514,10 @@ const file_functions_core_container_v1_container_proto_rawDesc = "" +
 	"\x05Mount\x12\x1b\n" +
 	"\thost_path\x18\x01 \x01(\tR\bhostPath\x12%\n" +
 	"\x0econtainer_path\x18\x02 \x01(\tR\rcontainerPath\x12\x1b\n" +
-	"\tread_only\x18\x03 \x01(\bR\breadOnly\"\xa0\x02\n" +
+	"\tread_only\x18\x03 \x01(\bR\breadOnly\"4\n" +
+	"\x04File\x12\x12\n" +
+	"\x04path\x18\x01 \x01(\tR\x04path\x12\x18\n" +
+	"\acontent\x18\x02 \x01(\fR\acontent\"\xf3\x02\n" +
 	"\n" +
 	"RunRequest\x12\x12\n" +
 	"\x04name\x18\x01 \x01(\tR\x04name\x12\x14\n" +
@@ -441,16 +525,19 @@ const file_functions_core_container_v1_container_proto_rawDesc = "" +
 	"\acommand\x18\x03 \x03(\tR\acommand\x12B\n" +
 	"\x03env\x18\x04 \x03(\v20.functions.core.container.v1.RunRequest.EnvEntryR\x03env\x12:\n" +
 	"\x06mounts\x18\x05 \x03(\v2\".functions.core.container.v1.MountR\x06mounts\x12\x16\n" +
-	"\x06detach\x18\x06 \x01(\bR\x06detach\x1a6\n" +
+	"\x06detach\x18\x06 \x01(\bR\x06detach\x127\n" +
+	"\x05files\x18\a \x03(\v2!.functions.core.container.v1.FileR\x05files\x12\x18\n" +
+	"\acollect\x18\b \x03(\tR\acollect\x1a6\n" +
 	"\bEnvEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
-	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"\x8d\x01\n" +
+	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"\xce\x01\n" +
 	"\vRunResponse\x12!\n" +
 	"\fcontainer_id\x18\x01 \x01(\tR\vcontainerId\x12\x1b\n" +
 	"\texit_code\x18\x02 \x01(\x05R\bexitCode\x12\x16\n" +
 	"\x06stdout\x18\x03 \x01(\tR\x06stdout\x12\x16\n" +
 	"\x06stderr\x18\x04 \x01(\tR\x06stderr\x12\x0e\n" +
-	"\x02ip\x18\x05 \x01(\tR\x02ip\"0\n" +
+	"\x02ip\x18\x05 \x01(\tR\x02ip\x12?\n" +
+	"\tcollected\x18\x06 \x03(\v2!.functions.core.container.v1.FileR\tcollected\"0\n" +
 	"\vStopRequest\x12!\n" +
 	"\fcontainer_id\x18\x01 \x01(\tR\vcontainerId\"\x0e\n" +
 	"\fStopResponse\"2\n" +
@@ -476,31 +563,34 @@ func file_functions_core_container_v1_container_proto_rawDescGZIP() []byte {
 	return file_functions_core_container_v1_container_proto_rawDescData
 }
 
-var file_functions_core_container_v1_container_proto_msgTypes = make([]protoimpl.MessageInfo, 8)
+var file_functions_core_container_v1_container_proto_msgTypes = make([]protoimpl.MessageInfo, 9)
 var file_functions_core_container_v1_container_proto_goTypes = []any{
 	(*Mount)(nil),          // 0: functions.core.container.v1.Mount
-	(*RunRequest)(nil),     // 1: functions.core.container.v1.RunRequest
-	(*RunResponse)(nil),    // 2: functions.core.container.v1.RunResponse
-	(*StopRequest)(nil),    // 3: functions.core.container.v1.StopRequest
-	(*StopResponse)(nil),   // 4: functions.core.container.v1.StopResponse
-	(*StatusRequest)(nil),  // 5: functions.core.container.v1.StatusRequest
-	(*StatusResponse)(nil), // 6: functions.core.container.v1.StatusResponse
-	nil,                    // 7: functions.core.container.v1.RunRequest.EnvEntry
+	(*File)(nil),           // 1: functions.core.container.v1.File
+	(*RunRequest)(nil),     // 2: functions.core.container.v1.RunRequest
+	(*RunResponse)(nil),    // 3: functions.core.container.v1.RunResponse
+	(*StopRequest)(nil),    // 4: functions.core.container.v1.StopRequest
+	(*StopResponse)(nil),   // 5: functions.core.container.v1.StopResponse
+	(*StatusRequest)(nil),  // 6: functions.core.container.v1.StatusRequest
+	(*StatusResponse)(nil), // 7: functions.core.container.v1.StatusResponse
+	nil,                    // 8: functions.core.container.v1.RunRequest.EnvEntry
 }
 var file_functions_core_container_v1_container_proto_depIdxs = []int32{
-	7, // 0: functions.core.container.v1.RunRequest.env:type_name -> functions.core.container.v1.RunRequest.EnvEntry
+	8, // 0: functions.core.container.v1.RunRequest.env:type_name -> functions.core.container.v1.RunRequest.EnvEntry
 	0, // 1: functions.core.container.v1.RunRequest.mounts:type_name -> functions.core.container.v1.Mount
-	1, // 2: functions.core.container.v1.Container.Run:input_type -> functions.core.container.v1.RunRequest
-	3, // 3: functions.core.container.v1.Container.Stop:input_type -> functions.core.container.v1.StopRequest
-	5, // 4: functions.core.container.v1.Container.Status:input_type -> functions.core.container.v1.StatusRequest
-	2, // 5: functions.core.container.v1.Container.Run:output_type -> functions.core.container.v1.RunResponse
-	4, // 6: functions.core.container.v1.Container.Stop:output_type -> functions.core.container.v1.StopResponse
-	6, // 7: functions.core.container.v1.Container.Status:output_type -> functions.core.container.v1.StatusResponse
-	5, // [5:8] is the sub-list for method output_type
-	2, // [2:5] is the sub-list for method input_type
-	2, // [2:2] is the sub-list for extension type_name
-	2, // [2:2] is the sub-list for extension extendee
-	0, // [0:2] is the sub-list for field type_name
+	1, // 2: functions.core.container.v1.RunRequest.files:type_name -> functions.core.container.v1.File
+	1, // 3: functions.core.container.v1.RunResponse.collected:type_name -> functions.core.container.v1.File
+	2, // 4: functions.core.container.v1.Container.Run:input_type -> functions.core.container.v1.RunRequest
+	4, // 5: functions.core.container.v1.Container.Stop:input_type -> functions.core.container.v1.StopRequest
+	6, // 6: functions.core.container.v1.Container.Status:input_type -> functions.core.container.v1.StatusRequest
+	3, // 7: functions.core.container.v1.Container.Run:output_type -> functions.core.container.v1.RunResponse
+	5, // 8: functions.core.container.v1.Container.Stop:output_type -> functions.core.container.v1.StopResponse
+	7, // 9: functions.core.container.v1.Container.Status:output_type -> functions.core.container.v1.StatusResponse
+	7, // [7:10] is the sub-list for method output_type
+	4, // [4:7] is the sub-list for method input_type
+	4, // [4:4] is the sub-list for extension type_name
+	4, // [4:4] is the sub-list for extension extendee
+	0, // [0:4] is the sub-list for field type_name
 }
 
 func init() { file_functions_core_container_v1_container_proto_init() }
@@ -514,7 +604,7 @@ func file_functions_core_container_v1_container_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_functions_core_container_v1_container_proto_rawDesc), len(file_functions_core_container_v1_container_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   8,
+			NumMessages:   9,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

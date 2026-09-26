@@ -20,8 +20,7 @@ import (
 	_ "embed"
 	"encoding/pem"
 	"fmt"
-	"os"
-	"path/filepath"
+	"strings"
 	"sync"
 	"time"
 
@@ -258,54 +257,39 @@ func (m *stepCAModule) putSecret(ctx context.Context, ref, value, kind string) e
 
 // --- conteneur step-ca (CLI `step`, mode local/hors-ligne) ---------------
 
-func (m *stepCAModule) runStep(ctx context.Context, hostDir string, args []string) (stdout, stderr string, err error) {
+// runStep exécute une commande dans un conteneur step-ca jetable. files
+// (chemin relatif à /pki -> contenu) y sont déposés avant l'exécution et
+// collect (chemins relatifs à /pki) relus après : core.container/v1 les fait
+// transiter par la couche du conteneur, jamais par un répertoire de la graine
+// (clé de la CA racine, mot de passe).
+func (m *stepCAModule) runStep(ctx context.Context, files map[string]string, collect []string, args []string) (stdout string, collected map[string]string, err error) {
 	if err := m.dial(); err != nil {
-		return "", "", err
+		return "", nil, err
 	}
-	resp, err := m.containerClient.Run(ctx, &containerv1.RunRequest{
-		Image:   stepCAImage,
-		Command: args,
-		Mounts:  []*containerv1.Mount{{HostPath: hostDir, ContainerPath: "/pki"}},
-	})
+	req := &containerv1.RunRequest{Image: stepCAImage, Command: args}
+	for name, content := range files {
+		req.Files = append(req.Files, &containerv1.File{Path: "/pki/" + name, Content: []byte(content)})
+	}
+	for _, name := range collect {
+		req.Collect = append(req.Collect, "/pki/"+name)
+	}
+	resp, err := m.containerClient.Run(ctx, req)
 	if err != nil {
-		return "", "", fmt.Errorf("step %v : %w", args, err)
+		return "", nil, fmt.Errorf("step %v : %w", args, err)
 	}
 	if resp.GetExitCode() != 0 {
-		return resp.GetStdout(), resp.GetStderr(), fmt.Errorf("step %v (code %d) :\n%s\n%s", args, resp.GetExitCode(), resp.GetStdout(), resp.GetStderr())
+		return "", nil, fmt.Errorf("step %v (code %d) :\n%s\n%s", args, resp.GetExitCode(), resp.GetStdout(), resp.GetStderr())
 	}
-	return resp.GetStdout(), resp.GetStderr(), nil
-}
-
-// catFile lit un fichier écrit par un conteneur step-ca précédent : ces
-// fichiers appartiennent à l'UID interne du conteneur (remappé côté hôte),
-// illisible directement par le process du module — un conteneur jetable
-// supplémentaire les relit à travers le même montage (vérifié manuellement
-// avant d'écrire ce code).
-func (m *stepCAModule) catFile(ctx context.Context, hostDir, relPath string) (string, error) {
-	stdout, _, err := m.runStep(ctx, hostDir, []string{"cat", "/pki/" + relPath})
-	if err != nil {
-		return "", fmt.Errorf("lecture de %s : %w", relPath, err)
+	collected = map[string]string{}
+	for _, f := range resp.GetCollected() {
+		collected[strings.TrimPrefix(f.GetPath(), "/pki/")] = string(f.GetContent())
 	}
-	return stdout, nil
-}
-
-func newWorkDir(prefix string) (string, error) {
-	dir, err := os.MkdirTemp("", prefix)
-	if err != nil {
-		return "", err
+	for _, name := range collect {
+		if _, ok := collected[name]; !ok {
+			return "", nil, fmt.Errorf("step %v : fichier %s absent après exécution", args, name)
+		}
 	}
-	// 0777 : le conteneur step-ca tourne sous son propre UID interne,
-	// distinct de celui de l'appelant (même précaution que core.ansible/v1
-	// et modules/coredns — docs/PROGRESS.md J5/J6).
-	if err := os.Chmod(dir, 0o777); err != nil {
-		_ = os.RemoveAll(dir)
-		return "", err
-	}
-	return dir, nil
-}
-
-func writePasswordFile(dir, password string) error {
-	return os.WriteFile(filepath.Join(dir, "password"), []byte(password), 0o644)
+	return resp.GetStdout(), collected, nil
 }
 
 // --- CA racine et intermédiaire ------------------------------------------
@@ -317,39 +301,23 @@ func (m *stepCAModule) ensureRoot(ctx context.Context, password string) (certPEM
 		return cert, key, nil
 	}
 
-	dir, err := newWorkDir("genesis-step-ca-root-*")
-	if err != nil {
-		return "", "", err
-	}
-	defer func() { _ = os.RemoveAll(dir) }()
-	if err := writePasswordFile(dir, password); err != nil {
-		return "", "", err
-	}
 	// --profile root-ca (par défaut) pose pathlen:1 sur la racine, ce qui
 	// suffit pour signer UN intermédiaire mais pas pour qu'un pki.issuer/v1
 	// tiers (ex. vault) obtienne à son tour un intermédiaire signé par
 	// celui de step-ca — vérifié manuellement dans Docker avant d'écrire ce
 	// code. --template est le seul moyen de contrôler maxPathLen sur une
 	// racine auto-signée (incompatible avec --profile).
-	if err := os.WriteFile(filepath.Join(dir, "root.tpl"), []byte(rootTemplate), 0o644); err != nil {
-		return "", "", err
-	}
-
-	if _, _, err := m.runStep(ctx, dir, []string{
-		"step", "certificate", "create", "Genesis Root CA", "/pki/root_ca.crt", "/pki/root_ca_key",
-		"--template", "/pki/root.tpl", "--password-file", "/pki/password", "--force",
-	}); err != nil {
+	_, out, err := m.runStep(ctx,
+		map[string]string{"password": password, "root.tpl": rootTemplate},
+		[]string{"root_ca.crt", "root_ca_key"},
+		[]string{
+			"step", "certificate", "create", "Genesis Root CA", "/pki/root_ca.crt", "/pki/root_ca_key",
+			"--template", "/pki/root.tpl", "--password-file", "/pki/password", "--force",
+		})
+	if err != nil {
 		return "", "", fmt.Errorf("génération de la CA racine : %w", err)
 	}
-
-	cert, err = m.catFile(ctx, dir, "root_ca.crt")
-	if err != nil {
-		return "", "", err
-	}
-	key, err = m.catFile(ctx, dir, "root_ca_key")
-	if err != nil {
-		return "", "", err
-	}
+	cert, key = out["root_ca.crt"], out["root_ca_key"]
 	if err := m.putSecret(ctx, rootCertRef, cert, "ca-root-cert"); err != nil {
 		return "", "", err
 	}
@@ -375,49 +343,42 @@ func (m *stepCAModule) ensureIntermediate(ctx context.Context, rootCert, rootKey
 	}
 	m.mu.Unlock()
 
-	dir, err := newWorkDir("genesis-step-ca-int-*")
-	if err != nil {
-		return "", "", err
-	}
-	defer func() { _ = os.RemoveAll(dir) }()
-	if err := writePasswordFile(dir, password); err != nil {
-		return "", "", err
-	}
-	if err := os.WriteFile(filepath.Join(dir, "root_ca.crt"), []byte(rootCert), 0o644); err != nil {
-		return "", "", err
-	}
-	if err := os.WriteFile(filepath.Join(dir, "root_ca_key"), []byte(rootKey), 0o644); err != nil {
-		return "", "", err
-	}
-
 	ttl := fmt.Sprintf("%dh", days*24)
 	// create --profile intermediate-ca ne permet pas de fixer pathlen (pas
 	// de flag --path-len sur `create`, seulement sur `sign`) : CSR généré
 	// séparément puis signé, pour que l'intermédiaire graine puisse à son
 	// tour signer l'intermédiaire d'un pki.issuer/v1 tiers (ex. vault) —
 	// vérifié manuellement dans Docker avant d'écrire ce code.
-	if _, _, err := m.runStep(ctx, dir, []string{
-		"step", "certificate", "create", "Genesis Root CA Intermediate", "/pki/intermediate_ca.csr", "/pki/intermediate_ca_key",
-		"--csr", "--password-file", "/pki/password", "--force",
-	}); err != nil {
+	_, csrOut, err := m.runStep(ctx,
+		map[string]string{"password": password},
+		[]string{"intermediate_ca.csr", "intermediate_ca_key"},
+		[]string{
+			"step", "certificate", "create", "Genesis Root CA Intermediate", "/pki/intermediate_ca.csr", "/pki/intermediate_ca_key",
+			"--csr", "--password-file", "/pki/password", "--force",
+		})
+	if err != nil {
 		return "", "", fmt.Errorf("génération du CSR de l'intermédiaire : %w", err)
 	}
 	// step certificate sign n'a pas de fichier de sortie positionnel : le
 	// certificat signé sort sur stdout (vérifié manuellement, même
 	// comportement que pour SignCSR plus bas).
-	cert, _, err = m.runStep(ctx, dir, []string{
-		"step", "certificate", "sign", "--profile", "intermediate-ca",
-		fmt.Sprintf("--path-len=%d", intermediatePathLen), "--not-before", notBeforeSkew, "--not-after", ttl,
-		"/pki/intermediate_ca.csr", "/pki/root_ca.crt", "/pki/root_ca_key", "--password-file", "/pki/password",
-	})
+	cert, _, err = m.runStep(ctx,
+		map[string]string{
+			"password":            password,
+			"root_ca.crt":         rootCert,
+			"root_ca_key":         rootKey,
+			"intermediate_ca.csr": csrOut["intermediate_ca.csr"],
+		},
+		nil,
+		[]string{
+			"step", "certificate", "sign", "--profile", "intermediate-ca",
+			fmt.Sprintf("--path-len=%d", intermediatePathLen), "--not-before", notBeforeSkew, "--not-after", ttl,
+			"/pki/intermediate_ca.csr", "/pki/root_ca.crt", "/pki/root_ca_key", "--password-file", "/pki/password",
+		})
 	if err != nil {
 		return "", "", fmt.Errorf("génération de l'intermédiaire : %w", err)
 	}
-
-	key, err = m.catFile(ctx, dir, "intermediate_ca_key")
-	if err != nil {
-		return "", "", err
-	}
+	key = csrOut["intermediate_ca_key"]
 	if err := m.putSecret(ctx, intermediateCertRef, cert, "ca-intermediate-cert"); err != nil {
 		return "", "", err
 	}
@@ -459,14 +420,13 @@ func (m *stepCAModule) ensurePKI(ctx context.Context) (pkiMaterial, error) {
 	return material, nil
 }
 
-func writeIntermediateFiles(dir string, material pkiMaterial) error {
-	if err := writePasswordFile(dir, material.Password); err != nil {
-		return err
+// intermediateFiles : fichiers nécessaires pour signer avec l'intermédiaire.
+func intermediateFiles(material pkiMaterial) map[string]string {
+	return map[string]string{
+		"password":            material.Password,
+		"intermediate_ca.crt": material.IntermediateCertPEM,
+		"intermediate_ca_key": material.IntermediateKeyPEM,
 	}
-	if err := os.WriteFile(filepath.Join(dir, "intermediate_ca.crt"), []byte(material.IntermediateCertPEM), 0o644); err != nil {
-		return err
-	}
-	return os.WriteFile(filepath.Join(dir, "intermediate_ca_key"), []byte(material.IntermediateKeyPEM), 0o644)
 }
 
 // --- pki.issuer/v1 --------------------------------------------------------
@@ -483,15 +443,6 @@ func (m *stepCAModule) IssueCert(ctx context.Context, req *pkiissuerv1.IssueCert
 	if err != nil {
 		return nil, err
 	}
-	dir, err := newWorkDir("genesis-step-ca-issue-*")
-	if err != nil {
-		return nil, err
-	}
-	defer func() { _ = os.RemoveAll(dir) }()
-	if err := writeIntermediateFiles(dir, material); err != nil {
-		return nil, err
-	}
-
 	args := []string{
 		"step", "certificate", "create", req.GetCommonName(), "/pki/leaf.crt", "/pki/leaf.key",
 		"--profile", "leaf", "--not-before", notBeforeSkew,
@@ -502,18 +453,11 @@ func (m *stepCAModule) IssueCert(ctx context.Context, req *pkiissuerv1.IssueCert
 	for _, san := range req.GetSans() {
 		args = append(args, "--san", san)
 	}
-	if _, _, err := m.runStep(ctx, dir, args); err != nil {
+	_, out, err := m.runStep(ctx, intermediateFiles(material), []string{"leaf.crt", "leaf.key"}, args)
+	if err != nil {
 		return nil, fmt.Errorf("émission du certificat pour %q : %w", req.GetCommonName(), err)
 	}
-
-	leafCert, err := m.catFile(ctx, dir, "leaf.crt")
-	if err != nil {
-		return nil, err
-	}
-	leafKey, err := m.catFile(ctx, dir, "leaf.key")
-	if err != nil {
-		return nil, err
-	}
+	leafCert, leafKey := out["leaf.crt"], out["leaf.key"]
 	return &pkiissuerv1.Certificate{
 		CertPem:       leafCert,
 		ChainPem:      leafCert + material.IntermediateCertPEM,
@@ -526,17 +470,8 @@ func (m *stepCAModule) SignCSR(ctx context.Context, req *pkiissuerv1.SignCSRRequ
 	if err != nil {
 		return nil, err
 	}
-	dir, err := newWorkDir("genesis-step-ca-sign-*")
-	if err != nil {
-		return nil, err
-	}
-	defer func() { _ = os.RemoveAll(dir) }()
-	if err := writeIntermediateFiles(dir, material); err != nil {
-		return nil, err
-	}
-	if err := os.WriteFile(filepath.Join(dir, "csr.pem"), []byte(req.GetCsrPem()), 0o644); err != nil {
-		return nil, err
-	}
+	files := intermediateFiles(material)
+	files["csr.pem"] = req.GetCsrPem()
 
 	args := []string{
 		"step", "certificate", "sign", "/pki/csr.pem", "/pki/intermediate_ca.crt", "/pki/intermediate_ca_key",
@@ -552,7 +487,7 @@ func (m *stepCAModule) SignCSR(ctx context.Context, req *pkiissuerv1.SignCSRRequ
 	// step certificate sign n'a pas de fichier de sortie positionnel : le
 	// certificat signé (bundle feuille+intermédiaire) sort sur stdout,
 	// vérifié manuellement avant d'écrire ce code.
-	stdout, _, err := m.runStep(ctx, dir, args)
+	stdout, _, err := m.runStep(ctx, files, nil, args)
 	if err != nil {
 		return nil, fmt.Errorf("signature du CSR : %w", err)
 	}

@@ -19,6 +19,13 @@ message Mount {
   bool read_only = 3;
 }
 
+// File est un fichier échangé avec un conteneur bloquant, par la couche du
+// conteneur : jamais écrit sur le disque de la graine (clés, mots de passe).
+message File {
+  string path = 1; // chemin absolu dans le conteneur
+  bytes content = 2;
+}
+
 message RunRequest {
   string name = 1; // optionnel, généré si absent
   string image = 2;
@@ -30,6 +37,11 @@ message RunRequest {
   // démarre un service et rend la main immédiatement (ex. CoreDNS en J6),
   // à piloter ensuite avec Stop/Status.
   bool detach = 6;
+  // files : déposés dans le conteneur avant son démarrage. collect : relus
+  // après sa fin, renvoyés dans RunResponse.collected si exit_code == 0.
+  // Mode bloquant (detach=false) seulement.
+  repeated File files = 7;
+  repeated string collect = 8;
 }
 
 message RunResponse {
@@ -38,6 +50,7 @@ message RunResponse {
   string stdout = 3;
   string stderr = 4;
   string ip = 5; // adresse IP du conteneur sur son réseau, valide si detach=true
+  repeated File collected = 6;
 }
 
 message StopRequest {
