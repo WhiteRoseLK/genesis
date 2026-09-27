@@ -1,4 +1,4 @@
-.PHONY: build test test-race test-docker lint proto proto-check e2e mod-check vuln licenses tools
+.PHONY: build test test-race test-docker pull-images lint proto proto-check e2e mod-check vuln licenses tools
 
 # Modules Go du monorepo, un par go.mod (cœur, sdk, modules/*, test/modules/*).
 # Découverts automatiquement : ajouter un module ne doit nécessiter aucune
@@ -66,6 +66,29 @@ test-docker:
 	@set -e; for m in $(GO_MODULES); do \
 		echo "==> go test -tags docker ($$m)"; \
 		(cd $$m && go test -tags docker ./...); \
+	done
+
+# Images épinglées (dépôt:tag@sha256:…) trouvées dans le code Go : aucune
+# liste à maintenir, un nouveau module est couvert d'office. Tirées d'avance
+# avec reprises espacées : une limite de débit passagère d'un registre
+# (toomanyrequests) ne fait plus échouer les tests d'intégration, et un
+# registre durablement indisponible est signalé comme tel.
+CONTAINER_RUNTIME ?= docker
+PULL_ATTEMPTS     ?= 5
+PINNED_IMAGES = $(shell grep -rhoE '"[a-z0-9./-]+:[A-Za-z0-9._-]+@sha256:[0-9a-f]{64}"' --include=*.go . | tr -d '"' | sort -u)
+
+pull-images:
+	@set -e; for img in $(PINNED_IMAGES); do \
+		i=1; \
+		until $(CONTAINER_RUNTIME) pull -q $$img >/dev/null; do \
+			if [ $$i -ge $(PULL_ATTEMPTS) ]; then \
+				echo "échec : $$img inaccessible après $(PULL_ATTEMPTS) essais (registre indisponible ou limite de débit)" >&2; \
+				exit 1; \
+			fi; \
+			echo "==> nouvel essai dans $$((i * 30)) s : $$img"; \
+			sleep $$((i * 30)); i=$$((i + 1)); \
+		done; \
+		echo "==> $$img"; \
 	done
 
 # Chaque go.mod doit se suffire à lui-même (hors espace de travail go.work) et

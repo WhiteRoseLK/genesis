@@ -39,6 +39,8 @@ jobs:
         with:
           go-version-file: go.mod
           cache-dependency-path: "**/go.sum"
+      - name: images épinglées (avec reprises)
+        run: make pull-images
       - run: make test-docker
 
   lint:
