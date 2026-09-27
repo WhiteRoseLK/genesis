@@ -1,5 +1,7 @@
 # 08 — Jalons et critères d'acceptation
 
+> Ce document définit chaque jalon et ses critères d'acceptation. Leur **suivi** se fait sur GitHub (ADR-049) : un [milestone](https://github.com/WhiteRoseLK/genesis/milestones) par jalon, une issue parente `jalon` et une sous-issue par PR.
+
 Implémenter dans l'ordre. Chaque jalon est livrable et testable seul.
 
 ## J0 — Squelette

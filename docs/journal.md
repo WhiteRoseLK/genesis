@@ -1,4 +1,6 @@
-# Journal des jalons
+# Journal des jalons (J0 à J8)
+
+> Historique figé. Depuis J9, le bilan de chaque jalon est le commentaire de clôture de son issue parente sur GitHub (ADR-049).
 
 Historique détaillé de chaque jalon (fait, décisions, dette, prochaine étape), tel qu'il a été écrit en fin de jalon. L'état courant est dans [`PROGRESS.md`](PROGRESS.md) ; la dette ouverte est suivie dans les [issues `dette-technique`](https://github.com/WhiteRoseLK/genesis/issues?q=is%3Aissue+is%3Aopen+label%3Adette-technique).
 

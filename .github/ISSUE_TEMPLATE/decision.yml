@@ -1,0 +1,42 @@
+name: "🧭 Décision"
+description: Débattre d'un choix d'architecture ou de processus ; la décision sera tracée en ADR (docs/adr/).
+title: "Décision : "
+labels: ["decision"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Le débat a lieu ici. Une fois tranché, la PR qui applique la décision ajoute `docs/adr/NNNN-titre.md` (NNNN = numéro de cette issue) et ferme l'issue. Voir `docs/09-decisions.md`.
+
+  - type: textarea
+    id: context
+    attributes:
+      label: Contexte
+      description: Le problème, les contraintes, ce qui rend une décision nécessaire (jalon, issue, ADR concernés).
+    validations:
+      required: true
+
+  - type: textarea
+    id: options
+    attributes:
+      label: Options
+      description: Chaque option envisagée, avec ses avantages et inconvénients.
+    validations:
+      required: true
+
+  - type: textarea
+    id: recommendation
+    attributes:
+      label: Recommandation
+      description: L'option proposée et pourquoi. La décision finale est donnée en commentaire.
+    validations:
+      required: true
+
+  - type: checkboxes
+    id: impact
+    attributes:
+      label: Impact
+      options:
+        - label: Modifie le contrat de module (`sdk/`) ou le format de spec — rupture possible.
+        - label: Ajoute une dépendance lourde.
+        - label: Remplace une ADR existante.
