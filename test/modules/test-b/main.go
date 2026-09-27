@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 
-// test-b requiert test.a/v1 et fournit test.b/v1 (docs/08-jalons.md, J4) :
+// test-b requiert test.a/v1 et fournit test.b/v1 (docs/08-milestones.md, J4) :
 // vérifie que le broker route bien un appel fait pendant une étape réelle.
 package main
 

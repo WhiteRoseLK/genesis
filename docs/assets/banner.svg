@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 880 220" width="880" height="220" role="img" aria-labelledby="t d">
   <title id="t">Genesis</title>
-  <desc id="d">Une graine qui germe en socle d'infrastructure : NTP, DNS, PKI, secrets, bastion.</desc>
+  <desc id="d">A seed sprouting into an infrastructure foundation: NTP, DNS, PKI, secrets, bastion.</desc>
   <style>
     .bg { fill: #f6f8fa; }
     .ink { fill: #1f2328; }
@@ -25,7 +25,7 @@
 
   <rect class="bg" width="880" height="220" rx="16"/>
 
-  <!-- Graine qui germe : la tige se ramifie vers les services du socle -->
+  <!-- Sprouting seed: the stem branches out to the foundation services -->
   <g stroke-width="3" fill="none" stroke-linecap="round" class="stem">
     <path d="M150 170 C150 140 150 120 150 100"/>
     <path d="M150 128 C125 118 105 104 92 84"/>
@@ -47,6 +47,6 @@
   <line class="line" x1="270" y1="44" x2="270" y2="176" stroke-width="2"/>
 
   <text class="ink" x="306" y="104" font-size="56" font-weight="700" letter-spacing="-1">Genesis</text>
-  <text class="muted" x="308" y="142" font-size="21">Une spec YAML. Un <tspan font-family="ui-monospace, SFMono-Regular, Menlo, monospace" class="ink">genesis apply</tspan>.</text>
-  <text class="muted" x="308" y="172" font-size="21">Un socle d'infrastructure complet, puis la graine s'efface.</text>
+  <text class="muted" x="308" y="142" font-size="21">One YAML spec. One <tspan font-family="ui-monospace, SFMono-Regular, Menlo, monospace" class="ink">genesis apply</tspan>.</text>
+  <text class="muted" x="308" y="172" font-size="21">A complete infrastructure foundation, then the seed steps aside.</text>
 </svg>

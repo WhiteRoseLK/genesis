@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 // Package atomicfile écrit des fichiers sans jamais laisser un état
-// partiellement écrit visible (docs/06-secrets-etat.md : "écritures atomiques"),
+// partiellement écrit visible (docs/06-secrets-state.md : "écritures atomiques"),
 // utilisé par internal/secrets, internal/state et internal/modulelock.
 package atomicfile
 

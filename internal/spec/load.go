@@ -16,7 +16,7 @@ import (
 //
 // La résolution des capacités en modules et la validation propre à chaque
 // module (config_schema) sont déléguées à des jalons ultérieurs (J3/J4,
-// docs/08-jalons.md).
+// docs/08-milestones.md).
 func Load(path string) (*Environment, error) {
 	raw, err := os.ReadFile(path)
 	if err != nil {

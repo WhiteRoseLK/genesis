@@ -17,7 +17,7 @@ import (
 	"github.com/WhiteRoseLK/genesis/internal/state"
 )
 
-// TestMigratesSecretsToKVCapability prouve docs/06-secrets-etat.md : dès
+// TestMigratesSecretsToKVCapability prouve docs/06-secrets-state.md : dès
 // que le module choisi pour la capacité "secrets" fournit secrets.kv/v1 et
 // devient target_ready, chaque secret non-recovery du backend file est
 // copié, vérifié par relecture, et le backend actif bascule — sans

@@ -24,7 +24,7 @@ import (
 // core.ansible/v1 et de compute.vm/v1 (via fake-compute) est déjà prouvé
 // pour de vrai ailleurs (internal/broker/ansible_test.go,
 // TestFakeComputeProvidesComputeVM) — ici on vérifie seulement le
-// câblage propre à chrony (docs/03-contrat-module.md règle 7 : un module
+// câblage propre à chrony (docs/03-module-contract.md règle 7 : un module
 // doit être testable seul, fonctions requises simulées).
 type chronyFakeComputeVMServer struct {
 	computevmv1.UnimplementedComputeVMServer
@@ -105,7 +105,7 @@ func newTestSecretsStore(t *testing.T) *secrets.FileStore {
 // chrony (Provision -> Configure -> Verify -> Destroy) avec compute.vm/v1
 // et core.ansible/v1 simulés, mais core.secrets/v1 réel (age + fichier) :
 // la génération de la paire SSH de service est prouvée pour de vrai
-// (docs/08-jalons.md, J6).
+// (docs/08-milestones.md, J6).
 func TestChronyProvisionsConfiguresAndVerifies(t *testing.T) {
 	binaryPath, manifest := buildModule(t, "chrony")
 
@@ -198,7 +198,7 @@ func TestChronyProvisionsConfiguresAndVerifies(t *testing.T) {
 }
 
 // TestChronyRejectsHighOffset vérifie que Verify échoue réellement quand
-// l'écart dépasse le seuil (docs/07-modules-mvp.md : "écart < 100 ms") —
+// l'écart dépasse le seuil (docs/07-mvp-modules.md : "écart < 100 ms") —
 // pas une réussite silencieuse.
 func TestChronyRejectsHighOffset(t *testing.T) {
 	binaryPath, manifest := buildModule(t, "chrony")

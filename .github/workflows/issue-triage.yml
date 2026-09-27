@@ -9,7 +9,7 @@ permissions:
 
 jobs:
   triage:
-    name: Synchroniser needs-triage
+    name: Sync needs-triage
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
@@ -18,7 +18,7 @@ jobs:
           script: |
             const issue = context.payload.issue;
             const labels = (issue.labels || []).map(l => (typeof l === 'string' ? l : l.name));
-            const hasPriority = labels.some(l => l.startsWith('priorite:'));
+            const hasPriority = labels.some(l => l.startsWith('priority:'));
             const hasNeedsTriage = labels.includes('needs-triage');
 
             if (hasPriority && hasNeedsTriage) {

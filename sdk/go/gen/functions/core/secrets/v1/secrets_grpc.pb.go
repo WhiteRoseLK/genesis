@@ -4,7 +4,7 @@
 // - protoc             (unknown)
 // source: functions/core/secrets/v1/secrets.proto
 
-// Fonction core.secrets/v1 (docs/03-contrat-module.md, docs/06-secrets-etat.md) :
+// Fonction core.secrets/v1 (docs/03-module-contract.md, docs/06-secrets-state.md) :
 // fournie nativement par le cœur, jamais par un module.
 
 package secretsv1

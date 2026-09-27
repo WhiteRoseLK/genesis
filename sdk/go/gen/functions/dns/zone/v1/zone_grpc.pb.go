@@ -4,7 +4,7 @@
 // - protoc             (unknown)
 // source: functions/dns/zone/v1/zone.proto
 
-// Fonction dns.zone/v1 (docs/03-contrat-module.md) : fournisseurs MVP
+// Fonction dns.zone/v1 (docs/03-module-contract.md) : fournisseurs MVP
 // coredns (seed) et powerdns (target).
 
 package dnszonev1

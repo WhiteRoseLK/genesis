@@ -11,7 +11,7 @@ import (
 )
 
 // ForwardEcho enregistre un EchoServer qui relaie chaque appel vers conn —
-// fonction de test générique (test.a/v1, test.b/v1...), docs/08-jalons.md J4.
+// fonction de test générique (test.a/v1, test.b/v1...), docs/08-milestones.md J4.
 func ForwardEcho(s *grpc.Server, conn *grpc.ClientConn) {
 	echov1.RegisterEchoServer(s, &forwardingEcho{client: echov1.NewEchoClient(conn)})
 }

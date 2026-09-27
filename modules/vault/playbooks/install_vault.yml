@@ -1,7 +1,7 @@
 ---
 # Configure (functions/pki/issuer/v1 + secrets/kv/v1, module vault) :
 # installe Vault (Raft mono-noeud, TLS) — image cloud Debian
-# (docs/01-vision-perimetre.md), depot APT officiel HashiCorp. Rejoue sans
+# (docs/01-vision-scope.md), depot APT officiel HashiCorp. Rejoue sans
 # risque pendant Handover pour redeployer un nouveau certificat TLS (les
 # tasks apt sont idempotentes, seul le TLS/redemarrage change).
 - hosts: target

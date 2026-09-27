@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 
-// chrony fournit time.ntp/v1 en phase cible (docs/07-modules-mvp.md) :
+// chrony fournit time.ntp/v1 en phase cible (docs/07-mvp-modules.md) :
 // contrairement à base-os ou fake-compute, chrony possède sa propre VM
 // (compute.vm/v1) et l'installe/configure lui-même en serveur chronyd
 // (core.ansible/v1) — os.base/v1 reste déclaré en requires (ADR-016) mais
@@ -225,7 +225,7 @@ func targetFromState(req *modulev1.StepRequest, pair sshKeyPair) (*ansiblev1.Tar
 }
 
 // Configure installe et configure chronyd en serveur sur la VM de chrony
-// (docs/07-modules-mvp.md).
+// (docs/07-mvp-modules.md).
 func (m *chronyModule) Configure(ctx context.Context, req *modulev1.StepRequest) (*modulev1.StepResult, error) {
 	if err := m.dial(); err != nil {
 		return nil, err
@@ -272,7 +272,7 @@ func (m *chronyModule) Configure(ctx context.Context, req *modulev1.StepRequest)
 var systemTimeRe = regexp.MustCompile(`System time\s*:\s*([-\d.]+) seconds`)
 
 // Verify prouve une synchronisation réelle depuis une VM tierce jetable
-// pointée vers le serveur chrony (docs/03-contrat-module.md règle 2 : test
+// pointée vers le serveur chrony (docs/03-module-contract.md règle 2 : test
 // depuis un point de vue consommateur, pas l'état d'un processus).
 func (m *chronyModule) Verify(ctx context.Context, req *modulev1.StepRequest) (*modulev1.StepResult, error) {
 	if err := m.dial(); err != nil {

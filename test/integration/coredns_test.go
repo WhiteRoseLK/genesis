@@ -133,7 +133,7 @@ func TestCoreDNSResolvesUpsertedRecord(t *testing.T) {
 		t.Fatalf("ListRecords = %+v, attendu 1 enregistrement", records.GetRecords())
 	}
 
-	// Requête DNS réelle, depuis un autre conteneur (docs/08-jalons.md, J6 :
+	// Requête DNS réelle, depuis un autre conteneur (docs/08-milestones.md, J6 :
 	// "Verify du doc 07").
 	out := resolveWith(t, rt, endpoint.GetAddress(), "infra01.lab.internal")
 	if !strings.Contains(out, "10.10.0.5") {

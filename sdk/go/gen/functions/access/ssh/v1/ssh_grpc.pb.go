@@ -4,7 +4,7 @@
 // - protoc             (unknown)
 // source: functions/access/ssh/v1/ssh.proto
 
-// Fonction access.ssh/v1 (docs/03-contrat-module.md) : accès SSH au parc,
+// Fonction access.ssh/v1 (docs/03-module-contract.md) : accès SSH au parc,
 // fournie par un module bastion (teleport). JumpHost expose le point
 // d'entrée public (proxy) ; SignUserKey signera une clé publique
 // utilisateur en certificat SSH court terme -- pas encore de consommateur

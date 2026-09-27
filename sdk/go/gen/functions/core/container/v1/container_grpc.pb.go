@@ -4,7 +4,7 @@
 // - protoc             (unknown)
 // source: functions/core/container/v1/container.proto
 
-// Fonction core.container/v1 (docs/03-contrat-module.md) : fournie
+// Fonction core.container/v1 (docs/03-module-contract.md) : fournie
 // nativement par le cœur, sur la graine. Runtime détecté (docker ou podman,
 // docs/04-spec.md : seed.container_runtime) piloté en ligne de commande.
 

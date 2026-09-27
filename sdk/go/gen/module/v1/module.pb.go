@@ -4,7 +4,7 @@
 // 	protoc        (unknown)
 // source: module/v1/module.proto
 
-// Protocole de cycle de vie module <-> cœur (docs/03-contrat-module.md).
+// Protocole de cycle de vie module <-> cœur (docs/03-module-contract.md).
 // Nommage : package "module.v1" (sans préfixe "genesis.") pour que le
 // répertoire sdk/proto/module/v1/ corresponde au paquet (convention buf).
 
@@ -220,7 +220,7 @@ func (x *FunctionRef) GetPhases() []string {
 type RequireEntry struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Function      string                 `protobuf:"bytes,1,opt,name=function,proto3" json:"function,omitempty"`  // ex. "compute.vm/v1", peut porter le suffixe "@seed"/"@target"
-	Optional      bool                   `protobuf:"varint,2,opt,name=optional,proto3" json:"optional,omitempty"` // docs/10-ajouter-un-module.md : dépendances optionnelles
+	Optional      bool                   `protobuf:"varint,2,opt,name=optional,proto3" json:"optional,omitempty"` // docs/10-adding-a-module.md : dépendances optionnelles
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -441,7 +441,7 @@ func (x *ResourceDecl) GetSize() string {
 	return ""
 }
 
-// Manifest reflète module.yaml (docs/03-contrat-module.md §1).
+// Manifest reflète module.yaml (docs/03-module-contract.md §1).
 type Manifest struct {
 	state         protoimpl.MessageState  `protogen:"open.v1"`
 	ApiVersion    string                  `protobuf:"bytes,1,opt,name=api_version,json=apiVersion,proto3" json:"api_version,omitempty"`
@@ -739,7 +739,7 @@ func (x *Diagnostics) GetDiagnostics() []*Diagnostic {
 }
 
 // StepRequest porte tout ce dont un module a besoin pour exécuter une étape
-// (docs/03-contrat-module.md §2) : le cœur ne laisse rien d'autre y accéder.
+// (docs/03-module-contract.md §2) : le cœur ne laisse rien d'autre y accéder.
 type StepRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	RunId         string                 `protobuf:"bytes,1,opt,name=run_id,json=runId,proto3" json:"run_id,omitempty"`
@@ -973,7 +973,7 @@ func (x *CheckResult) GetDetail() string {
 }
 
 // StepResult : le module ne persiste rien lui-même, state est à
-// persister par le cœur, opaque (docs/03-contrat-module.md §2).
+// persister par le cœur, opaque (docs/03-module-contract.md §2).
 type StepResult struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Status        StepResult_Status      `protobuf:"varint,1,opt,name=status,proto3,enum=module.v1.StepResult_Status" json:"status,omitempty"`

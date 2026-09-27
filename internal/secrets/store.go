@@ -7,7 +7,7 @@ import (
 	"time"
 )
 
-// Meta décrit un secret sans jamais porter sa valeur (docs/06-secrets-etat.md).
+// Meta décrit un secret sans jamais porter sa valeur (docs/06-secrets-state.md).
 type Meta struct {
 	Owner     string    `json:"owner"`     // capacité propriétaire
 	Consumers []string  `json:"consumers"` // capacités / VM consommatrices
@@ -26,7 +26,7 @@ type Entry struct {
 // Generator produit la valeur initiale d'un secret lors d'un Ensure.
 type Generator func() (Secret, error)
 
-// Store est l'interface de stockage des secrets (docs/06-secrets-etat.md).
+// Store est l'interface de stockage des secrets (docs/06-secrets-state.md).
 // Implémentations prévues : file (itération 1, graine) et vault (cible).
 type Store interface {
 	// Ensure crée le secret ref via gen s'il est absent ; ne fait rien s'il

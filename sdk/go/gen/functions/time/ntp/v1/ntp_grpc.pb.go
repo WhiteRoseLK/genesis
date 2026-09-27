@@ -4,7 +4,7 @@
 // - protoc             (unknown)
 // source: functions/time/ntp/v1/ntp.proto
 
-// Fonction time.ntp/v1 (docs/03-contrat-module.md) : fournisseur MVP chrony (target).
+// Fonction time.ntp/v1 (docs/03-module-contract.md) : fournisseur MVP chrony (target).
 
 package timentpv1
 

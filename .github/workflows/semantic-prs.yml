@@ -1,7 +1,7 @@
 name: Semantic PRs
 
-# Les PR sont fusionnées en squash (ADR-021) : le titre devient le commit sur
-# main, lu par Release Please. Il doit donc suivre Conventional Commits.
+# PRs are squash-merged (ADR-021): the title becomes the commit on main,
+# which Release Please reads. It must therefore follow Conventional Commits.
 on:
   pull_request_target:
     types: [opened, edited, reopened, synchronize]
@@ -34,7 +34,7 @@ jobs:
             ci
             build
             chore
-          # Scope libre et facultatif : couche du cœur (engine, broker…), sdk,
-          # proto ou nom du module (teleport, vault…). Aucune liste ici :
-          # ajouter un module ne modifie rien hors de son répertoire.
+          # Free, optional scope: core layer (engine, broker…), sdk, proto or
+          # module name (teleport, vault…). No list here: adding a module
+          # changes nothing outside its directory.
           requireScope: false

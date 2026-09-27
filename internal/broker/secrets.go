@@ -16,7 +16,7 @@ import (
 )
 
 // NativeSecrets construit le fournisseur core.secrets/v1, natif au cœur
-// (jamais un module, docs/03-contrat-module.md). L'appelant ne peut lire
+// (jamais un module, docs/03-module-contract.md). L'appelant ne peut lire
 // (Get) qu'un secret dont il est owner ou consumer (docs/02-architecture.md :
 // "un module... ne peut lire que ses propres secrets et ceux explicitement
 // partagés").

@@ -1,12 +1,12 @@
 // SPDX-License-Identifier: Apache-2.0
 
 // coredns fournit dns.zone/v1 et dns.resolver/v1 en phase graine
-// (docs/07-modules-mvp.md), en conteneur sur la graine (core.container/v1).
+// (docs/07-mvp-modules.md), en conteneur sur la graine (core.container/v1).
 // La zone est régénérée (fichier BIND réécrit, conteneur redémarré) à
 // chaque UpsertRecord/DeleteRecord.
 //
 // Portée assumée pour ce jalon : les enregistrements vivent en mémoire dans
-// le process du module, pas dans l'état du cœur (docs/03-contrat-module.md
+// le process du module, pas dans l'état du cœur (docs/03-module-contract.md
 // §4 règle 6 vise avant tout la persistance inter-redémarrage pour l'état
 // de cycle de vie ; UpsertRecord/DeleteRecord sont des appels de fonction,
 // sans StepRequest.state à travers lequel passer). Un kill+relance du cœur
@@ -62,7 +62,7 @@ func (m *coreDNSModule) Validate(context.Context, *modulev1.ValidateRequest) (*m
 // Check : conforme une fois amorcé (seeded) ou déjà retiré par une
 // passation (retired) — coredns ne fournit rien en phase cible, son
 // itération de plan (internal/engine) s'arrête donc à seed_ready
-// (docs/03-contrat-module.md §5) ; le jeton de session est capturé pour
+// (docs/03-module-contract.md §5) ; le jeton de session est capturé pour
 // que les gestionnaires de fonction (UpsertRecord...) puissent joindre
 // core.container/v1.
 func (m *coreDNSModule) Check(_ context.Context, req *modulev1.StepRequest) (*modulev1.CheckResult, error) {
@@ -89,7 +89,7 @@ func (m *coreDNSModule) Verify(_ context.Context, req *modulev1.StepRequest) (*m
 
 // SeedDown arrête réellement le conteneur CoreDNS — déclenché par la
 // passation d'un module cible (ex. powerdns), pas par sa propre itération
-// de plan (docs/08-jalons.md, J6 : "après passation, arrêt de coredns sans
+// de plan (docs/08-milestones.md, J6 : "après passation, arrêt de coredns sans
 // impact").
 func (m *coreDNSModule) SeedDown(ctx context.Context, req *modulev1.StepRequest) (*modulev1.StepResult, error) {
 	if err := m.zoneServer.stopContainer(ctx); err != nil {
@@ -231,7 +231,7 @@ func (s *dnsZoneServer) stopContainer(ctx context.Context) error {
 }
 
 // reload régénère le Corefile et les fichiers de zone, puis redémarre le
-// conteneur CoreDNS (docs/07-modules-mvp.md : "Zone régénérée à chaque
+// conteneur CoreDNS (docs/07-mvp-modules.md : "Zone régénérée à chaque
 // UpsertRecord").
 func (s *dnsZoneServer) reload(ctx context.Context) error {
 	s.mu.Lock()

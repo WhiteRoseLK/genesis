@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 // proxmox fournit compute.vm/v1 sur un cluster Proxmox VE existant
-// (docs/07-modules-mvp.md). Pas d'accès à un vrai cluster dans cet
+// (docs/07-mvp-modules.md). Pas d'accès à un vrai cluster dans cet
 // environnement de développement (voir docs/PROGRESS.md, J5) : construit et
 // testé contre des fixtures HTTP, jamais exécuté contre une instance réelle.
 //
@@ -268,7 +268,7 @@ func (s *computeVMServer) DeleteVM(ctx context.Context, req *computevmv1.DeleteV
 	return &computevmv1.DeleteVMResponse{}, nil
 }
 
-// Now interroge l'heure du nœud (docs/05-cycle-bootstrap.md : contrôle
+// Now interroge l'heure du nœud (docs/05-bootstrap-lifecycle.md : contrôle
 // d'horloge de la graine, première dépendance de toute la chaîne).
 func (s *computeVMServer) Now(ctx context.Context, _ *computevmv1.NowRequest) (*computevmv1.NowResponse, error) {
 	client, cfg, err := s.client()

@@ -2,14 +2,14 @@
 
 // Package moduletest est le harnais de test du SDK : suite de conformité
 // qu'un module doit passer avant d'être considéré terminé
-// (docs/10-ajouter-un-module.md, docs/03-contrat-module.md §4).
+// (docs/10-adding-a-module.md, docs/03-module-contract.md §4).
 //
 // Squelette au jalon J3 : seules les vérifications qui ne dépendent pas du
 // broker sont faites ici (Describe cohérent avec le manifest, Validate ne
 // plante pas). Les vérifications sémantiques complètes — idempotence
 // rejouée, absence de secret dans les sorties, respect de chaque fonction
 // fournie avec des fonctions requises simulées — ont besoin du broker et
-// arrivent au jalon J4 (docs/08-jalons.md).
+// arrivent au jalon J4 (docs/08-milestones.md).
 package moduletest
 
 import (
@@ -23,7 +23,7 @@ import (
 )
 
 // RunConformance exécute la suite de conformité minimale sur impl, dont le
-// manifest est à manifestPath (docs/10-ajouter-un-module.md, étape 5 :
+// manifest est à manifestPath (docs/10-adding-a-module.md, étape 5 :
 // `go test ./... -run Conformance`).
 func RunConformance(t *testing.T, impl modulev1.ModuleServer, manifestPath string) {
 	t.Helper()

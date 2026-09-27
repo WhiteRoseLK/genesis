@@ -21,7 +21,7 @@ import (
 	"github.com/WhiteRoseLK/genesis/internal/atomicfile"
 )
 
-// FileStore est le backend `file` de l'itération 1 (docs/06-secrets-etat.md) :
+// FileStore est le backend `file` de l'itération 1 (docs/06-secrets-state.md) :
 // un fichier chiffré age par secret, des métadonnées en clair mais sans
 // valeur, sous state_dir/secrets/.
 type FileStore struct {

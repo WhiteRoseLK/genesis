@@ -389,7 +389,7 @@ func (m *vaultModule) currentAPI() *vaultClient {
 
 // Verify prouve, depuis une VM tierce jetable, une émission + validation de
 // chaîne réelle et une lecture KV via AppRole — pas le root token
-// (docs/03-contrat-module.md règle 2, docs/07-modules-mvp.md).
+// (docs/03-module-contract.md règle 2, docs/07-mvp-modules.md).
 func (m *vaultModule) Verify(ctx context.Context, req *modulev1.StepRequest) (*modulev1.StepResult, error) {
 	if err := m.dial(); err != nil {
 		return nil, err

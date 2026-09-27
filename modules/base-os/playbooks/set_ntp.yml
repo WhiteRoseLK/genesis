@@ -1,8 +1,8 @@
 ---
 # SetNTP (functions/os/base/v1) : pointe la synchronisation d'horloge de la
-# VM vers le fournisseur actif (docs/03-contrat-module.md, appelé aussi en
+# VM vers le fournisseur actif (docs/03-module-contract.md, appelé aussi en
 # Repoint). systemd-timesyncd : présent par défaut sur l'image cloud Debian
-# (docs/01-vision-perimetre.md) tant que le module chrony (J6) ne l'a pas
+# (docs/01-vision-scope.md) tant que le module chrony (J6) ne l'a pas
 # remplacé sur les VM qui l'hébergent.
 - hosts: target
   gather_facts: false

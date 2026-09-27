@@ -97,7 +97,7 @@ func generateAuthorizedKey(t *testing.T) string {
 	return string(gossh.MarshalAuthorizedKey(sshPub))
 }
 
-// TestFakeComputeProvidesComputeVM vérifie que fake-compute (docs/07-modules-mvp.md)
+// TestFakeComputeProvidesComputeVM vérifie que fake-compute (docs/07-mvp-modules.md)
 // crée une vraie « VM » (conteneur SSH-joignable) via core.container/v1, que
 // EnsureVM est idempotent par nom, et que DeleteVM l'arrête réellement.
 func TestFakeComputeProvidesComputeVM(t *testing.T) {

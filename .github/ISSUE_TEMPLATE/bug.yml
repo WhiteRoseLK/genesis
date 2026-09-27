@@ -1,27 +1,27 @@
 name: "🐞 Bug"
-description: Un comportement de Genesis ou d'un module ne correspond pas à la conception.
+description: Genesis or a module does not behave as designed.
 title: "bug: "
 labels: ["bug", "needs-triage"]
 body:
   - type: markdown
     attributes:
       value: |
-        ⚠️ Ne collez **aucun secret** (jeton, mot de passe, clé, contenu de `genesis.secrets`) : masquez-les avant envoi.
+        ⚠️ Do not paste **any secret** (token, password, key, contents of `genesis.secrets`): mask them before submitting.
 
   - type: input
     id: version
     attributes:
       label: Version / commit
-      placeholder: ex. v0.3.0 ou 0cbb6c9
+      placeholder: e.g. v0.3.0 or 0cbb6c9
     validations:
       required: true
 
   - type: input
     id: scope
     attributes:
-      label: Composant concerné
-      description: Couche du cœur (engine, broker, spec…) ou module (teleport, vault…).
-      placeholder: ex. engine / module vault
+      label: Affected component
+      description: Core layer (engine, broker, spec…) or module (teleport, vault…).
+      placeholder: e.g. engine / vault module
     validations:
       required: true
 
@@ -29,7 +29,7 @@ body:
     id: description
     attributes:
       label: Description
-      description: Ce qui se passe, et le comportement attendu (référence au document de conception si possible).
+      description: What happens, and the expected behaviour (with a reference to the design document if possible).
     validations:
       required: true
 
@@ -37,7 +37,7 @@ body:
     id: steps
     attributes:
       label: Reproduction
-      description: Spec minimale (secrets masqués), commande lancée, étape en échec.
+      description: Minimal spec (secrets masked), command run, failing step.
       render: shell
     validations:
       required: true
@@ -45,8 +45,8 @@ body:
   - type: textarea
     id: logs
     attributes:
-      label: Sortie / journaux
-      description: Erreur retournée (module, étape, cause) et extrait de journal utile.
+      label: Output / logs
+      description: Returned error (module, step, cause) and a useful log excerpt.
       render: text
     validations:
       required: false

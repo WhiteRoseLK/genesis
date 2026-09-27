@@ -15,7 +15,7 @@ import (
 	"time"
 )
 
-// vaultClient parle directement à l'API REST de Vault (docs/07-modules-mvp.md),
+// vaultClient parle directement à l'API REST de Vault (docs/07-mvp-modules.md),
 // même principe que modules/powerdns/api.go et modules/proxmox/proxmoxapi :
 // un module appelle l'API du produit qu'il pilote directement, ansible se
 // limite à l'installation/configuration système.
@@ -27,7 +27,7 @@ type vaultClient struct {
 // newVaultClient fait confiance UNIQUEMENT à rootCAPEM (la racine step-ca
 // qui a signé le certificat serveur de Vault), pas au magasin système —
 // Vault est son propre service interne, jamais exposé publiquement dans ce
-// MVP (docs/01-vision-perimetre.md).
+// MVP (docs/01-vision-scope.md).
 func newVaultClient(baseURL, rootCAPEM string) (*vaultClient, error) {
 	pool := x509.NewCertPool()
 	if !pool.AppendCertsFromPEM([]byte(rootCAPEM)) {

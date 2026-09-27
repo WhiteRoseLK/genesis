@@ -21,7 +21,7 @@ import (
 const passwordAlphabet = "ABCDEFGHJKMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789"
 
 // GeneratePassword produit un mot de passe de 32 caractères sur un alphabet
-// sûr (docs/06-secrets-etat.md).
+// sûr (docs/06-secrets-state.md).
 func GeneratePassword() Generator {
 	return func() (Secret, error) {
 		const length = 32
@@ -86,7 +86,7 @@ type SSHKeyPair struct {
 	PublicKeyAuthorized string `json:"public_key_authorized"`
 }
 
-// GenerateSSHKeyPair produit une paire de clés SSH Ed25519 (docs/06-secrets-etat.md).
+// GenerateSSHKeyPair produit une paire de clés SSH Ed25519 (docs/06-secrets-state.md).
 func GenerateSSHKeyPair() Generator {
 	return func() (Secret, error) {
 		pub, priv, err := ed25519.GenerateKey(rand.Reader)

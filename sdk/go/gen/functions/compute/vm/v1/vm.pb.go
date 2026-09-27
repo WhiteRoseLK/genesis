@@ -4,7 +4,7 @@
 // 	protoc        (unknown)
 // source: functions/compute/vm/v1/vm.proto
 
-// Fonction compute.vm/v1 (docs/03-contrat-module.md) : fournisseurs MVP
+// Fonction compute.vm/v1 (docs/03-module-contract.md) : fournisseurs MVP
 // proxmox (J5) et fake-compute (J4, registre mémoire).
 
 package computevmv1
@@ -111,7 +111,7 @@ type EnsureVMRequest struct {
 	Env   string                 `protobuf:"bytes,2,opt,name=env,proto3" json:"env,omitempty"` // tag genesis-env=<nom>, clé d'idempotence (docs/07)
 	Size  string                 `protobuf:"bytes,3,opt,name=size,proto3" json:"size,omitempty"`
 	Extra map[string]string      `protobuf:"bytes,4,rep,name=extra,proto3" json:"extra,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
-	// cloud-init (docs/07-modules-mvp.md : "IP, clé SSH de service, utilisateur genesis").
+	// cloud-init (docs/07-mvp-modules.md : "IP, clé SSH de service, utilisateur genesis").
 	Ip            string `protobuf:"bytes,5,opt,name=ip,proto3" json:"ip,omitempty"`
 	Gateway       string `protobuf:"bytes,6,opt,name=gateway,proto3" json:"gateway,omitempty"`
 	SshPublicKey  string `protobuf:"bytes,7,opt,name=ssh_public_key,json=sshPublicKey,proto3" json:"ssh_public_key,omitempty"`

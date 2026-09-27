@@ -13,7 +13,7 @@ import (
 // appelant (caller), une session de broker n'exposant que les fonctions
 // listées dans allowed. Le jeton retourné est à placer dans
 // StepRequest.broker_token avant d'invoquer l'étape correspondante
-// (docs/03-contrat-module.md §2).
+// (docs/03-module-contract.md §2).
 //
 // AcceptAndServe bloque jusqu'à la fermeture de la session (c'est un
 // Accept+Serve, comme http.Server.Serve) : il tourne donc dans sa propre

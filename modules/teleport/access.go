@@ -14,7 +14,7 @@ import (
 
 const proxyPort = 3080
 
-// teleportAccessServer implémente access.ssh/v1 (docs/03-contrat-module.md).
+// teleportAccessServer implémente access.ssh/v1 (docs/03-module-contract.md).
 type teleportAccessServer struct {
 	accesssshv1.UnimplementedAccessSSHServer
 	module *teleportModule

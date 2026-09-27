@@ -1,3 +1,3 @@
-# Consignes pour les assistants IA
+# Instructions for AI assistants
 
-La source de vérité est [`CLAUDE.md`](CLAUDE.md) (règles non négociables, méthode de travail, commandes), complétée par [`CONTRIBUTING.md`](CONTRIBUTING.md) (issues, PR atomiques, squash, Conventional Commits) et par les documents de [`docs/`](docs/). Ce fichier ne duplique rien, afin de ne pas maintenir deux versions des règles.
+The source of truth is [`CLAUDE.md`](CLAUDE.md) (non-negotiable rules, way of working, commands), complemented by [`CONTRIBUTING.md`](CONTRIBUTING.md) (issues, atomic PRs, squash, Conventional Commits) and the documents in [`docs/`](docs/). This file duplicates nothing, so that there are never two versions of the rules to maintain.

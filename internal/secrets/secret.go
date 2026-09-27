@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 // Package secrets génère, stocke et distribue les secrets de l'outil
-// (docs/06-secrets-etat.md). L'utilisateur ne fournit que les identifiants
+// (docs/06-secrets-state.md). L'utilisateur ne fournit que les identifiants
 // de l'hyperviseur ; tout le reste est généré.
 package secrets
 

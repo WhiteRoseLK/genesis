@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: Apache-2.0
 
-// step-ca fournit pki.issuer/v1 en phase graine (docs/07-modules-mvp.md) :
+// step-ca fournit pki.issuer/v1 en phase graine (docs/07-mvp-modules.md) :
 // CA racine (stockée en recovery via core.secrets) + intermédiaire graine,
 // émission/signature de certificats en pilotant réellement le CLI `step`
-// du conteneur smallstep/step-ca (docs/03-contrat-module.md règle 8 :
+// du conteneur smallstep/step-ca (docs/03-module-contract.md règle 8 :
 // "orchestrer, ne pas réinventer"). Signature purement locale/hors-ligne
 // (`step certificate create`/`sign` avec les fichiers de la CA montés) —
 // pas de serveur step-ca détaché : évite la complexité TLS/DNS/provisioner

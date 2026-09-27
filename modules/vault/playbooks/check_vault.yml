@@ -1,8 +1,8 @@
 ---
 # Verify (functions/pki/issuer/v1 + secrets/kv/v1, module vault) : exécuté
 # sur une VM tierce jetable — émission + validation de chaîne, lecture KV
-# via AppRole, pas le root token (docs/07-modules-mvp.md,
-# docs/03-contrat-module.md règle 2).
+# via AppRole, pas le root token (docs/07-mvp-modules.md,
+# docs/03-module-contract.md règle 2).
 - hosts: target
   gather_facts: false
   become: true

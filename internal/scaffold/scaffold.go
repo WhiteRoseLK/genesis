@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 // Package scaffold génère le squelette d'un nouveau module
-// (docs/10-ajouter-un-module.md, étape 1 : `genesis modules scaffold`).
+// (docs/10-adding-a-module.md, étape 1 : `genesis modules scaffold`).
 package scaffold
 
 import (

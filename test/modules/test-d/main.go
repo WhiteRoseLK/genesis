@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 // test-d requiert test.a/v1 et fournit test.d/v1 : preuve d'extensibilité du
-// jalon J4 (docs/08-jalons.md) — ajouté après coup, sans toucher au
+// jalon J4 (docs/08-milestones.md) — ajouté après coup, sans toucher au
 // résolveur, au planificateur, au moteur ni aux autres modules.
 package main
 

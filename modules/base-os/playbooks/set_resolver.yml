@@ -1,6 +1,6 @@
 ---
 # SetResolver (functions/os/base/v1) : pointe la résolution DNS de la VM vers
-# le fournisseur actif (docs/03-contrat-module.md, appelé aussi en Repoint).
+# le fournisseur actif (docs/03-module-contract.md, appelé aussi en Repoint).
 - hosts: target
   gather_facts: false
   become: true

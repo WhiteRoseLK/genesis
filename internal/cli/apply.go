@@ -78,7 +78,7 @@ func newApplyCmd() *cobra.Command {
 
 // printSeedStatus indique si la graine a été retirée et, le cas échéant, ce
 // qu'il faut conserver hors ligne avant de supprimer la machine graine
-// (docs/05-cycle-bootstrap.md, phase 4).
+// (docs/05-bootstrap-lifecycle.md, phase 4).
 func printSeedStatus(out io.Writer, stateDir string) error {
 	st, err := state.Load(stateDir)
 	if err != nil {

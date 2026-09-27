@@ -29,7 +29,7 @@ func newValidateCmd() *cobra.Command {
 		if _, err := fmt.Fprintf(out, "%s : structure valide.\n", file); err != nil {
 			return err
 		}
-		_, err = fmt.Fprintln(out, "résolution des modules et validation par module : pas encore implémentées (prévues aux J3/J4, voir docs/08-jalons.md).")
+		_, err = fmt.Fprintln(out, "résolution des modules et validation par module : pas encore implémentées (prévues aux J3/J4, voir docs/08-milestones.md).")
 		return err
 	}
 	return cmd

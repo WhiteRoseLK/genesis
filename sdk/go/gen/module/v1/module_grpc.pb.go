@@ -4,7 +4,7 @@
 // - protoc             (unknown)
 // source: module/v1/module.proto
 
-// Protocole de cycle de vie module <-> cœur (docs/03-contrat-module.md).
+// Protocole de cycle de vie module <-> cœur (docs/03-module-contract.md).
 // Nommage : package "module.v1" (sans préfixe "genesis.") pour que le
 // répertoire sdk/proto/module/v1/ corresponde au paquet (convention buf).
 

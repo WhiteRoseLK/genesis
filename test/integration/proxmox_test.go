@@ -22,7 +22,7 @@ import (
 
 // fakeProxmoxServer simule juste assez de l'API Proxmox VE pour exercer
 // proxmox de bout en bout : liste de VM, next-id, clone, config cloud-init,
-// start, status, delete, version, time (docs/08-jalons.md, J5 — pas de
+// start, status, delete, version, time (docs/08-milestones.md, J5 — pas de
 // cluster réel dans cet environnement, voir docs/PROGRESS.md).
 type fakeProxmoxServer struct {
 	mu       sync.Mutex

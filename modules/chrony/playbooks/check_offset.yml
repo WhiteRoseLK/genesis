@@ -1,7 +1,7 @@
 ---
 # Verify (functions/time/ntp/v1, module chrony) : exécuté sur une VM tierce
 # jetable pointée vers le serveur chrony à vérifier — "Verify : depuis une
-# autre VM, source sélectionnée, écart < 100 ms" (docs/07-modules-mvp.md).
+# autre VM, source sélectionnée, écart < 100 ms" (docs/07-mvp-modules.md).
 - hosts: target
   gather_facts: false
   become: true

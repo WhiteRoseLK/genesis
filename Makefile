@@ -105,7 +105,7 @@ lint:
 		(cd $$m && golangci-lint run ./...); \
 	done
 
-# Le protocole module/v1 (sdk/proto) existe depuis le jalon J3 (docs/08-jalons.md).
+# Le protocole module/v1 (sdk/proto) existe depuis le jalon J3 (docs/08-milestones.md).
 proto:
 	@if [ -z "$$(find sdk/proto -name '*.proto' 2>/dev/null)" ]; then \
 		echo "aucun fichier .proto pour le moment"; \

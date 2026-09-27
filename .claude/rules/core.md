@@ -3,9 +3,9 @@ paths:
   - "internal/**"
   - "cmd/**"
 ---
-# Règles du cœur
-- Aucun import de `modules/` ni de SDK produit (Proxmox, PowerDNS, Vault…). Le cœur ne manipule que des manifests, des fonctions et des données opaques.
-- Aucune variable globale mutable (le moteur devra paralléliser plus tard).
-- Le cœur est seul propriétaire de l'état : écriture atomique, verrou, jamais de valeur secrète (uniquement des `secrets.Ref`).
-- Le broker refuse tout appel à une fonction non déclarée dans les `requires` du module appelant.
-- Référence : docs/02-architecture.md, docs/06-secrets-etat.md.
+# Core rules
+- No import of `modules/` or of any product SDK (Proxmox, PowerDNS, Vault…). The core only handles manifests, functions and opaque data.
+- No mutable global variable (the engine will have to parallelise later).
+- The core alone owns the state: atomic writes, lock, never a secret value (only `secrets.Ref`).
+- The broker refuses any call to a function not declared in the calling module's `requires`.
+- Reference: docs/02-architecture.md, docs/06-secrets-state.md.

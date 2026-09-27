@@ -1,6 +1,6 @@
 syntax = "proto3";
 
-// Fonction compute.vm/v1 (docs/03-contrat-module.md) : fournisseurs MVP
+// Fonction compute.vm/v1 (docs/03-module-contract.md) : fournisseurs MVP
 // proxmox (J5) et fake-compute (J4, registre mémoire).
 package functions.compute.vm.v1;
 
@@ -27,7 +27,7 @@ message EnsureVMRequest {
   string env = 2; // tag genesis-env=<nom>, clé d'idempotence (docs/07)
   string size = 3;
   map<string, string> extra = 4;
-  // cloud-init (docs/07-modules-mvp.md : "IP, clé SSH de service, utilisateur genesis").
+  // cloud-init (docs/07-mvp-modules.md : "IP, clé SSH de service, utilisateur genesis").
   string ip = 5;
   string gateway = 6;
   string ssh_public_key = 7;
