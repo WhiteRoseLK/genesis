@@ -1,25 +1,25 @@
 ---
-# Verify (functions/pki/issuer/v1 + secrets/kv/v1, module vault) : exécuté
-# sur une VM tierce jetable — émission + validation de chaîne, lecture KV
-# via AppRole, pas le root token (docs/07-mvp-modules.md,
-# docs/03-module-contract.md règle 2).
+# Verify (functions/pki/issuer/v1 + secrets/kv/v1, vault module): runs on a
+# disposable third-party VM — issuance + chain validation, KV read through the
+# AppRole, not the root token (docs/07-mvp-modules.md,
+# docs/03-module-contract.md rule 2).
 - hosts: target
   gather_facts: false
   become: true
   tasks:
-    - name: installer les outils de vérification
+    - name: install the verification tools
       ansible.builtin.apt:
         name: [curl, python3, ca-certificates]
         state: present
         update_cache: true
 
-    - name: déposer la racine step-ca (pour vérifier la chaîne TLS et PKI)
+    - name: place the step-ca root (to verify the TLS and PKI chain)
       ansible.builtin.copy:
         content: "{{ root_ca_pem }}"
         dest: /tmp/root_ca.pem
         mode: "0644"
 
-    - name: déposer le script de vérification
+    - name: place the verification script
       ansible.builtin.copy:
         content: |
           #!/bin/sh
@@ -51,11 +51,11 @@
         dest: /tmp/check_vault.sh
         mode: "0755"
 
-    - name: exécuter la vérification
+    - name: run the verification
       ansible.builtin.command: sh /tmp/check_vault.sh
       register: check
       changed_when: false
 
-    - name: afficher le résultat
+    - name: show the result
       ansible.builtin.debug:
         var: check.stdout

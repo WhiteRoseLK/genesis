@@ -1,15 +1,14 @@
 // SPDX-License-Identifier: Apache-2.0
 
-// powerdns fournit dns.zone/v1 et dns.resolver/v1 en phase cible
-// (docs/07-mvp-modules.md) : PowerDNS Authoritative (SQLite, API) + Recursor
-// sur sa propre VM (compute.vm/v1), reprend la zone de coredns au moment de
-// la passation (Handover lit dns.zone/v1@seed, recrée tout, compare).
+// powerdns provides dns.zone/v1 and dns.resolver/v1 in the target phase
+// (docs/07-mvp-modules.md): PowerDNS Authoritative (SQLite, API) + Recursor on
+// its own VM (compute.vm/v1); it takes over the zone from coredns at handover
+// time (Handover reads dns.zone/v1@seed, recreates everything, compares).
 //
-// Portée assumée pour ce jalon : comme modules/coredns, les paramètres de
-// connexion à l'API PowerDNS (adresse, clé) vivent en mémoire dans le
-// process du module, peuplés par Configure — un redémarrage du cœur en
-// cours de cycle de vie les perdrait (même dette que coredns,
-// docs/PROGRESS.md).
+// Accepted scope for this milestone: like modules/coredns, the PowerDNS API
+// connection parameters (address, key) live in memory in the module process,
+// populated by Configure — a restart of the core mid-lifecycle would lose them
+// (the same debt as coredns, docs/PROGRESS.md).
 package main
 
 import (
@@ -60,9 +59,9 @@ const (
 	verifyReverseZ   = "255.255.10.in-addr.arpa"
 )
 
-// sshKeyPair reflète la valeur JSON du générateur GENERATOR_SSH_KEYPAIR
-// côté cœur (internal/secrets.SSHKeyPair) — dupliqué ici par son contrat
-// JSON, les modules n'important jamais internal/ (même choix que chrony).
+// sshKeyPair mirrors the JSON value of the core's GENERATOR_SSH_KEYPAIR
+// generator (internal/secrets.SSHKeyPair) — duplicated here from its JSON
+// contract, since modules never import internal/ (the same choice as chrony).
 type sshKeyPair struct {
 	PrivateKeyOpenSSH   string `json:"private_key_openssh"`
 	PublicKeyAuthorized string `json:"public_key_authorized"`
@@ -102,12 +101,12 @@ func (m *powerdnsModule) Check(_ context.Context, req *modulev1.StepRequest) (*m
 	return &modulev1.CheckResult{Status: modulev1.CheckResult_STATUS_COMPLIANT}, nil
 }
 
-// dial dial la session de broker au plus une fois (Dial ne réussit qu'une
-// fois par jeton) et construit tous les clients typés sur la même
-// connexion — même précaution que modules/chrony. dns.zone/v1@seed est
-// résolu vers le fournisseur graine actif (coredns) via la clé qualifiée du
-// registre (internal/engine), dns.resolver/v1 et les autres via leur clé
-// active (docs/05-bootstrap-lifecycle.md).
+// dial dials the broker session at most once (Dial only succeeds once per
+// token) and builds all the typed clients on the same connection — the same
+// precaution as modules/chrony. dns.zone/v1@seed resolves to the active seed
+// provider (coredns) through the registry's qualified key (internal/engine),
+// dns.resolver/v1 and the others through their active key
+// (docs/05-bootstrap-lifecycle.md).
 func (m *powerdnsModule) dial() error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
@@ -115,11 +114,11 @@ func (m *powerdnsModule) dial() error {
 		return nil
 	}
 	if m.broker == nil || m.brokerToken == "" {
-		return fmt.Errorf("powerdns : aucune session de broker (Check n'a pas encore été appelé)")
+		return fmt.Errorf("powerdns: no broker session (Check has not been called yet)")
 	}
 	conn, err := m.broker.Dial(m.brokerToken)
 	if err != nil {
-		return fmt.Errorf("connexion aux fonctions requises : %w", err)
+		return fmt.Errorf("connecting to the required functions: %w", err)
 	}
 	m.vmClient = computevmv1.NewComputeVMClient(conn)
 	m.osBaseClient = osbasev1.NewBaseClient(conn)
@@ -132,17 +131,17 @@ func (m *powerdnsModule) dial() error {
 	return nil
 }
 
-// installFleetAgents appelle fleet.agent/v1.Install(target) (docs/09-decisions.md
-// ADR-017) : diffusé vers tout module « de parc » installé (ex. teleport),
-// no-op silencieux si aucun n'est présent (fleet.agent/v1 est un requires
-// optionnel — Unimplemented est alors la réponse normale du broker, pas
-// une erreur), même méthode que modules/chrony.
+// installFleetAgents calls fleet.agent/v1.Install(target)
+// (docs/09-decisions.md ADR-017): fanned out to every installed "fleet" module
+// (e.g. teleport), a silent no-op if none is present (fleet.agent/v1 is an
+// optional requires — Unimplemented is then the broker's normal answer, not an
+// error), the same method as modules/chrony.
 func (m *powerdnsModule) installFleetAgents(ctx context.Context, target connTarget) error {
 	_, err := m.fleetAgentClient.Install(ctx, &fleetagentv1.InstallRequest{
 		Target: &fleetagentv1.Target{Host: target.Host, Port: target.Port, User: target.User, SshPrivateKey: target.PrivateKey},
 	})
 	if err != nil && status.Code(err) != codes.Unimplemented {
-		return fmt.Errorf("fleet.agent/v1.Install : %w", err)
+		return fmt.Errorf("fleet.agent/v1.Install: %w", err)
 	}
 	return nil
 }
@@ -172,15 +171,15 @@ func (m *powerdnsModule) sshKeyPair(ctx context.Context, name string) (sshKeyPai
 		Generator: secretsv1.Generator_GENERATOR_SSH_KEYPAIR,
 		Meta:      &secretsv1.Meta{Owner: "powerdns", Consumers: []string{"powerdns"}, Kind: "ssh_keypair"},
 	}); err != nil {
-		return sshKeyPair{}, fmt.Errorf("génération de la paire SSH : %w", err)
+		return sshKeyPair{}, fmt.Errorf("generating the SSH pair: %w", err)
 	}
 	resp, err := m.secretsClient.Get(ctx, &secretsv1.GetRequest{Ref: ref})
 	if err != nil {
-		return sshKeyPair{}, fmt.Errorf("lecture de la paire SSH : %w", err)
+		return sshKeyPair{}, fmt.Errorf("reading the SSH pair: %w", err)
 	}
 	var pair sshKeyPair
 	if err := json.Unmarshal([]byte(resp.GetValue()), &pair); err != nil {
-		return sshKeyPair{}, fmt.Errorf("décodage de la paire SSH : %w", err)
+		return sshKeyPair{}, fmt.Errorf("decoding the SSH pair: %w", err)
 	}
 	return pair, nil
 }
@@ -192,17 +191,17 @@ func (m *powerdnsModule) apiKeySecret(ctx context.Context, name string) (string,
 		Generator: secretsv1.Generator_GENERATOR_TOKEN,
 		Meta:      &secretsv1.Meta{Owner: "powerdns", Consumers: []string{"powerdns"}, Kind: "api-key"},
 	}); err != nil {
-		return "", fmt.Errorf("génération de la clé API : %w", err)
+		return "", fmt.Errorf("generating the API key: %w", err)
 	}
 	resp, err := m.secretsClient.Get(ctx, &secretsv1.GetRequest{Ref: ref})
 	if err != nil {
-		return "", fmt.Errorf("lecture de la clé API : %w", err)
+		return "", fmt.Errorf("reading the API key: %w", err)
 	}
 	return resp.GetValue(), nil
 }
 
-// Provision crée (ou retrouve, EnsureVM est idempotent) la VM dédiée de
-// powerdns.
+// Provision creates (or finds again, EnsureVM is idempotent) powerdns's
+// dedicated VM.
 func (m *powerdnsModule) Provision(ctx context.Context, req *modulev1.StepRequest) (*modulev1.StepResult, error) {
 	if err := m.dial(); err != nil {
 		return nil, err
@@ -220,7 +219,7 @@ func (m *powerdnsModule) Provision(ctx context.Context, req *modulev1.StepReques
 		User:         sshUser,
 	})
 	if err != nil {
-		return nil, fmt.Errorf("EnsureVM(%q) : %w", name, err)
+		return nil, fmt.Errorf("EnsureVM(%q): %w", name, err)
 	}
 
 	state := sdk.StateMap(req.GetState())
@@ -235,9 +234,9 @@ func (m *powerdnsModule) Provision(ctx context.Context, req *modulev1.StepReques
 	return &modulev1.StepResult{Status: modulev1.StepResult_STATUS_OK, State: s}, nil
 }
 
-// connTarget porte les coordonnées de connexion à une VM cible, indépendant
-// du type protobuf de la fonction qui les consomme (ansiblev1.Target et
-// osbasev1.Target portent les mêmes champs mais sont des types distincts).
+// connTarget holds the connection details of a target VM, independently of the
+// protobuf type of the function that consumes them (ansiblev1.Target and
+// osbasev1.Target carry the same fields but are distinct types).
 type connTarget struct {
 	Host       string
 	Port       int32
@@ -270,10 +269,10 @@ func (t connTarget) osBase() *osbasev1.Target {
 	return &osbasev1.Target{Host: t.Host, Port: t.Port, User: t.User, SshPrivateKey: t.PrivateKey}
 }
 
-// Configure installe PowerDNS (authoritative + recursor), pointe la VM sur
-// le NTP et le résolveur actifs (time.ntp/v1, dns.resolver/v1 — tous deux
-// déjà réels à ce stade du jalon J6, contrairement à chrony qui n'avait
-// encore aucun fournisseur), puis branche le client HTTP de l'API.
+// Configure installs PowerDNS (authoritative + recursor), points the VM at the
+// active NTP and resolver (time.ntp/v1, dns.resolver/v1 — both already real at
+// this point of milestone M6, unlike chrony, which had no provider yet), then
+// wires the HTTP API client.
 func (m *powerdnsModule) Configure(ctx context.Context, req *modulev1.StepRequest) (*modulev1.StepResult, error) {
 	if err := m.dial(); err != nil {
 		return nil, err
@@ -288,18 +287,18 @@ func (m *powerdnsModule) Configure(ctx context.Context, req *modulev1.StepReques
 
 	ntpEndpoint, err := m.timeNTPClient.Endpoint(ctx, &timentpv1.Empty{})
 	if err != nil {
-		return nil, fmt.Errorf("lecture de time.ntp/v1 : %w", err)
+		return nil, fmt.Errorf("lecture de time.ntp/v1: %w", err)
 	}
 	if _, err := m.osBaseClient.SetNTP(ctx, &osbasev1.SetNTPRequest{Target: target.osBase(), Servers: []string{ntpEndpoint.GetAddress()}}); err != nil {
-		return nil, fmt.Errorf("SetNTP : %w", err)
+		return nil, fmt.Errorf("SetNTP: %w", err)
 	}
 
 	resolverEndpoint, err := m.dnsResolverClient.Endpoint(ctx, &dnsresolverv1.Empty{})
 	if err != nil {
-		return nil, fmt.Errorf("lecture de dns.resolver/v1 : %w", err)
+		return nil, fmt.Errorf("lecture de dns.resolver/v1: %w", err)
 	}
 	if _, err := m.osBaseClient.SetResolver(ctx, &osbasev1.SetResolverRequest{Target: target.osBase(), Nameservers: []string{resolverEndpoint.GetAddress()}, Domain: dom}); err != nil {
-		return nil, fmt.Errorf("SetResolver : %w", err)
+		return nil, fmt.Errorf("SetResolver: %w", err)
 	}
 
 	apiKey, err := m.apiKeySecret(ctx, name)
@@ -324,7 +323,7 @@ func (m *powerdnsModule) Configure(ctx context.Context, req *modulev1.StepReques
 		return nil, err
 	}
 	if !resp.GetOk() {
-		return nil, fmt.Errorf("Configure(powerdns) a échoué :\n%s", resp.GetOutput())
+		return nil, fmt.Errorf("Configure(powerdns) failed:\n%s", resp.GetOutput())
 	}
 	if err := m.installFleetAgents(ctx, target); err != nil {
 		return nil, err
@@ -339,10 +338,10 @@ func (m *powerdnsModule) Configure(ctx context.Context, req *modulev1.StepReques
 	return &modulev1.StepResult{Status: modulev1.StepResult_STATUS_OK, State: req.GetState()}, nil
 }
 
-// Handover relit dns.zone/v1@seed (coredns) et recrée chaque enregistrement
-// via sa propre implémentation de dns.zone/v1, puis compare
-// (docs/07-mvp-modules.md : "relit la zone via dns.zone@seed.ListRecords,
-// recrée tout, compare").
+// Handover reads dns.zone/v1@seed (coredns) back and recreates each record
+// through its own dns.zone/v1 implementation, then compares
+// (docs/07-mvp-modules.md: "reads the zone back through
+// dns.zone@seed.ListRecords, recreates everything, compares").
 func (m *powerdnsModule) Handover(ctx context.Context, req *modulev1.StepRequest) (*modulev1.StepResult, error) {
 	if err := m.dial(); err != nil {
 		return nil, err
@@ -351,12 +350,12 @@ func (m *powerdnsModule) Handover(ctx context.Context, req *modulev1.StepRequest
 
 	seedRecords, err := m.dnsZoneSeedClient.ListRecords(ctx, &dnszonev1.Zone{Zone: dom})
 	if err != nil {
-		return nil, fmt.Errorf("lecture de dns.zone/v1@seed : %w", err)
+		return nil, fmt.Errorf("lecture de dns.zone/v1@seed: %w", err)
 	}
 
 	for _, r := range seedRecords.GetRecords() {
 		if _, err := m.zoneServer.UpsertRecord(ctx, r); err != nil {
-			return nil, fmt.Errorf("recréation de %s %s : %w", r.GetType(), r.GetName(), err)
+			return nil, fmt.Errorf("recreating %s %s: %w", r.GetType(), r.GetName(), err)
 		}
 	}
 
@@ -365,7 +364,7 @@ func (m *powerdnsModule) Handover(ctx context.Context, req *modulev1.StepRequest
 		return nil, err
 	}
 	if !recordsEqual(seedRecords.GetRecords(), ownRecords.GetRecords()) {
-		return nil, fmt.Errorf("passation : les enregistrements recréés (%d) ne correspondent pas à ceux de la graine (%d)",
+		return nil, fmt.Errorf("handover: the recreated records (%d) do not match the seed's (%d)",
 			len(ownRecords.GetRecords()), len(seedRecords.GetRecords()))
 	}
 
@@ -402,9 +401,9 @@ func recordsEqual(a, b []*dnszonev1.Record) bool {
 	return true
 }
 
-// Verify prouve, depuis une VM tierce jetable, une résolution directe et
-// inverse réelle, plus un nom externe via le recursor
-// (docs/07-mvp-modules.md, docs/03-module-contract.md règle 2).
+// Verify proves, from a disposable third-party VM, a real forward and reverse
+// resolution, plus an external name through the recursor
+// (docs/07-mvp-modules.md, docs/03-module-contract.md rule 2).
 func (m *powerdnsModule) Verify(ctx context.Context, req *modulev1.StepRequest) (*modulev1.StepResult, error) {
 	if err := m.dial(); err != nil {
 		return nil, err
@@ -415,7 +414,7 @@ func (m *powerdnsModule) Verify(ctx context.Context, req *modulev1.StepRequest) 
 	if _, err := m.zoneServer.UpsertRecord(ctx, &dnszonev1.Record{
 		Zone: dom, Name: verifyProbeName, Type: "A", Values: []string{verifyProbeIP}, Ttl: 300,
 	}); err != nil {
-		return nil, fmt.Errorf("Verify(powerdns) : sonde directe : %w", err)
+		return nil, fmt.Errorf("Verify(powerdns): forward probe: %w", err)
 	}
 	defer func() {
 		_, _ = m.zoneServer.DeleteRecord(context.Background(), &dnszonev1.RecordKey{Zone: dom, Name: verifyProbeName, Type: "A"})
@@ -424,7 +423,7 @@ func (m *powerdnsModule) Verify(ctx context.Context, req *modulev1.StepRequest) 
 	if _, err := m.zoneServer.UpsertRecord(ctx, &dnszonev1.Record{
 		Zone: verifyReverseZ, Name: verifyReverseIP1, Type: "PTR", Values: []string{fqdn(verifyProbeName + "." + dom)}, Ttl: 300,
 	}); err != nil {
-		return nil, fmt.Errorf("Verify(powerdns) : sonde inverse : %w", err)
+		return nil, fmt.Errorf("Verify(powerdns): reverse probe: %w", err)
 	}
 	defer func() {
 		_, _ = m.zoneServer.DeleteRecord(context.Background(), &dnszonev1.RecordKey{Zone: verifyReverseZ, Name: verifyReverseIP1, Type: "PTR"})
@@ -439,7 +438,7 @@ func (m *powerdnsModule) Verify(ctx context.Context, req *modulev1.StepRequest) 
 		Name: verifierName, Env: verifierName, SshPublicKey: pair.PublicKeyAuthorized, User: sshUser,
 	})
 	if err != nil {
-		return nil, fmt.Errorf("EnsureVM(%q) (vérificateur) : %w", verifierName, err)
+		return nil, fmt.Errorf("EnsureVM(%q) (verifier): %w", verifierName, err)
 	}
 	defer func() {
 		_, _ = m.vmClient.DeleteVM(context.Background(), &computevmv1.DeleteVMRequest{Name: verifierName})
@@ -468,21 +467,21 @@ func (m *powerdnsModule) Verify(ctx context.Context, req *modulev1.StepRequest) 
 		return nil, err
 	}
 	if !resp.GetOk() {
-		return nil, fmt.Errorf("Verify(powerdns) a échoué :\n%s", resp.GetOutput())
+		return nil, fmt.Errorf("Verify(powerdns) failed:\n%s", resp.GetOutput())
 	}
 
 	forward, reverse, external, err := parseResolutionOutput(resp.GetOutput())
 	if err != nil {
-		return nil, fmt.Errorf("Verify(powerdns) : %w\nsortie :\n%s", err, resp.GetOutput())
+		return nil, fmt.Errorf("Verify(powerdns): %w\nsortie:\n%s", err, resp.GetOutput())
 	}
 	if !strings.Contains(forward, verifyProbeIP) {
-		return nil, fmt.Errorf("Verify(powerdns) : résolution directe = %q, attendu de contenir %q", forward, verifyProbeIP)
+		return nil, fmt.Errorf("Verify(powerdns): forward resolution = %q, expected to contain %q", forward, verifyProbeIP)
 	}
 	if !strings.Contains(reverse, verifyProbeName) {
-		return nil, fmt.Errorf("Verify(powerdns) : résolution inverse = %q, attendu de contenir %q", reverse, verifyProbeName)
+		return nil, fmt.Errorf("Verify(powerdns): reverse resolution = %q, expected to contain %q", reverse, verifyProbeName)
 	}
 	if strings.TrimSpace(external) == "" {
-		return nil, fmt.Errorf("Verify(powerdns) : résolution d'un nom externe vide (recursor non fonctionnel ?)")
+		return nil, fmt.Errorf("Verify(powerdns): empty resolution of an external name (recursor not working?)")
 	}
 
 	return &modulev1.StepResult{Status: modulev1.StepResult_STATUS_OK, State: req.GetState()}, nil
@@ -499,7 +498,7 @@ func parseResolutionOutput(output string) (forward, reverse, external string, er
 	r := reverseRe.FindStringSubmatch(output)
 	e := externalRe.FindStringSubmatch(output)
 	if f == nil || r == nil || e == nil {
-		return "", "", "", fmt.Errorf("résultats forward/reverse/external introuvables dans la sortie de check_resolution.yml")
+		return "", "", "", fmt.Errorf("forward/reverse/external results not found in the output of check_resolution.yml")
 	}
 	return f[1], r[1], e[1], nil
 }
@@ -510,15 +509,14 @@ func (m *powerdnsModule) Destroy(ctx context.Context, req *modulev1.StepRequest)
 	}
 	name := vmName(req)
 	if _, err := m.vmClient.DeleteVM(ctx, &computevmv1.DeleteVMRequest{Name: name}); err != nil {
-		return nil, fmt.Errorf("DeleteVM(%q) : %w", name, err)
+		return nil, fmt.Errorf("DeleteVM(%q): %w", name, err)
 	}
 	return &modulev1.StepResult{Status: modulev1.StepResult_STATUS_OK, State: req.GetState()}, nil
 }
 
-// powerdnsZoneServer implémente dns.zone/v1 en pilotant directement l'API
-// REST de PowerDNS (api.go) — dns.resolver/v1 (resolverAdapter, plus bas)
-// l'enveloppe pour lire le même point d'accès (même schéma que
-// modules/coredns).
+// powerdnsZoneServer implements dns.zone/v1 by driving the PowerDNS REST API
+// directly (api.go) — dns.resolver/v1 (resolverAdapter, below) wraps it to
+// read the same access point (the same pattern as modules/coredns).
 type powerdnsZoneServer struct {
 	dnszonev1.UnimplementedDnsZoneServer
 
@@ -532,7 +530,7 @@ func (s *powerdnsZoneServer) ready() (*pdnsClient, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	if s.client == nil {
-		return nil, fmt.Errorf("dns.zone/v1 : powerdns pas encore configuré (Configure n'a pas encore réussi)")
+		return nil, fmt.Errorf("dns.zone/v1: powerdns not configured yet (Configure has not succeeded yet)")
 	}
 	return s.client, nil
 }
@@ -597,7 +595,7 @@ func (s *powerdnsZoneServer) ListRecords(ctx context.Context, req *dnszonev1.Zon
 	var out []*dnszonev1.Record
 	for _, rr := range rrsets {
 		if rr.Name == apex && (rr.Type == "SOA" || rr.Type == "NS") {
-			continue // auto-créés par PowerDNS à la création de la zone, pas des enregistrements de l'utilisateur.
+			continue // created automatically by PowerDNS with the zone, not user records.
 		}
 		name := strings.TrimSuffix(rr.Name, ".")
 		name = strings.TrimSuffix(name, "."+req.GetZone())
@@ -616,9 +614,9 @@ func (s *powerdnsZoneServer) Endpoint(context.Context, *dnszonev1.Empty) (*dnszo
 	return &dnszonev1.EndpointInfo{Address: s.vmIP, Port: 53}, nil
 }
 
-// resolverAdapter implémente dns.resolver/v1 en lisant le même point
-// d'accès que dns.zone/v1 — le recursor tourne sur la même VM, port 53
-// (même schéma que modules/coredns).
+// resolverAdapter implements dns.resolver/v1 by reading the same access point
+// as dns.zone/v1 — the recursor runs on the same VM, port 53 (the same pattern
+// as modules/coredns).
 type resolverAdapter struct {
 	dnsresolverv1.UnimplementedDnsResolverServer
 	*powerdnsZoneServer

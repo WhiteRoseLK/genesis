@@ -1,7 +1,7 @@
 apiVersion: genesis/module/v1
 name: test-kv
 version: 0.1.0
-description: "module de test J7 : fournit secrets.kv/v1 en cible, pour prouver la migration file->vault sans le vrai produit vault"
+description: "M7 test module: provides secrets.kv/v1 as a target, to prove the file->vault migration without the real vault product"
 layer: platform
 core: ">=0.1.0"
 protocol: 1

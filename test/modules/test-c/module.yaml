@@ -1,7 +1,7 @@
 apiVersion: genesis/module/v1
 name: test-c
 version: 0.1.0
-description: "module de test J4 : requiert test.b/v1, fournit test.c/v1"
+description: "M4 test module: requires test.b/v1, provides test.c/v1"
 layer: platform
 core: ">=0.1.0"
 protocol: 1

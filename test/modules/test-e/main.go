@@ -1,11 +1,11 @@
 // SPDX-License-Identifier: Apache-2.0
 
-// test-e fournit test.e/v1 en phase graine PURE (aucune phase cible) :
-// exerce la passation croisée entre DEUX modules distincts (docs/05-bootstrap-lifecycle.md,
-// jalon J6) — contrairement à test-a (qui fournit la même fonction dans les
-// deux phases, auto-passation), test-e ne devient jamais son propre
-// fournisseur cible : c'est test-f qui reprend test.e/v1, et c'est
-// l'exécution DE test-f (pas la sienne) qui déclenche son SeedDown.
+// test-e provides test.e/v1 in a PURE seed phase (no target phase): it
+// exercises the cross-module handover between TWO distinct modules
+// (docs/05-bootstrap-lifecycle.md, milestone M6) — unlike test-a (which
+// provides the same function in both phases, a self-handover), test-e never
+// becomes its own target provider: test-f takes over test.e/v1, and it is
+// test-f's run (not its own) that triggers its SeedDown.
 package main
 
 import (
@@ -35,8 +35,8 @@ func (m *testEModule) Validate(context.Context, *modulev1.ValidateRequest) (*mod
 	return &modulev1.Diagnostics{}, nil
 }
 
-// Check : conforme une fois amorcé (seeded) ou déjà retiré (retired) — un
-// module graine pur n'a rien d'autre à rejouer (docs/03 §5).
+// Check: compliant once bootstrapped (seeded) or already retired (retired) — a
+// pure seed module has nothing else to replay (docs/03 §5).
 func (m *testEModule) Check(_ context.Context, req *modulev1.StepRequest) (*modulev1.CheckResult, error) {
 	flags := sdk.StateMap(req.GetState())
 	if boolFlag(flags, "seeded") || boolFlag(flags, "retired") {
@@ -53,9 +53,9 @@ func (m *testEModule) Verify(_ context.Context, req *modulev1.StepRequest) (*mod
 	return setFlag(req, "verified")
 }
 
-// SeedDown : jamais appelé par sa propre itération de plan (test-e ne
-// fournit rien en phase cible) — uniquement par la passation d'un AUTRE
-// module (test-f), c'est précisément ce que ce fixture prouve.
+// SeedDown: never called by its own plan iteration (test-e provides nothing in
+// the target phase) — only by the handover of ANOTHER module (test-f), which
+// is precisely what this fixture proves.
 func (m *testEModule) SeedDown(_ context.Context, req *modulev1.StepRequest) (*modulev1.StepResult, error) {
 	return setFlag(req, "retired")
 }

@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: Apache-2.0
 
-// test-a est la racine de la chaîne test-a -> test-b -> test-c
-// (docs/08-milestones.md, J4) : il fournit test.a/v1 en phase graine ET cible,
-// exerçant SeedUp/Handover/SeedDown (docs/03-module-contract.md §5).
+// test-a is the root of the test-a -> test-b -> test-c chain
+// (docs/08-milestones.md, M4): it provides test.a/v1 in the seed AND target
+// phases, exercising SeedUp/Handover/SeedDown (docs/03-module-contract.md §5).
 package main
 
 import (
@@ -87,7 +87,7 @@ func boolFlag(flags map[string]any, key string) bool {
 	return v
 }
 
-// echoServer implémente functions/test/echo/v1 pour la fonction test.a/v1.
+// echoServer implements functions/test/echo/v1 for the test.a/v1 function.
 type echoServer struct {
 	echov1.UnimplementedEchoServer
 }

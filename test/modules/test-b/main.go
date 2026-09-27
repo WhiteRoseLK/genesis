@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
-// test-b requiert test.a/v1 et fournit test.b/v1 (docs/08-milestones.md, J4) :
-// vérifie que le broker route bien un appel fait pendant une étape réelle.
+// test-b requires test.a/v1 and provides test.b/v1 (docs/08-milestones.md,
+// M4): it checks that the broker routes a call made during a real step.
 package main
 
 import (
@@ -51,19 +51,19 @@ func (m *testBModule) Configure(_ context.Context, req *modulev1.StepRequest) (*
 	return setFlag(req, "configured")
 }
 
-// Verify appelle réellement test.a/v1 à travers le broker, pendant une
-// étape — c'est le round-trip complet que le jalon J4 doit prouver.
+// Verify really calls test.a/v1 through the broker, during a step — the
+// complete round trip milestone M4 must prove.
 func (m *testBModule) Verify(ctx context.Context, req *modulev1.StepRequest) (*modulev1.StepResult, error) {
 	conn, err := m.broker.Dial(req.GetBrokerToken())
 	if err != nil {
-		return nil, fmt.Errorf("connexion au broker : %w", err)
+		return nil, fmt.Errorf("connecting to the broker: %w", err)
 	}
-	resp, err := echov1.NewEchoClient(conn).Call(ctx, &echov1.CallRequest{Message: "salut depuis test-b"})
+	resp, err := echov1.NewEchoClient(conn).Call(ctx, &echov1.CallRequest{Message: "hello from test-b"})
 	if err != nil {
-		return nil, fmt.Errorf("appel de test.a/v1 via le broker : %w", err)
+		return nil, fmt.Errorf("calling test.a/v1 through the broker: %w", err)
 	}
 	if resp.GetFrom() != "test-a" {
-		return nil, fmt.Errorf("réponse inattendue de test.a/v1 : %+v", resp)
+		return nil, fmt.Errorf("unexpected response from test.a/v1: %+v", resp)
 	}
 	return setFlag(req, "verified")
 }
@@ -91,7 +91,7 @@ func boolFlag(flags map[string]any, key string) bool {
 	return v
 }
 
-// echoServer implémente functions/test/echo/v1 pour la fonction test.b/v1.
+// echoServer implements functions/test/echo/v1 for the test.b/v1 function.
 type echoServer struct {
 	echov1.UnimplementedEchoServer
 }

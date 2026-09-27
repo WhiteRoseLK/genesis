@@ -1,12 +1,12 @@
 ---
-# Configure (functions/time/ntp/v1, module chrony) : installe et configure
-# chronyd en serveur NTP (docs/07-mvp-modules.md) — image cloud Debian
-# (docs/01-vision-scope.md), même hypothèse que modules/base-os.
+# Configure (functions/time/ntp/v1, chrony module): installs and configures
+# chronyd as an NTP server (docs/07-mvp-modules.md) — Debian cloud image
+# (docs/01-vision-scope.md), the same assumption as modules/base-os.
 - hosts: target
   gather_facts: false
   become: true
   tasks:
-    - name: installer chrony
+    - name: install chrony
       ansible.builtin.apt:
         name: chrony
         state: present
@@ -25,14 +25,14 @@
         mode: "0644"
       register: chrony_conf
 
-    - name: activer et redémarrer chronyd
+    - name: enable and restart chronyd
       ansible.builtin.systemd:
         name: chrony
         enabled: true
         state: restarted
       when: chrony_conf.changed
 
-    - name: s'assurer que chronyd tourne
+    - name: make sure chronyd is running
       ansible.builtin.systemd:
         name: chrony
         state: started

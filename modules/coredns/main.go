@@ -1,16 +1,16 @@
 // SPDX-License-Identifier: Apache-2.0
 
-// coredns fournit dns.zone/v1 et dns.resolver/v1 en phase graine
-// (docs/07-mvp-modules.md), en conteneur sur la graine (core.container/v1).
-// La zone est régénérée (fichier BIND réécrit, conteneur redémarré) à
-// chaque UpsertRecord/DeleteRecord.
+// coredns provides dns.zone/v1 and dns.resolver/v1 in the seed phase
+// (docs/07-mvp-modules.md), as a container on the seed (core.container/v1).
+// The zone is regenerated (BIND file rewritten, container restarted) on every
+// UpsertRecord/DeleteRecord.
 //
-// Portée assumée pour ce jalon : les enregistrements vivent en mémoire dans
-// le process du module, pas dans l'état du cœur (docs/03-module-contract.md
-// §4 règle 6 vise avant tout la persistance inter-redémarrage pour l'état
-// de cycle de vie ; UpsertRecord/DeleteRecord sont des appels de fonction,
-// sans StepRequest.state à travers lequel passer). Un kill+relance du cœur
-// perdrait donc la zone accumulée — noté en dette, docs/PROGRESS.md.
+// Accepted scope for this milestone: the records live in memory in the module
+// process, not in the core's state (docs/03-module-contract.md §4 rule 6
+// targets above all persistence across restarts for lifecycle state;
+// UpsertRecord/DeleteRecord are function calls, with no StepRequest.state to
+// go through). A kill+restart of the core would therefore lose the accumulated
+// zone — noted as debt, docs/PROGRESS.md.
 package main
 
 import (
@@ -59,12 +59,11 @@ func (m *coreDNSModule) Validate(context.Context, *modulev1.ValidateRequest) (*m
 	return &modulev1.Diagnostics{}, nil
 }
 
-// Check : conforme une fois amorcé (seeded) ou déjà retiré par une
-// passation (retired) — coredns ne fournit rien en phase cible, son
-// itération de plan (internal/engine) s'arrête donc à seed_ready
-// (docs/03-module-contract.md §5) ; le jeton de session est capturé pour
-// que les gestionnaires de fonction (UpsertRecord...) puissent joindre
-// core.container/v1.
+// Check: compliant once bootstrapped (seeded) or already retired by a handover
+// (retired) — coredns provides nothing in the target phase, so its plan
+// iteration (internal/engine) stops at seed_ready (docs/03-module-contract.md
+// §5); the session token is captured so that the function handlers
+// (UpsertRecord...) can reach core.container/v1.
 func (m *coreDNSModule) Check(_ context.Context, req *modulev1.StepRequest) (*modulev1.CheckResult, error) {
 	m.brokerToken = req.GetBrokerToken()
 	flags := sdk.StateMap(req.GetState())
@@ -78,18 +77,17 @@ func (m *coreDNSModule) SeedUp(_ context.Context, req *modulev1.StepRequest) (*m
 	return m.setFlag(req, "seeded")
 }
 
-// Verify : rien de spécifique au produit à vérifier avant qu'une zone
-// existe (UpsertRecord n'a encore jamais été appelé à ce stade du cycle de
-// vie) — la résolution DNS réelle est prouvée du point de vue consommateur
-// dans internal/modulehost/coredns_test.go, une fois des enregistrements
-// présents.
+// Verify: nothing product-specific to check before a zone exists (UpsertRecord
+// has never been called at this point of the lifecycle) — real DNS resolution
+// is proven from a consumer's point of view in
+// internal/modulehost/coredns_test.go, once records are present.
 func (m *coreDNSModule) Verify(_ context.Context, req *modulev1.StepRequest) (*modulev1.StepResult, error) {
 	return m.setFlag(req, "verified")
 }
 
-// SeedDown arrête réellement le conteneur CoreDNS — déclenché par la
-// passation d'un module cible (ex. powerdns), pas par sa propre itération
-// de plan (docs/08-milestones.md, J6 : "après passation, arrêt de coredns sans
+// SeedDown really stops the CoreDNS container — triggered by the handover of a
+// target module (e.g. powerdns), not by its own plan iteration
+// (docs/08-milestones.md, M6: "after the handover, stopping coredns has no
 // impact").
 func (m *coreDNSModule) SeedDown(ctx context.Context, req *modulev1.StepRequest) (*modulev1.StepResult, error) {
 	if err := m.zoneServer.stopContainer(ctx); err != nil {
@@ -98,8 +96,8 @@ func (m *coreDNSModule) SeedDown(ctx context.Context, req *modulev1.StepRequest)
 	return m.setFlag(req, "retired")
 }
 
-// Destroy : même nettoyage que SeedDown, pour un retrait de la graine hors
-// passation (ex. `genesis destroy` sans module cible installé).
+// Destroy: the same cleanup as SeedDown, for a seed removal outside a handover
+// (e.g. `genesis destroy` with no target module installed).
 func (m *coreDNSModule) Destroy(ctx context.Context, req *modulev1.StepRequest) (*modulev1.StepResult, error) {
 	if err := m.zoneServer.stopContainer(ctx); err != nil {
 		return nil, err
@@ -126,9 +124,9 @@ func boolFlag(flags map[string]any, key string) bool {
 	return v
 }
 
-// containers dial la session de broker au plus une fois (Dial ne réussit
-// qu'une fois par jeton) et met le client en cache — même précaution que
-// modules/base-os et modules/fake-compute.
+// containers dials the broker session at most once (Dial only succeeds once
+// per token) and caches the client — the same precaution as modules/base-os
+// and modules/fake-compute.
 func (m *coreDNSModule) containers() (containerv1.ContainerClient, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
@@ -136,25 +134,25 @@ func (m *coreDNSModule) containers() (containerv1.ContainerClient, error) {
 		return m.containerClient, nil
 	}
 	if m.broker == nil || m.brokerToken == "" {
-		return nil, fmt.Errorf("coredns : aucune session de broker (Check n'a pas encore été appelé)")
+		return nil, fmt.Errorf("coredns: no broker session (Check has not been called yet)")
 	}
 	conn, err := m.broker.Dial(m.brokerToken)
 	if err != nil {
-		return nil, fmt.Errorf("connexion à core.container/v1 : %w", err)
+		return nil, fmt.Errorf("connecting to core.container/v1: %w", err)
 	}
 	m.containerClient = containerv1.NewContainerClient(conn)
 	return m.containerClient, nil
 }
 
-// dnsZoneServer implémente dns.zone/v1. dns.resolver/v1 (resolverAdapter,
-// plus bas) l'enveloppe pour lire le même point d'accès (docs/07 : coredns
-// fait office des deux fonctions à la fois).
+// dnsZoneServer implements dns.zone/v1. dns.resolver/v1 (resolverAdapter,
+// below) wraps it to read the same access point (docs/07: coredns acts as both
+// functions at once).
 type dnsZoneServer struct {
 	dnszonev1.UnimplementedDnsZoneServer
 	module *coreDNSModule
 
 	mu          sync.Mutex
-	records     map[string]*dnszonev1.Record // clé : zone|name|type
+	records     map[string]*dnszonev1.Record // key: zone|name|type
 	containerID string
 	ip          string
 }
@@ -206,9 +204,9 @@ func (s *dnsZoneServer) Endpoint(context.Context, *dnszonev1.Empty) (*dnszonev1.
 	return &dnszonev1.EndpointInfo{Address: s.ip, Port: 53}, nil
 }
 
-// stopContainer arrête réellement le conteneur CoreDNS s'il tourne —
-// idempotent (aucun conteneur démarré : no-op, ex. passation avant tout
-// UpsertRecord). Appelé par SeedDown et Destroy.
+// stopContainer really stops the CoreDNS container if it is running —
+// idempotent (no container started: no-op, e.g. a handover before any
+// UpsertRecord). Called by SeedDown and Destroy.
 func (s *dnsZoneServer) stopContainer(ctx context.Context) error {
 	s.mu.Lock()
 	id := s.containerID
@@ -221,7 +219,7 @@ func (s *dnsZoneServer) stopContainer(ctx context.Context) error {
 		return err
 	}
 	if _, err := containers.Stop(ctx, &containerv1.StopRequest{ContainerId: id}); err != nil {
-		return fmt.Errorf("arrêt du conteneur CoreDNS : %w", err)
+		return fmt.Errorf("stopping the CoreDNS container: %w", err)
 	}
 	s.mu.Lock()
 	s.containerID = ""
@@ -230,8 +228,8 @@ func (s *dnsZoneServer) stopContainer(ctx context.Context) error {
 	return nil
 }
 
-// reload régénère le Corefile et les fichiers de zone, puis redémarre le
-// conteneur CoreDNS (docs/07-mvp-modules.md : "Zone régénérée à chaque
+// reload regenerates the Corefile and the zone files, then restarts the
+// CoreDNS container (docs/07-mvp-modules.md: "Zone regenerated on every
 // UpsertRecord").
 func (s *dnsZoneServer) reload(ctx context.Context) error {
 	s.mu.Lock()
@@ -244,13 +242,13 @@ func (s *dnsZoneServer) reload(ctx context.Context) error {
 
 	dir, err := os.MkdirTemp("", "genesis-coredns-*")
 	if err != nil {
-		return fmt.Errorf("préparation du répertoire de zone : %w", err)
+		return fmt.Errorf("preparing the zone directory: %w", err)
 	}
-	// Chmod : le conteneur coredns tourne sous son propre UID interne
-	// (même précaution que core.ansible/v1, docs/PROGRESS.md J5).
-	// Données de zone publiques par nature (servies par DNS), pas un secret.
-	if err := os.Chmod(dir, 0o755); err != nil { //nolint:gosec // G302 : voir ci-dessus
-		return fmt.Errorf("permissions du répertoire de zone : %w", err)
+	// Chmod: the coredns container runs as its own internal UID (the same
+	// precaution as core.ansible/v1, docs/PROGRESS.md M5). Zone data is public
+	// by nature (served over DNS), not a secret.
+	if err := os.Chmod(dir, 0o755); err != nil { //nolint:gosec // G302: see above
+		return fmt.Errorf("zone directory permissions: %w", err)
 	}
 
 	zoneNames := make([]string, 0, len(zones))
@@ -263,17 +261,17 @@ func (s *dnsZoneServer) reload(ctx context.Context) error {
 	for _, zone := range zoneNames {
 		fmt.Fprintf(&corefile, "%s:53 {\n    file /zones/db.%s\n    log\n}\n", zone, zone)
 		content := zoneFileContent(zone, zones[zone])
-		if err := os.WriteFile(filepath.Join(dir, "db."+zone), []byte(content), 0o644); err != nil { //nolint:gosec // G306 : zone DNS, publique
-			return fmt.Errorf("écriture de la zone %q : %w", zone, err)
+		if err := os.WriteFile(filepath.Join(dir, "db."+zone), []byte(content), 0o644); err != nil { //nolint:gosec // G306: public DNS zone
+			return fmt.Errorf("writing zone %q: %w", zone, err)
 		}
 	}
 	if len(zoneNames) == 0 {
-		// Corefile minimal valide tant qu'aucune zone n'a encore de
-		// enregistrement (premier appel possible avant tout UpsertRecord).
+		// Minimal valid Corefile as long as no zone has a record yet (a first
+		// call is possible before any UpsertRecord).
 		corefile.WriteString(".:53 {\n    health\n}\n")
 	}
-	if err := os.WriteFile(filepath.Join(dir, "Corefile"), []byte(corefile.String()), 0o644); err != nil { //nolint:gosec // G306 : configuration sans secret
-		return fmt.Errorf("écriture du Corefile : %w", err)
+	if err := os.WriteFile(filepath.Join(dir, "Corefile"), []byte(corefile.String()), 0o644); err != nil { //nolint:gosec // G306: configuration without secrets
+		return fmt.Errorf("writing the Corefile: %w", err)
 	}
 
 	containers, err := s.module.containers()
@@ -283,7 +281,7 @@ func (s *dnsZoneServer) reload(ctx context.Context) error {
 
 	if oldContainerID != "" {
 		if _, err := containers.Stop(ctx, &containerv1.StopRequest{ContainerId: oldContainerID}); err != nil {
-			return fmt.Errorf("arrêt de l'ancien conteneur CoreDNS : %w", err)
+			return fmt.Errorf("stopping the previous CoreDNS container: %w", err)
 		}
 	}
 
@@ -295,7 +293,7 @@ func (s *dnsZoneServer) reload(ctx context.Context) error {
 		Detach:  true,
 	})
 	if err != nil {
-		return fmt.Errorf("démarrage de CoreDNS : %w", err)
+		return fmt.Errorf("starting CoreDNS: %w", err)
 	}
 
 	s.mu.Lock()
@@ -305,8 +303,8 @@ func (s *dnsZoneServer) reload(ctx context.Context) error {
 	return nil
 }
 
-// zoneFileContent génère un fichier de zone BIND minimal valide pour le
-// plugin "file" de CoreDNS.
+// zoneFileContent generates a minimal valid BIND zone file for CoreDNS's
+// "file" plugin.
 func zoneFileContent(zone string, records []*dnszonev1.Record) string {
 	var b strings.Builder
 	fmt.Fprintf(&b, "$ORIGIN %s.\n$TTL 300\n", zone)
@@ -348,8 +346,8 @@ func main() {
 	)
 }
 
-// resolverAdapter implémente dns.resolver/v1 en lisant le même point
-// d'accès que dns.zone/v1 (champs de dnsZoneServer promus par l'embedding).
+// resolverAdapter implements dns.resolver/v1 by reading the same access point
+// as dns.zone/v1 (dnsZoneServer fields promoted through embedding).
 type resolverAdapter struct {
 	dnsresolverv1.UnimplementedDnsResolverServer
 	*dnsZoneServer

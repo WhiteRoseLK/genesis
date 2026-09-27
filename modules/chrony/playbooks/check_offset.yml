@@ -1,18 +1,18 @@
 ---
-# Verify (functions/time/ntp/v1, module chrony) : exécuté sur une VM tierce
-# jetable pointée vers le serveur chrony à vérifier — "Verify : depuis une
-# autre VM, source sélectionnée, écart < 100 ms" (docs/07-mvp-modules.md).
+# Verify (functions/time/ntp/v1, chrony module): runs on a disposable
+# third-party VM pointed at the chrony server to check — "Verify: from another
+# VM, source selected, offset < 100 ms" (docs/07-mvp-modules.md).
 - hosts: target
   gather_facts: false
   become: true
   tasks:
-    - name: installer chrony (client de vérification)
+    - name: install chrony (verification client)
       ansible.builtin.apt:
         name: chrony
         state: present
         update_cache: true
 
-    - name: pointer chrony vers le serveur à vérifier
+    - name: point chrony at the server to check
       ansible.builtin.copy:
         content: |
           server {{ ntp_server }} iburst
@@ -20,13 +20,13 @@
         dest: /etc/chrony/chrony.conf
         mode: "0644"
 
-    - name: redémarrer chronyd
+    - name: restart chronyd
       ansible.builtin.systemd:
         name: chrony
         enabled: true
         state: restarted
 
-    - name: attendre une synchronisation exploitable
+    - name: wait for a usable synchronisation
       ansible.builtin.command: chronyc tracking
       register: tracking
       changed_when: false
@@ -34,6 +34,6 @@
       retries: 12
       delay: 5
 
-    - name: afficher chronyc tracking
+    - name: show chronyc tracking
       ansible.builtin.debug:
         var: tracking.stdout

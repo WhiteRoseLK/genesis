@@ -14,11 +14,11 @@ import (
 
 var joinTokenRe = regexp.MustCompile(`[a-f0-9]{32}`)
 
-// teleportFleetServer implémente fleet.agent/v1 (ADR-017) : Install génère
-// un jeton d'enrôlement à usage court (tctl tokens add, sur la propre VM de
-// teleport) puis installe/enrôle l'agent SSH sur la VM cible -- le sshd
-// natif de la cible n'est volontairement PAS désactivé à ce jalon (Repoint
-// différé, voir le commentaire de package dans main.go).
+// teleportFleetServer implements fleet.agent/v1 (ADR-017): Install generates a
+// short-lived enrolment token (tctl tokens add, on teleport's own VM) then
+// installs/enrols the SSH agent on the target VM -- the target's native sshd
+// is deliberately NOT disabled at this milestone (deferred Repoint, see the
+// package comment in main.go).
 type teleportFleetServer struct {
 	fleetagentv1.UnimplementedFleetAgentServer
 	module *teleportModule
@@ -30,23 +30,23 @@ func (s *teleportFleetServer) Install(ctx context.Context, req *fleetagentv1.Ins
 	ownTarget := m.ownTarget
 	m.mu.Unlock()
 	if ownTarget.Host == "" {
-		return nil, fmt.Errorf("fleet.agent/v1.Install : teleport pas encore configuré (Configure n'a pas encore réussi)")
+		return nil, fmt.Errorf("fleet.agent/v1.Install: teleport not configured yet (Configure has not succeeded yet)")
 	}
 
 	t := req.GetTarget()
 	if t == nil || t.GetHost() == "" {
-		return nil, fmt.Errorf("fleet.agent/v1.Install : target manquant")
+		return nil, fmt.Errorf("fleet.agent/v1.Install: missing target")
 	}
 
 	if err := m.installAgent(ctx, ownTarget, t); err != nil {
-		return nil, fmt.Errorf("fleet.agent/v1.Install(%s) : %w", t.GetHost(), err)
+		return nil, fmt.Errorf("fleet.agent/v1.Install(%s): %w", t.GetHost(), err)
 	}
 	return &fleetagentv1.InstallResponse{}, nil
 }
 
-// installAgent génère un jeton d'enrôlement puis déploie/enrôle l'agent
-// Teleport sur la cible -- factorisé pour être appelé à la fois par
-// Install (consommateurs réels) et par Verify (VM jetable de test).
+// installAgent generates an enrolment token then deploys/enrols the Teleport
+// agent on the target -- factored out to be called both by Install (real
+// consumers) and by Verify (disposable test VM).
 func (m *teleportModule) installAgent(ctx context.Context, ownTarget connTarget, t *fleetagentv1.Target) error {
 	m.mu.Lock()
 	caPin := m.caPin
@@ -54,7 +54,7 @@ func (m *teleportModule) installAgent(ctx context.Context, ownTarget connTarget,
 
 	joinToken, err := m.newJoinToken(ctx, ownTarget)
 	if err != nil {
-		return fmt.Errorf("génération du jeton d'enrôlement : %w", err)
+		return fmt.Errorf("generating the enrolment token: %w", err)
 	}
 
 	agentTarget := &ansiblev1.Target{Host: t.GetHost(), Port: t.GetPort(), User: t.GetUser(), SshPrivateKey: t.GetSshPrivateKey()}
@@ -74,14 +74,14 @@ func (m *teleportModule) installAgent(ctx context.Context, ownTarget connTarget,
 		return err
 	}
 	if !resp.GetOk() {
-		return fmt.Errorf("échec :\n%s", resp.GetOutput())
+		return fmt.Errorf("failed:\n%s", resp.GetOutput())
 	}
 	return nil
 }
 
-// newJoinToken génère un jeton d'enrôlement Teleport à usage court (tctl
-// tokens add --type=node) sur la propre VM de teleport -- un jeton par
-// enrôlement, jamais réutilisé (docs/09-decisions.md ADR-017).
+// newJoinToken generates a short-lived Teleport enrolment token (tctl tokens
+// add --type=node) on teleport's own VM -- one token per enrolment, never
+// reused (docs/09-decisions.md ADR-017).
 func (m *teleportModule) newJoinToken(ctx context.Context, ownTarget connTarget) (string, error) {
 	vars, err := sdk.NewState(map[string]any{"join_ttl": joinTokenTTL})
 	if err != nil {
@@ -94,11 +94,11 @@ func (m *teleportModule) newJoinToken(ctx context.Context, ownTarget connTarget)
 		return "", err
 	}
 	if !resp.GetOk() {
-		return "", fmt.Errorf("échec :\n%s", resp.GetOutput())
+		return "", fmt.Errorf("failed:\n%s", resp.GetOutput())
 	}
 	token := joinTokenRe.FindString(resp.GetOutput())
 	if token == "" {
-		return "", fmt.Errorf("jeton introuvable dans la sortie de tctl tokens add :\n%s", resp.GetOutput())
+		return "", fmt.Errorf("token not found in the output of tctl tokens add:\n%s", resp.GetOutput())
 	}
 	return token, nil
 }

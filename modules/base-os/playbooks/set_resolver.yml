@@ -1,11 +1,11 @@
 ---
-# SetResolver (functions/os/base/v1) : pointe la résolution DNS de la VM vers
-# le fournisseur actif (docs/03-module-contract.md, appelé aussi en Repoint).
+# SetResolver (functions/os/base/v1): points the VM's DNS resolution to the
+# active provider (docs/03-module-contract.md, also called during Repoint).
 - hosts: target
   gather_facts: false
   become: true
   tasks:
-    - name: configurer le résolveur DNS
+    - name: configure the DNS resolver
       ansible.builtin.copy:
         content: |
           {% for ns in nameservers %}

@@ -1,12 +1,11 @@
 // SPDX-License-Identifier: Apache-2.0
 
-// fake-compute fournit compute.vm/v1 via de vrais conteneurs SSH-joignables
-// sur la graine (docs/07-mvp-modules.md), pour tester le cœur et les
-// modules de service sans hyperviseur. Chaque « VM » est un conteneur
-// lscr.io/linuxserver/openssh-server réel, démarré via core.container/v1 —
-// pas de systemd à l'intérieur (contrairement à la lettre du doc 07) : le
-// point du module est d'être une cible SSH réelle pour les autres modules,
-// pas de reproduire fidèlement un système d'exploitation complet.
+// fake-compute provides compute.vm/v1 through real SSH-reachable containers on
+// the seed (docs/07-mvp-modules.md), to test the core and the service modules
+// without a hypervisor. Each "VM" is a real lscr.io/linuxserver/openssh-server
+// container, started through core.container/v1 — no systemd inside (unlike the
+// letter of doc 07): the point of the module is to be a real SSH target for
+// the other modules, not to faithfully reproduce a complete operating system.
 package main
 
 import (
@@ -27,8 +26,9 @@ import (
 //go:embed module.yaml
 var manifestYAML []byte
 
-// sshTargetImage et le port interne sont fixés : le point de fake-compute
-// est d'être une cible SSH prévisible, pas configurable (docs/08-milestones.md, J4/J6).
+// sshTargetImage and the internal port are fixed: the point of fake-compute is
+// to be a predictable SSH target, not a configurable one
+// (docs/08-milestones.md, M4/M6).
 const (
 	sshTargetImage = "lscr.io/linuxserver/openssh-server:10.3_p1-r1-ls237@sha256:946fa26105e0ec212fdf821b9ddc59aab65f2c2d07c02b25ff0f5001fc332ff0"
 	sshTargetPort  = 22
@@ -55,10 +55,10 @@ func (m *fakeComputeModule) Validate(context.Context, *modulev1.ValidateRequest)
 }
 
 func (m *fakeComputeModule) Check(_ context.Context, req *modulev1.StepRequest) (*modulev1.CheckResult, error) {
-	// Rien à provisionner pour le module lui-même : les VM factices sont
-	// créées à la demande via la fonction compute.vm/v1. Capture le jeton
-	// de session pour joindre core.container/v1 (même mécanisme que
-	// modules/base-os avec core.ansible/v1).
+	// Nothing to provision for the module itself: the fake VMs are created on
+	// demand through the compute.vm/v1 function. Captures the session token to
+	// reach core.container/v1 (the same mechanism as modules/base-os with
+	// core.ansible/v1).
 	m.brokerToken = req.GetBrokerToken()
 	return &modulev1.CheckResult{Status: modulev1.CheckResult_STATUS_COMPLIANT}, nil
 }
@@ -87,9 +87,9 @@ func ok(req *modulev1.StepRequest) (*modulev1.StepResult, error) {
 	return &modulev1.StepResult{Status: modulev1.StepResult_STATUS_OK, State: s}, nil
 }
 
-// containers dial la session de broker au plus une fois (Dial ne réussit
-// qu'une fois par jeton) et met le client en cache pour tous les appels
-// suivants — même précaution que modules/base-os.
+// containers dials the broker session at most once (Dial only succeeds once
+// per token) and caches the client for every later call — the same precaution
+// as modules/base-os.
 func (m *fakeComputeModule) containers() (containerv1.ContainerClient, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
@@ -97,17 +97,17 @@ func (m *fakeComputeModule) containers() (containerv1.ContainerClient, error) {
 		return m.containerClient, nil
 	}
 	if m.broker == nil || m.brokerToken == "" {
-		return nil, fmt.Errorf("fake-compute : aucune session de broker (Check n'a pas encore été appelé)")
+		return nil, fmt.Errorf("fake-compute: no broker session (Check has not been called yet)")
 	}
 	conn, err := m.broker.Dial(m.brokerToken)
 	if err != nil {
-		return nil, fmt.Errorf("connexion à core.container/v1 : %w", err)
+		return nil, fmt.Errorf("connecting to core.container/v1: %w", err)
 	}
 	m.containerClient = containerv1.NewContainerClient(conn)
 	return m.containerClient, nil
 }
 
-// computeVMServer implémente functions/compute/vm/v1.
+// computeVMServer implements functions/compute/vm/v1.
 type computeVMServer struct {
 	computevmv1.UnimplementedComputeVMServer
 	module *fakeComputeModule
@@ -124,7 +124,7 @@ func (s *computeVMServer) EnsureImage(context.Context, *computevmv1.EnsureImageR
 	return &computevmv1.EnsureImageResponse{}, nil
 }
 
-// EnsureVM est idempotent par nom (clé d'idempotence, docs/07-mvp-modules.md).
+// EnsureVM is idempotent by name (idempotence key, docs/07-mvp-modules.md).
 func (s *computeVMServer) EnsureVM(ctx context.Context, req *computevmv1.EnsureVMRequest) (*computevmv1.VM, error) {
 	s.mu.Lock()
 	if vm, ok := s.vms[req.GetName()]; ok {
@@ -156,7 +156,7 @@ func (s *computeVMServer) EnsureVM(ctx context.Context, req *computevmv1.EnsureV
 		Detach: true,
 	})
 	if err != nil {
-		return nil, fmt.Errorf("démarrage de la VM %q : %w", req.GetName(), err)
+		return nil, fmt.Errorf("starting VM %q: %w", req.GetName(), err)
 	}
 
 	vm := &computevmv1.VM{
@@ -179,7 +179,7 @@ func (s *computeVMServer) GetVM(_ context.Context, req *computevmv1.GetVMRequest
 	defer s.mu.Unlock()
 	vm, ok := s.vms[req.GetName()]
 	if !ok {
-		return nil, fmt.Errorf("VM %q introuvable", req.GetName())
+		return nil, fmt.Errorf("VM %q not found", req.GetName())
 	}
 	return vm, nil
 }
@@ -193,7 +193,7 @@ func (s *computeVMServer) DeleteVM(ctx context.Context, req *computevmv1.DeleteV
 	s.mu.Unlock()
 
 	if !ok {
-		return &computevmv1.DeleteVMResponse{}, nil // idempotent : déjà absente
+		return &computevmv1.DeleteVMResponse{}, nil // idempotent: already gone
 	}
 
 	containers, err := s.module.containers()
@@ -201,7 +201,7 @@ func (s *computeVMServer) DeleteVM(ctx context.Context, req *computevmv1.DeleteV
 		return nil, err
 	}
 	if _, err := containers.Stop(ctx, &containerv1.StopRequest{ContainerId: vm.GetId()}); err != nil {
-		return nil, fmt.Errorf("arrêt de la VM %q : %w", req.GetName(), err)
+		return nil, fmt.Errorf("stopping VM %q: %w", req.GetName(), err)
 	}
 	return &computevmv1.DeleteVMResponse{}, nil
 }

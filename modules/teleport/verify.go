@@ -21,12 +21,12 @@ var (
 	certificateB64  = regexp.MustCompile(`CERTIFICATE_B64:(\S+)`)
 )
 
-// Verify prouve, depuis une VM tierce jetable, une connexion SSH réelle à
-// travers l'agent Teleport installé sur une deuxième VM jetable
-// (docs/03-module-contract.md règle 2 : point de vue consommateur). Le sshd
-// natif de la cible n'est pas désactivé à ce jalon (Repoint différé,
-// main.go) : Verify ne teste donc que la connexion via l'agent, pas le
-// refus de l'accès direct.
+// Verify proves, from a disposable third-party VM, a real SSH connection
+// through the Teleport agent installed on a second disposable VM
+// (docs/03-module-contract.md rule 2: a consumer's point of view). The
+// target's native sshd is not disabled at this milestone (deferred Repoint,
+// main.go): Verify therefore only tests the connection through the agent, not
+// that direct access is refused.
 func (m *teleportModule) Verify(ctx context.Context, req *modulev1.StepRequest) (*modulev1.StepResult, error) {
 	if err := m.dial(); err != nil {
 		return nil, err
@@ -47,7 +47,7 @@ func (m *teleportModule) Verify(ctx context.Context, req *modulev1.StepRequest) 
 		Name: agentTargetName, Env: agentTargetName, SshPublicKey: agentPair.PublicKeyAuthorized, User: sshUser,
 	})
 	if err != nil {
-		return nil, fmt.Errorf("EnsureVM(%q) (cible de l'agent) : %w", agentTargetName, err)
+		return nil, fmt.Errorf("EnsureVM(%q) (agent target): %w", agentTargetName, err)
 	}
 	defer func() {
 		_, _ = m.vmClient.DeleteVM(context.Background(), &computevmv1.DeleteVMRequest{Name: agentTargetName})
@@ -56,12 +56,12 @@ func (m *teleportModule) Verify(ctx context.Context, req *modulev1.StepRequest) 
 	if err := m.installAgent(ctx, ownTarget, &fleetagentv1.Target{
 		Host: agentVM.GetIp(), Port: agentVM.GetSshPort(), User: sshUser, SshPrivateKey: agentPair.PrivateKeyOpenSSH,
 	}); err != nil {
-		return nil, fmt.Errorf("Verify(teleport) : installation de l'agent sur la cible de test : %w", err)
+		return nil, fmt.Errorf("Verify(teleport): installing the agent on the test target: %w", err)
 	}
 
 	privKeyPEM, certOpenSSH, err := m.generateUserCert(ctx, ownTarget)
 	if err != nil {
-		return nil, fmt.Errorf("Verify(teleport) : %w", err)
+		return nil, fmt.Errorf("Verify(teleport): %w", err)
 	}
 
 	verifierName := name + verifierSuffix
@@ -73,7 +73,7 @@ func (m *teleportModule) Verify(ctx context.Context, req *modulev1.StepRequest) 
 		Name: verifierName, Env: verifierName, SshPublicKey: verifierPair.PublicKeyAuthorized, User: sshUser,
 	})
 	if err != nil {
-		return nil, fmt.Errorf("EnsureVM(%q) (vérificateur) : %w", verifierName, err)
+		return nil, fmt.Errorf("EnsureVM(%q) (verifier): %w", verifierName, err)
 	}
 	defer func() {
 		_, _ = m.vmClient.DeleteVM(context.Background(), &computevmv1.DeleteVMRequest{Name: verifierName})
@@ -98,18 +98,18 @@ func (m *teleportModule) Verify(ctx context.Context, req *modulev1.StepRequest) 
 		return nil, err
 	}
 	if !resp.GetOk() {
-		return nil, fmt.Errorf("Verify(teleport) a échoué :\n%s", resp.GetOutput())
+		return nil, fmt.Errorf("Verify(teleport) failed:\n%s", resp.GetOutput())
 	}
 	if !strings.Contains(resp.GetOutput(), "AGENT_SSH_OK") {
-		return nil, fmt.Errorf("Verify(teleport) : sortie inattendue, attendu AGENT_SSH_OK :\n%s", resp.GetOutput())
+		return nil, fmt.Errorf("Verify(teleport): unexpected output, expected AGENT_SSH_OK:\n%s", resp.GetOutput())
 	}
 
 	return &modulev1.StepResult{Status: modulev1.StepResult_STATUS_OK, State: req.GetState()}, nil
 }
 
-// generateUserCert crée (idempotent) un utilisateur Teleport de
-// vérification et signe un certificat SSH court terme pour lui (tctl auth
-// sign --format=openssh), sur la propre VM teleport.
+// generateUserCert creates (idempotently) a Teleport verification user and
+// signs a short-lived SSH certificate for it (tctl auth sign
+// --format=openssh), on teleport's own VM.
 func (m *teleportModule) generateUserCert(ctx context.Context, ownTarget connTarget) (privKeyPEM, certOpenSSH string, err error) {
 	vars, err := sdk.NewState(map[string]any{
 		"verify_user": verifyTeleportUser,
@@ -126,20 +126,20 @@ func (m *teleportModule) generateUserCert(ctx context.Context, ownTarget connTar
 		return "", "", err
 	}
 	if !resp.GetOk() {
-		return "", "", fmt.Errorf("génération du certificat utilisateur de vérification a échoué :\n%s", resp.GetOutput())
+		return "", "", fmt.Errorf("generating the verification user certificate failed:\n%s", resp.GetOutput())
 	}
 	privMatch := privateKeyB64Re.FindStringSubmatch(resp.GetOutput())
 	certMatch := certificateB64.FindStringSubmatch(resp.GetOutput())
 	if privMatch == nil || certMatch == nil {
-		return "", "", fmt.Errorf("clé privée/certificat introuvables dans la sortie de tctl auth sign :\n%s", resp.GetOutput())
+		return "", "", fmt.Errorf("private key/certificate not found in the output of tctl auth sign:\n%s", resp.GetOutput())
 	}
 	priv, err := base64.StdEncoding.DecodeString(privMatch[1])
 	if err != nil {
-		return "", "", fmt.Errorf("décodage de la clé privée générée : %w", err)
+		return "", "", fmt.Errorf("decoding the generated private key: %w", err)
 	}
 	cert, err := base64.StdEncoding.DecodeString(certMatch[1])
 	if err != nil {
-		return "", "", fmt.Errorf("décodage du certificat généré : %w", err)
+		return "", "", fmt.Errorf("decoding the generated certificate: %w", err)
 	}
 	return string(priv), string(cert), nil
 }

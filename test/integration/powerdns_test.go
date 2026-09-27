@@ -26,13 +26,13 @@ import (
 	modulev1 "github.com/WhiteRoseLK/genesis/sdk/go/gen/module/v1"
 )
 
-// powerdnsAPIPort doit correspondre à la constante non exportée
-// pdnsAPIPort de modules/powerdns/main.go (8081) : les deux packages sont
-// des binaires séparés (modules/* n'importe jamais internal/, et
-// inversement), donc dupliquée ici intentionnellement.
+// powerdnsAPIPort must match the unexported constant pdnsAPIPort of
+// modules/powerdns/main.go (8081): the two packages are separate binaries
+// (modules/* never imports internal/, and vice versa), hence the intentional
+// duplication here.
 const powerdnsAPIPort = 8081
 
-// --- compute.vm/v1 simulé --------------------------------------------------
+// --- simulated compute.vm/v1 ----------------------------------------------
 
 type powerdnsFakeComputeVMServer struct {
 	computevmv1.UnimplementedComputeVMServer
@@ -52,8 +52,8 @@ func (f *powerdnsFakeComputeVMServer) EnsureVM(_ context.Context, req *computevm
 	if vm, ok := f.vms[req.GetName()]; ok {
 		return vm, nil
 	}
-	// 127.0.0.1 : la VM "cible" doit réellement joindre le faux serveur
-	// PowerDNS HTTP lancé par ce test sur la boucle locale.
+	// 127.0.0.1: the "target" VM must really reach the fake PowerDNS HTTP
+	// server started by this test on the loopback.
 	vm := &computevmv1.VM{Id: "vm-" + req.GetName(), Name: req.GetName(), Ip: "127.0.0.1", Status: "running", SshPort: 22}
 	f.vms[req.GetName()] = vm
 	return vm, nil
@@ -66,7 +66,7 @@ func (f *powerdnsFakeComputeVMServer) DeleteVM(_ context.Context, req *computevm
 	return &computevmv1.DeleteVMResponse{}, nil
 }
 
-// --- os.base/v1 simulé ------------------------------------------------------
+// --- simulated os.base/v1 --------------------------------------------------
 
 type powerdnsFakeOSBaseServer struct {
 	osbasev1.UnimplementedBaseServer
@@ -88,7 +88,7 @@ func (f *powerdnsFakeOSBaseServer) SetResolver(_ context.Context, req *osbasev1.
 	return &osbasev1.SetResolverResponse{}, nil
 }
 
-// --- core.ansible/v1 simulé --------------------------------------------------
+// --- simulated core.ansible/v1 ---------------------------------------------
 
 type powerdnsFakeAnsibleServer struct {
 	ansiblev1.UnimplementedAnsibleServer
@@ -101,10 +101,10 @@ func (f *powerdnsFakeAnsibleServer) RunPlaybook(_ context.Context, req *ansiblev
 	f.calls = append(f.calls, req)
 	f.mu.Unlock()
 
-	if strings.Contains(string(req.GetPlaybookYaml()), "installer les outils DNS de vérification") {
+	if strings.Contains(string(req.GetPlaybookYaml()), "install the DNS verification tools") {
 		return &ansiblev1.RunPlaybookResponse{
 			Ok: true,
-			Output: `TASK [afficher les résultats] ***
+			Output: `TASK [show the results] ***
 ok: [target] => {
     "msg": {
         "external": "93.184.216.34",
@@ -126,8 +126,8 @@ func (f *powerdnsFakeAnsibleServer) lastCall() *ansiblev1.RunPlaybookRequest {
 	return f.calls[len(f.calls)-1]
 }
 
-// --- time.ntp/v1 et dns.resolver/v1 simulés (fournisseurs actifs avant la
-// passation, ex. chrony et coredns) -----------------------------------------
+// --- simulated time.ntp/v1 and dns.resolver/v1 (active providers before the
+// handover, e.g. chrony and coredns) ---------------------------------------
 
 type powerdnsFakeTimeNTPServer struct {
 	timentpv1.UnimplementedTimeNTPServer
@@ -145,7 +145,7 @@ func (powerdnsFakeDnsResolverServer) Endpoint(context.Context, *dnsresolverv1.Em
 	return &dnsresolverv1.EndpointInfo{Address: "10.10.0.8", Port: 53}, nil
 }
 
-// --- dns.zone/v1@seed simulé (coredns) --------------------------------------
+// --- simulated dns.zone/v1@seed (coredns) ----------------------------------
 
 type powerdnsFakeDnsZoneSeedServer struct {
 	dnszonev1.UnimplementedDnsZoneServer
@@ -162,11 +162,11 @@ func (f *powerdnsFakeDnsZoneSeedServer) ListRecords(_ context.Context, req *dnsz
 	return &dnszonev1.Records{Records: out}, nil
 }
 
-// --- API REST PowerDNS simulée -----------------------------------------------
+// --- simulated PowerDNS REST API -------------------------------------------
 
-// startFakePowerDNSAPI simule l'API REST de PowerDNS Authoritative sur le
-// port fixe attendu par modules/powerdns (127.0.0.1:8081) — c'est le VRAI
-// client HTTP du module (api.go) qui parle à ce serveur, aucun mock côté Go.
+// startFakePowerDNSAPI simulates the PowerDNS Authoritative REST API on the
+// fixed port modules/powerdns expects (127.0.0.1:8081) — it is the module's
+// REAL HTTP client (api.go) that talks to this server, no mock on the Go side.
 type fakeRRData struct {
 	Values []string
 	TTL    uint32
@@ -174,7 +174,7 @@ type fakeRRData struct {
 
 type fakePowerDNSAPI struct {
 	mu    sync.Mutex
-	zones map[string]map[string]map[string]fakeRRData // zone -> name -> type -> données
+	zones map[string]map[string]map[string]fakeRRData // zone -> name -> type -> data
 }
 
 func startFakePowerDNSAPI(t *testing.T) *fakePowerDNSAPI {
@@ -259,7 +259,7 @@ func startFakePowerDNSAPI(t *testing.T) *fakePowerDNSAPI {
 
 	listener, err := net.Listen("tcp", "127.0.0.1:"+strconv.Itoa(powerdnsAPIPort))
 	if err != nil {
-		t.Skipf("port %d indisponible pour la fausse API PowerDNS : %v", powerdnsAPIPort, err)
+		t.Skipf("port %d unavailable for the fake PowerDNS API: %v", powerdnsAPIPort, err)
 	}
 	server := httptest.NewUnstartedServer(mux)
 	_ = server.Listener.Close()
@@ -269,22 +269,22 @@ func startFakePowerDNSAPI(t *testing.T) *fakePowerDNSAPI {
 	return api
 }
 
-// TestPowerDNSLifecycle exerce Provision -> Configure -> Handover -> Verify
-// -> Destroy avec compute.vm/os.base/ansible/time.ntp/dns.resolver/
-// dns.zone@seed simulés (docs03 §4 règle 7), secrets réels (age+fichier,
-// même précaution que chrony), et une vraie API PowerDNS HTTP simulée sur
-// 127.0.0.1:8081 — la génération/configuration réelle de PowerDNS par
-// ansible est déjà prouvée pour de vrai ailleurs
-// (internal/broker/ansible_test.go), le mécanisme HTTP api.go l'est dans
-// modules/powerdns/api_test.go ; ce test-ci prouve le câblage du cycle de
-// vie et la passation.
+// TestPowerDNSLifecycle exercises Provision -> Configure -> Handover -> Verify
+// -> Destroy with simulated
+// compute.vm/os.base/ansible/time.ntp/dns.resolver/dns.zone@seed (doc 03 §4
+// rule 7), real secrets (age+file, the same precaution as chrony), and a real
+// simulated PowerDNS HTTP API on 127.0.0.1:8081 — the real
+// generation/configuration of PowerDNS by ansible is already proven for real
+// elsewhere (internal/broker/ansible_test.go), and the api.go HTTP mechanism
+// in modules/powerdns/api_test.go; this test proves the lifecycle wiring and
+// the handover.
 func TestPowerDNSLifecycle(t *testing.T) {
 	binaryPath, manifest := buildModule(t, "powerdns")
 	pdnsAPI := startFakePowerDNSAPI(t)
 
 	client, err := modulehost.Launch(binaryPath, manifest)
 	if err != nil {
-		t.Fatalf("Launch : %v", err)
+		t.Fatalf("Launch: %v", err)
 	}
 	defer client.Close()
 	ctx := context.Background()
@@ -312,75 +312,76 @@ func TestPowerDNSLifecycle(t *testing.T) {
 	token := strconv.FormatUint(uint64(sessionID), 10)
 
 	if _, err := client.Module().Check(ctx, &modulev1.StepRequest{RunId: "test", BrokerToken: token}); err != nil {
-		t.Fatalf("Check : %v", err)
+		t.Fatalf("Check: %v", err)
 	}
 
 	provisionResp, err := client.Module().Provision(ctx, &modulev1.StepRequest{RunId: "test", BrokerToken: token})
 	if err != nil {
-		t.Fatalf("Provision : %v", err)
+		t.Fatalf("Provision: %v", err)
 	}
 	if len(vmServer.calls) != 1 || vmServer.calls[0].GetName() != "powerdns01" {
-		t.Fatalf("EnsureVM appelé avec %+v, attendu name=powerdns01", vmServer.calls)
+		t.Fatalf("EnsureVM called with %+v, want name=powerdns01", vmServer.calls)
 	}
 
 	configureResp, err := client.Module().Configure(ctx, &modulev1.StepRequest{RunId: "test", BrokerToken: token, State: provisionResp.GetState()})
 	if err != nil {
-		t.Fatalf("Configure : %v", err)
+		t.Fatalf("Configure: %v", err)
 	}
 	if call := ansibleServer.lastCall(); call == nil || !strings.Contains(string(call.GetPlaybookYaml()), "PowerDNS") {
-		t.Errorf("Configure n'a pas envoyé install_powerdns.yml : %+v", call)
+		t.Errorf("Configure did not send install_powerdns.yml: %+v", call)
 	}
 	osBaseServer.mu.Lock()
 	calls := append([]string(nil), osBaseServer.calls...)
 	osBaseServer.mu.Unlock()
 	if len(calls) != 2 || !strings.Contains(calls[0], "10.10.0.9") || !strings.Contains(calls[1], "10.10.0.8") {
-		t.Errorf("appels os.base = %v, attendu SetNTP(10.10.0.9) puis SetResolver(10.10.0.8)", calls)
+		t.Errorf("os.base calls = %v, want SetNTP(10.10.0.9) then SetResolver(10.10.0.8)", calls)
 	}
 
 	handoverResp, err := client.Module().Handover(ctx, &modulev1.StepRequest{RunId: "test", BrokerToken: token, State: configureResp.GetState()})
 	if err != nil {
-		t.Fatalf("Handover : %v", err)
+		t.Fatalf("Handover: %v", err)
 	}
 	pdnsAPI.mu.Lock()
 	got := pdnsAPI.zones["lab.internal."]["infra01.lab.internal."]["A"]
 	pdnsAPI.mu.Unlock()
 	if len(got.Values) != 1 || got.Values[0] != "10.10.0.5" {
-		t.Errorf("après Handover, la fausse API PowerDNS contient %+v pour infra01.lab.internal. A, attendu [10.10.0.5]", got)
+		t.Errorf("after Handover, the fake PowerDNS API holds %+v for infra01.lab.internal. A, want [10.10.0.5]", got)
 	}
 
 	verifyResp, err := client.Module().Verify(ctx, &modulev1.StepRequest{RunId: "test", BrokerToken: token, State: handoverResp.GetState()})
 	if err != nil {
-		t.Fatalf("Verify : %v", err)
+		t.Fatalf("Verify: %v", err)
 	}
 	if verifyResp.GetStatus() != modulev1.StepResult_STATUS_OK {
 		t.Fatalf("Verify().Status = %v", verifyResp.GetStatus())
 	}
 	if len(vmServer.calls) != 2 || vmServer.calls[1].GetName() != "powerdns01-verify" {
-		t.Fatalf("EnsureVM (vérificateur) appelé avec %+v, attendu name=powerdns01-verify", vmServer.calls)
+		t.Fatalf("EnsureVM (verifier) called with %+v, want name=powerdns01-verify", vmServer.calls)
 	}
 	if _, stillThere := vmServer.vms["powerdns01-verify"]; stillThere {
-		t.Error("la VM de vérification n'a pas été supprimée après Verify")
+		t.Error("the verification VM was not deleted after Verify")
 	}
-	// La sonde de Verify doit être nettoyée, la vraie donnée reprise (infra01) doit rester.
+	// Verify's probe must be cleaned up, the real data taken over (infra01)
+	// must remain.
 	pdnsAPI.mu.Lock()
 	_, probeStillThere := pdnsAPI.zones["lab.internal."]["verify-probe.lab.internal."]["A"]
 	_, infraStillThere := pdnsAPI.zones["lab.internal."]["infra01.lab.internal."]["A"]
 	pdnsAPI.mu.Unlock()
 	if probeStillThere {
-		t.Error("l'enregistrement de sonde de Verify n'a pas été nettoyé")
+		t.Error("Verify's probe record was not cleaned up")
 	}
 	if !infraStillThere {
-		t.Error("Verify a supprimé un enregistrement repris qui ne lui appartenait pas")
+		t.Error("Verify deleted a taken-over record that did not belong to it")
 	}
 
 	destroyResp, err := client.Module().Destroy(ctx, &modulev1.StepRequest{RunId: "test", BrokerToken: token, State: handoverResp.GetState()})
 	if err != nil {
-		t.Fatalf("Destroy : %v", err)
+		t.Fatalf("Destroy: %v", err)
 	}
 	if destroyResp.GetStatus() != modulev1.StepResult_STATUS_OK {
 		t.Fatalf("Destroy().Status = %v", destroyResp.GetStatus())
 	}
 	if _, stillThere := vmServer.vms["powerdns01"]; stillThere {
-		t.Error("la VM powerdns01 n'a pas été supprimée par Destroy")
+		t.Error("the powerdns01 VM was not deleted by Destroy")
 	}
 }

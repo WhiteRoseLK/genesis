@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: Apache-2.0
 
-// test-f reprend test.e/v1 en phase cible, amorcée par test-e en phase
-// graine (docs/05-bootstrap-lifecycle.md, jalon J6) : Handover lit réellement
-// test.e/v1@seed à travers le broker (deux modules distincts, contrairement
-// à test-a qui se reprend lui-même) — le cœur (internal/engine) doit alors
-// déclencher SeedDown sur test-e, pas sur test-f.
+// test-f takes over test.e/v1 in the target phase, bootstrapped by test-e in
+// the seed phase (docs/05-bootstrap-lifecycle.md, milestone M6): Handover
+// really reads test.e/v1@seed through the broker (two distinct modules, unlike
+// test-a, which takes over from itself) — the core (internal/engine) must then
+// trigger SeedDown on test-e, not on test-f.
 package main
 
 import (
@@ -58,20 +58,20 @@ func (m *testFModule) Verify(_ context.Context, req *modulev1.StepRequest) (*mod
 	return setFlag(req, "verified")
 }
 
-// Handover lit réellement test.e/v1@seed (dial avec le jeton de CET appel,
-// pas un jeton mis en cache — docs/02-architecture.md : une session par
-// appel) et conserve la preuve de la lecture dans l'état.
+// Handover really reads test.e/v1@seed (dialling with THIS call's token, not a
+// cached token — docs/02-architecture.md: one session per call) and keeps the
+// proof of the read in the state.
 func (m *testFModule) Handover(ctx context.Context, req *modulev1.StepRequest) (*modulev1.StepResult, error) {
 	conn, err := m.broker.Dial(req.GetBrokerToken())
 	if err != nil {
-		return nil, fmt.Errorf("connexion au broker : %w", err)
+		return nil, fmt.Errorf("connecting to the broker: %w", err)
 	}
-	resp, err := echov1.NewEchoClient(conn).Call(ctx, &echov1.CallRequest{Message: "passation depuis test-f"})
+	resp, err := echov1.NewEchoClient(conn).Call(ctx, &echov1.CallRequest{Message: "handover from test-f"})
 	if err != nil {
-		return nil, fmt.Errorf("appel de test.e/v1@seed via le broker : %w", err)
+		return nil, fmt.Errorf("calling test.e/v1@seed through the broker: %w", err)
 	}
 	if resp.GetFrom() != "test-e" {
-		return nil, fmt.Errorf("réponse inattendue de test.e/v1@seed : %+v", resp)
+		return nil, fmt.Errorf("unexpected response from test.e/v1@seed: %+v", resp)
 	}
 	flags := sdk.StateMap(req.GetState())
 	flags["handed_over"] = true
@@ -106,8 +106,8 @@ func boolFlag(flags map[string]any, key string) bool {
 	return v
 }
 
-// echoServer implémente functions/test/echo/v1 pour test.e/v1 en phase
-// cible (fourni PAR test-f, une fois la passation faite).
+// echoServer implements functions/test/echo/v1 for test.e/v1 in the target
+// phase (provided BY test-f, once the handover is done).
 type echoServer struct {
 	echov1.UnimplementedEchoServer
 }

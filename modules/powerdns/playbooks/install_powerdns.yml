@@ -1,14 +1,14 @@
 ---
-# Configure (functions/dns/zone/v1 + dns/resolver/v1, module powerdns) :
-# installe et configure PowerDNS Authoritative (SQLite, API) + Recursor
-# (docs/07-mvp-modules.md) — image cloud Debian (docs/01-vision-scope.md).
+# Configure (functions/dns/zone/v1 + dns/resolver/v1, powerdns module):
+# installs and configures PowerDNS Authoritative (SQLite, API) + Recursor
+# (docs/07-mvp-modules.md) — Debian cloud image (docs/01-vision-scope.md).
 - hosts: target
   gather_facts: false
   become: true
   vars:
     pdns_db: /var/lib/powerdns/pdns.sqlite3
   tasks:
-    - name: installer PowerDNS (authoritative, backend SQLite, recursor)
+    - name: install PowerDNS (authoritative, SQLite backend, recursor)
       ansible.builtin.apt:
         name:
           - pdns-server
@@ -18,13 +18,13 @@
         state: present
         update_cache: true
 
-    - name: arrêter pdns-server le temps de préparer la base
+    - name: stop pdns-server while the database is prepared
       ansible.builtin.systemd:
         name: pdns
         state: stopped
       failed_when: false
 
-    - name: créer le schéma SQLite de la base authoritative
+    - name: create the SQLite schema of the authoritative database
       ansible.builtin.command: >
         sqlite3 {{ pdns_db }}
         -init /usr/share/pdns-backend-sqlite3/schema/schema.sqlite3.sql
@@ -33,7 +33,7 @@
         creates: "{{ pdns_db }}"
       changed_when: true
 
-    - name: définir le propriétaire de la base
+    - name: set the database owner
       ansible.builtin.file:
         path: "{{ pdns_db }}"
         owner: pdns
@@ -72,20 +72,20 @@
         mode: "0644"
       register: recursor_conf
 
-    - name: activer et démarrer pdns (authoritative)
+    - name: enable and start pdns (authoritative)
       ansible.builtin.systemd:
         name: pdns
         enabled: true
         state: restarted
 
-    - name: activer et démarrer pdns-recursor
+    - name: enable and start pdns-recursor
       ansible.builtin.systemd:
         name: pdns-recursor
         enabled: true
         state: restarted
       when: recursor_conf.changed or pdns_conf.changed
 
-    - name: s'assurer que pdns-recursor tourne
+    - name: make sure pdns-recursor is running
       ansible.builtin.systemd:
         name: pdns-recursor
         state: started

@@ -1,7 +1,7 @@
 apiVersion: genesis/module/v1
 name: test-f
 version: 0.1.0
-description: "module de test J6 : reprend test.e/v1 en phase cible (passation croisée depuis test-e)"
+description: "M6 test module: takes over test.e/v1 in the target phase (cross-module handover from test-e)"
 layer: platform
 core: ">=0.1.0"
 protocol: 1

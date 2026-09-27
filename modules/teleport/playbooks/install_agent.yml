@@ -1,50 +1,50 @@
-# fleet.agent/v1.Install (module teleport, ADR-017) : installe l'agent
-# Teleport (ssh_service seul) sur une VM du parc et l'enrôle via un jeton à
-# usage court (join_token/ca_pin/auth_server reçus du module). Le sshd natif
-# reste actif à ce jalon -- le cœur ne bascule pas encore ses runners
-# core.ansible/v1 vers l'agent (Repoint différé, docs/PROGRESS.md, dette
-# suivie par une issue dédiée) : le désactiver casserait tout appel
-# ultérieur de core.ansible/v1 sur cette VM (ex. Handover de vault).
+# fleet.agent/v1.Install (teleport module, ADR-017): installs the Teleport
+# agent (ssh_service only) on a fleet VM and enrols it with a short-lived token
+# (join_token/ca_pin/auth_server received from the module). The native sshd
+# stays active at this milestone -- the core does not switch its
+# core.ansible/v1 runners to the agent yet (deferred Repoint, docs/PROGRESS.md,
+# debt tracked by a dedicated issue): disabling it would break every later
+# core.ansible/v1 call on this VM (e.g. vault's Handover).
 - hosts: target
   gather_facts: true
   become: true
   tasks:
-    - name: installer les prerequis
+    - name: install the prerequisites
       ansible.builtin.apt:
         name: [gnupg, curl, ca-certificates]
         state: present
         update_cache: true
 
-    - name: creer le repertoire des cles APT
+    - name: create the APT keys directory
       ansible.builtin.file:
         path: /usr/share/keyrings
         state: directory
         mode: "0755"
 
-    - name: ajouter la cle GPG Teleport
+    - name: add the Teleport GPG key
       ansible.builtin.get_url:
         url: https://apt.releases.teleport.dev/gpg
         dest: /usr/share/keyrings/teleport-archive-keyring.asc
         mode: "0644"
 
-    - name: ajouter le depot Teleport
+    - name: add the Teleport repository
       ansible.builtin.apt_repository:
         repo: "deb [signed-by=/usr/share/keyrings/teleport-archive-keyring.asc] https://apt.releases.teleport.dev/debian/ {{ ansible_distribution_release | default('bookworm') }} stable/v17"
         state: present
         filename: teleport
 
-    - name: installer teleport
+    - name: install teleport
       ansible.builtin.apt:
         name: teleport
         state: present
         update_cache: true
 
-    - name: verifier si l'agent est deja enrole
+    - name: check whether the agent is already enrolled
       ansible.builtin.stat:
         path: /var/lib/teleport/host_uuid
       register: enrolled
 
-    - name: configurer teleport.yaml (agent SSH seul)
+    - name: configure teleport.yaml (SSH agent only)
       ansible.builtin.copy:
         content: |
           version: v3
@@ -67,14 +67,14 @@
         mode: "0640"
       when: not enrolled.stat.exists
 
-    - name: activer et demarrer l'agent teleport
+    - name: enable and start the teleport agent
       ansible.builtin.systemd:
         name: teleport
         enabled: true
         state: restarted
       when: not enrolled.stat.exists
 
-    - name: s'assurer que l'agent tourne
+    - name: make sure the agent is running
       ansible.builtin.systemd:
         name: teleport
         state: started

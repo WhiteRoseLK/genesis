@@ -37,17 +37,17 @@ import (
 	modulev1 "github.com/WhiteRoseLK/genesis/sdk/go/gen/module/v1"
 )
 
-// Vault, contrairement à chrony/coredns/powerdns, ne peut pas être installé
-// via `apt`+systemd sur les conteneurs SSH jetables (Alpine, sans systemd)
-// utilisés ailleurs dans ce dépôt : le mécanisme ansible/systemd réel est
-// déjà prouvé (internal/broker/ansible_test.go) et ne peut de toute façon
-// pas être réexercé ici sans une vraie VM Debian complète (hors périmètre
-// sans accès Proxmox, docs/PROGRESS.md J5). vaultFakeAnsibleServer simule
-// donc « ce qu'ansible aurait fait » en pilotant directement le VRAI
-// conteneur hashicorp/vault avec les VRAIES variables (certificats TLS
-// émis par le vrai step-ca, role_id/secret_id réels) que le module vault
-// lui a transmises — tout le reste (init, unseal, pki_int signé par
-// step-ca, KV v2, AppRole) tourne pour de vrai, contre un vrai Vault.
+// Vault, unlike chrony/coredns/powerdns, cannot be installed with
+// `apt`+systemd on the disposable SSH containers (Alpine, no systemd) used
+// elsewhere in this repository: the real ansible/systemd mechanism is already
+// proven (internal/broker/ansible_test.go) and could not be exercised again
+// here anyway without a real, complete Debian VM (out of scope without Proxmox
+// access, docs/PROGRESS.md M5). vaultFakeAnsibleServer therefore simulates
+// "what ansible would have done" by driving the REAL hashicorp/vault container
+// directly with the REAL variables (TLS certificates issued by the real
+// step-ca, real role_id/secret_id) that the vault module passed to it —
+// everything else (init, unseal, pki_int signed by step-ca, KV v2, AppRole)
+// runs for real, against a real Vault.
 
 type vaultFakeComputeVMServer struct {
 	computevmv1.UnimplementedComputeVMServer
@@ -124,27 +124,27 @@ func (f *vaultFakeAnsibleServer) RunPlaybook(_ context.Context, req *ansiblev1.R
 	playbook := string(req.GetPlaybookYaml())
 	vars := req.GetVars().AsMap()
 
-	if strings.Contains(playbook, "installer les prerequis") {
+	if strings.Contains(playbook, "install the prerequisites") {
 		out, err := f.deployVaultContainer(vars)
 		if err != nil {
 			return &ansiblev1.RunPlaybookResponse{Ok: false, Output: out + "\n" + err.Error()}, nil
 		}
 		return &ansiblev1.RunPlaybookResponse{Ok: true, Output: out}, nil
 	}
-	if strings.Contains(playbook, "installer les outils de vérification") {
+	if strings.Contains(playbook, "install the verification tools") {
 		out, err := f.runVerification(vars)
 		if err != nil {
 			return &ansiblev1.RunPlaybookResponse{Ok: false, Output: out + "\n" + err.Error()}, nil
 		}
 		return &ansiblev1.RunPlaybookResponse{Ok: true, Output: out}, nil
 	}
-	return &ansiblev1.RunPlaybookResponse{Ok: false, Output: "playbook inconnu du fake"}, nil
+	return &ansiblev1.RunPlaybookResponse{Ok: false, Output: "playbook unknown to the fake"}, nil
 }
 
-// deployVaultContainer pilote directement Docker avec le VRAI certificat
-// TLS reçu du module (émis par le vrai step-ca) — équivalent réel de ce
-// qu'install_vault.yml ferait sur une VM (dépôt du cert, configuration,
-// (re)démarrage du service).
+// deployVaultContainer drives Docker directly with the REAL TLS certificate
+// received from the module (issued by the real step-ca) — the real equivalent
+// of what install_vault.yml would do on a VM (placing the cert, configuration,
+// (re)starting the service).
 func (f *vaultFakeAnsibleServer) deployVaultContainer(vars map[string]any) (string, error) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
@@ -152,7 +152,7 @@ func (f *vaultFakeAnsibleServer) deployVaultContainer(vars map[string]any) (stri
 	certPEM, _ := vars["tls_cert_pem"].(string)
 	keyPEM, _ := vars["tls_key_pem"].(string)
 	if certPEM == "" || keyPEM == "" {
-		return "", fmt.Errorf("vars tls_cert_pem/tls_key_pem manquantes")
+		return "", fmt.Errorf("missing tls_cert_pem/tls_key_pem vars")
 	}
 
 	if f.dir == "" {
@@ -166,10 +166,11 @@ func (f *vaultFakeAnsibleServer) deployVaultContainer(vars map[string]any) (stri
 		if err := os.MkdirAll(dir+"/data", 0o777); err != nil {
 			return "", err
 		}
-		// MkdirAll subit l'umask du process (souvent 022) : 0777 demandé
-		// devient 0755 réel, insuffisant pour l'utilisateur interne non-root
-		// du conteneur vault — chmod explicite après coup, même précaution
-		// que core.ansible/v1 et modules/coredns (docs/PROGRESS.md J5/J6).
+		// MkdirAll is subject to the process umask (often 022): the 0777
+		// requested becomes an actual 0755, not enough for the vault
+		// container's internal non-root user — an explicit chmod afterwards,
+		// the same precaution as core.ansible/v1 and modules/coredns
+		// (docs/PROGRESS.md M5/M6).
 		if err := os.Chmod(dir+"/data", 0o777); err != nil {
 			return "", err
 		}
@@ -212,7 +213,7 @@ disable_mlock = true
 		"hashicorp/vault:2.1.1@sha256:47f14a6acb98f48d798a07df7c83f23a6e636e1cf724c5f8ff165cb32667a1e2", "server")
 	out, err := cmd.CombinedOutput()
 	if err != nil {
-		return string(out), fmt.Errorf("docker run vault : %w", err)
+		return string(out), fmt.Errorf("docker run vault: %w", err)
 	}
 	f.container = strings.TrimSpace(string(out))
 	return string(out), nil
@@ -229,9 +230,9 @@ func (f *vaultFakeAnsibleServer) cleanup() {
 	}
 }
 
-// runVerification exécute réellement, en Go, ce que check_vault.yml ferait
-// en shell sur une VM tierce (login AppRole, émission, vérification de
-// chaîne, écriture/lecture KV) — même API, mêmes identifiants réels.
+// runVerification really runs, in Go, what check_vault.yml would do in shell
+// on a third-party VM (AppRole login, issuance, chain verification, KV
+// write/read) — the same API, the same real credentials.
 func (f *vaultFakeAnsibleServer) runVerification(vars map[string]any) (string, error) {
 	vaultAddr, _ := vars["vault_addr"].(string)
 	roleID, _ := vars["role_id"].(string)
@@ -249,21 +250,21 @@ func (f *vaultFakeAnsibleServer) runVerification(vars map[string]any) (string, e
 	}
 	token, err := api.appRoleLogin(context.Background(), roleID, secretID)
 	if err != nil {
-		return "", fmt.Errorf("login approle : %w", err)
+		return "", fmt.Errorf("login approle: %w", err)
 	}
 	issued, err := api.issueCert(context.Background(), token, pkiMount, pkiRole, "verify-probe.internal", nil, "")
 	if err != nil {
-		return "", fmt.Errorf("issue : %w", err)
+		return "", fmt.Errorf("issue: %w", err)
 	}
 	if !verifyChainForTest(issued.ChainPEM, rootCAPEM) {
 		return "", fmt.Errorf("CHAIN_INVALID")
 	}
 	if err := api.kvWrite(context.Background(), token, kvMount, kvPath, kvValue); err != nil {
-		return "", fmt.Errorf("kv write : %w", err)
+		return "", fmt.Errorf("kv write: %w", err)
 	}
 	got, found, err := api.kvRead(context.Background(), token, kvMount, kvPath)
 	if err != nil || !found {
-		return "", fmt.Errorf("kv read : found=%v err=%w", found, err)
+		return "", fmt.Errorf("kv read: found=%v err=%w", found, err)
 	}
 	return fmt.Sprintf("CHAIN_OK\nKV_VALUE=%s", got), nil
 }
@@ -287,31 +288,31 @@ func launchVaultTest(t *testing.T) vaultTestHandle {
 	registry.SetNative("core.container/v1", broker.NativeContainer(rt))
 	registry.SetNative("core.secrets/v1", broker.NativeSecrets(store))
 
-	// step-ca réel : seul fournisseur pki.issuer/v1@seed crédible pour ce
-	// test (le réimplémenter en fake reviendrait à réécrire step-ca).
+	// Real step-ca: the only credible pki.issuer/v1@seed provider for this
+	// test (re-implementing it as a fake would mean rewriting step-ca).
 	stepCABinary, stepCAManifest := buildModule(t, "step-ca")
 	stepCAClient, err := modulehost.Launch(stepCABinary, stepCAManifest)
 	if err != nil {
-		t.Fatalf("modulehost.Launch(step-ca) : %v", err)
+		t.Fatalf("modulehost.Launch(step-ca): %v", err)
 	}
 	t.Cleanup(stepCAClient.Close)
 	stepCAToken := registry.OpenSession(stepCAClient.Broker(), "step-ca", []string{"core.container/v1", "core.secrets/v1"})
 	if _, err := stepCAClient.Module().Check(ctx, &modulev1.StepRequest{RunId: "test", BrokerToken: stepCAToken}); err != nil {
-		t.Fatalf("Check(step-ca) : %v", err)
+		t.Fatalf("Check(step-ca): %v", err)
 	}
 	seedToken := registry.OpenSession(stepCAClient.Broker(), "step-ca", []string{"core.container/v1", "core.secrets/v1"})
 	if _, err := stepCAClient.Module().SeedUp(ctx, &modulev1.StepRequest{RunId: "test", BrokerToken: seedToken}); err != nil {
-		t.Fatalf("SeedUp(step-ca) : %v", err)
+		t.Fatalf("SeedUp(step-ca): %v", err)
 	}
 	stepCAConn, err := stepCAClient.DispenseFunction("pki.issuer/v1")
 	if err != nil {
-		t.Fatalf("DispenseFunction(step-ca, pki.issuer/v1) : %v", err)
+		t.Fatalf("DispenseFunction(step-ca, pki.issuer/v1): %v", err)
 	}
 
 	binaryPath, manifest := buildModule(t, "vault")
 	client, err := modulehost.Launch(binaryPath, manifest)
 	if err != nil {
-		t.Fatalf("modulehost.Launch(vault) : %v", err)
+		t.Fatalf("modulehost.Launch(vault): %v", err)
 	}
 	t.Cleanup(client.Close)
 
@@ -334,15 +335,15 @@ func launchVaultTest(t *testing.T) vaultTestHandle {
 	token := strconv.FormatUint(uint64(sessionID), 10)
 
 	if _, err := client.Module().Check(ctx, &modulev1.StepRequest{RunId: "test", BrokerToken: token}); err != nil {
-		t.Fatalf("Check(vault) : %v", err)
+		t.Fatalf("Check(vault): %v", err)
 	}
 	provisionResp, err := client.Module().Provision(ctx, &modulev1.StepRequest{RunId: "test", BrokerToken: token})
 	if err != nil {
-		t.Fatalf("Provision(vault) : %v", err)
+		t.Fatalf("Provision(vault): %v", err)
 	}
 	configureResp, err := client.Module().Configure(ctx, &modulev1.StepRequest{RunId: "test", BrokerToken: token, State: provisionResp.GetState()})
 	if err != nil {
-		t.Fatalf("Configure(vault) : %v", err)
+		t.Fatalf("Configure(vault): %v", err)
 	}
 	if configureResp.GetStatus() != modulev1.StepResult_STATUS_OK {
 		t.Fatalf("Configure(vault).Status = %v", configureResp.GetStatus())
@@ -350,7 +351,7 @@ func launchVaultTest(t *testing.T) vaultTestHandle {
 
 	conn, err := client.DispenseFunction("pki.issuer/v1")
 	if err != nil {
-		t.Fatalf("DispenseFunction(vault, pki.issuer/v1) : %v", err)
+		t.Fatalf("DispenseFunction(vault, pki.issuer/v1): %v", err)
 	}
 	return vaultTestHandle{
 		client: client, token: token, configured: configureResp,
@@ -358,10 +359,10 @@ func launchVaultTest(t *testing.T) vaultTestHandle {
 	}
 }
 
-// pkiIssuerForwarder relaie vers le vrai step-ca, pour donner à vault une
-// session pki.issuer/v1@seed fonctionnelle sans dupliquer le broker réel
-// (internal/engine, non exercé ici — cohérent avec les autres tests
-// module-isolés de ce paquet).
+// pkiIssuerForwarder relays to the real step-ca, to give vault a working
+// pki.issuer/v1@seed session without duplicating the real broker
+// (internal/engine, not exercised here — consistent with the other
+// module-isolated tests of this package).
 type pkiIssuerForwarder struct {
 	pkiissuerv1.UnimplementedPkiIssuerServer
 	client pkiissuerv1.PkiIssuerClient
@@ -377,43 +378,43 @@ func (f *pkiIssuerForwarder) CAChain(ctx context.Context, req *pkiissuerv1.Empty
 	return f.client.CAChain(ctx, req)
 }
 
-// TestVaultConfiguresAndIssuesRealCertificates prouve, contre un vrai
-// conteneur hashicorp/vault et un vrai step-ca, tout le cycle J7 :
-// init 5/3, unseal, pki_int signé par step-ca (le scénario exact prouvé
-// par TestStepCASignsThirdPartyIntermediate), KV v2, AppRole — puis
-// IssueCert/SignCSR via vault lui-même, et Verify (émission + chaîne +
-// KV) depuis le point de vue consommateur.
+// TestVaultConfiguresAndIssuesRealCertificates proves, against a real
+// hashicorp/vault container and a real step-ca, the whole M7 cycle: init 5/3,
+// unseal, pki_int signed by step-ca (exactly the scenario proven by
+// TestStepCASignsThirdPartyIntermediate), KV v2, AppRole — then
+// IssueCert/SignCSR through vault itself, and Verify (issuance + chain + KV)
+// from the consumer's point of view.
 func TestVaultConfiguresAndIssuesRealCertificates(t *testing.T) {
 	h := launchVaultTest(t)
 	ctx := context.Background()
 
 	chain, err := h.pki.CAChain(ctx, &pkiissuerv1.Empty{})
 	if err != nil {
-		t.Fatalf("CAChain(vault) : %v", err)
+		t.Fatalf("CAChain(vault): %v", err)
 	}
 	if chain.GetChainPem() == "" {
-		t.Fatal("CAChain(vault) : chaîne vide")
+		t.Fatal("CAChain(vault): empty chain")
 	}
 
 	issued, err := h.pki.IssueCert(ctx, &pkiissuerv1.IssueCertRequest{CommonName: "infra01.lab.internal"})
 	if err != nil {
-		t.Fatalf("IssueCert(vault) : %v", err)
+		t.Fatalf("IssueCert(vault): %v", err)
 	}
 	if issued.GetPrivateKeyPem() == "" {
-		t.Error("IssueCert(vault) : private_key_pem vide")
+		t.Error("IssueCert(vault): empty private_key_pem")
 	}
 	if !verifyChainForTest(issued.GetChainPem()+"\n"+chain.GetChainPem(), chain.GetChainPem()) {
-		t.Error("IssueCert(vault) : chaîne invalide jusqu'à la racine step-ca")
+		t.Error("IssueCert(vault): chain invalid up to the step-ca root")
 	}
 
 	if h.ansibleServer.calls < 1 {
-		t.Error("install_vault.yml n'a jamais été envoyé")
+		t.Error("install_vault.yml was never sent")
 	}
 }
 
-// TestVaultVerifyPassesFromThirdPartyVM exécute la vraie étape Verify du
-// cycle de vie (docs08 : critère d'acceptation J7) — émission, validation
-// de chaîne et lecture KV via AppRole, pas le root token.
+// TestVaultVerifyPassesFromThirdPartyVM runs the real Verify step of the
+// lifecycle (doc 08: M7 acceptance criterion) — issuance, chain validation and
+// KV read through the AppRole, not the root token.
 func TestVaultVerifyPassesFromThirdPartyVM(t *testing.T) {
 	h := launchVaultTest(t)
 	ctx := context.Background()
@@ -422,36 +423,35 @@ func TestVaultVerifyPassesFromThirdPartyVM(t *testing.T) {
 		RunId: "test", BrokerToken: h.token, State: h.configured.GetState(),
 	})
 	if err != nil {
-		t.Fatalf("Verify(vault) : %v", err)
+		t.Fatalf("Verify(vault): %v", err)
 	}
 	if verifyResp.GetStatus() != modulev1.StepResult_STATUS_OK {
 		t.Fatalf("Verify(vault).Status = %v", verifyResp.GetStatus())
 	}
 	if h.ansibleServer.calls < 2 {
-		t.Errorf("check_vault.yml n'a pas été envoyé (appels ansible = %d)", h.ansibleServer.calls)
+		t.Errorf("check_vault.yml was not sent (ansible calls = %d)", h.ansibleServer.calls)
 	}
 }
 
-// TestVaultHandoverReissuesCertAndRevokesRootToken prouve Handover
-// (docs/07-mvp-modules.md : "réémission de son propre certificat...
-// révocation du token root") : vault redevient joignable après le
-// redéploiement TLS via son PROPRE pki_int, IssueCert continue de
-// fonctionner (token AppRole, jamais affecté par la révocation du root
-// token), et le root token révoqué est bien rejeté par Vault.
+// TestVaultHandoverReissuesCertAndRevokesRootToken proves Handover
+// (docs/07-mvp-modules.md: "reissues its own certificate... revokes the root
+// token"): vault is reachable again after the TLS redeployment through its OWN
+// pki_int, IssueCert keeps working (AppRole token, never affected by the root
+// token revocation), and the revoked root token is indeed rejected by Vault.
 func TestVaultHandoverReissuesCertAndRevokesRootToken(t *testing.T) {
 	h := launchVaultTest(t)
 	ctx := context.Background()
 
 	rootTokenBefore, err := h.store.Get(ctx, secrets.Ref("vault/root-token"))
 	if err != nil {
-		t.Fatalf("lecture directe du root token (file) : %v", err)
+		t.Fatalf("reading the root token directly (file): %v", err)
 	}
 
 	handoverResp, err := h.client.Module().Handover(ctx, &modulev1.StepRequest{
 		RunId: "test", BrokerToken: h.token, State: h.configured.GetState(),
 	})
 	if err != nil {
-		t.Fatalf("Handover(vault) : %v", err)
+		t.Fatalf("Handover(vault): %v", err)
 	}
 	if handoverResp.GetStatus() != modulev1.StepResult_STATUS_OK {
 		t.Fatalf("Handover(vault).Status = %v", handoverResp.GetStatus())
@@ -459,33 +459,33 @@ func TestVaultHandoverReissuesCertAndRevokesRootToken(t *testing.T) {
 
 	chain, err := h.pki.CAChain(ctx, &pkiissuerv1.Empty{})
 	if err != nil {
-		t.Fatalf("CAChain(vault) après Handover : %v", err)
+		t.Fatalf("CAChain(vault) after Handover: %v", err)
 	}
 	issued, err := h.pki.IssueCert(ctx, &pkiissuerv1.IssueCertRequest{CommonName: "post-handover.lab.internal"})
 	if err != nil {
-		t.Fatalf("IssueCert(vault) après Handover (token AppRole) : %v", err)
+		t.Fatalf("IssueCert(vault) after Handover (AppRole token): %v", err)
 	}
 	if !verifyChainForTest(issued.GetChainPem()+"\n"+chain.GetChainPem(), chain.GetChainPem()) {
-		t.Error("IssueCert(vault) après Handover : chaîne invalide")
+		t.Error("IssueCert(vault) after Handover: invalid chain")
 	}
 
 	api, err := newVaultClientForTest("https://127.0.0.1:"+vaultTestPort, chain.GetChainPem())
 	if err != nil {
-		t.Fatalf("client de vérification : %v", err)
+		t.Fatalf("verification client: %v", err)
 	}
 	status, _, err := api.request(ctx, http.MethodGet, "/v1/auth/token/lookup-self", rootTokenBefore.ExposeSecret(), nil)
 	if err != nil {
-		t.Fatalf("requête de vérification du root token : %v", err)
+		t.Fatalf("root token verification request: %v", err)
 	}
 	if status != http.StatusForbidden {
-		t.Errorf("le root token révoqué répond encore avec le statut %d, attendu 403", status)
+		t.Errorf("the revoked root token still gets status %d, want 403", status)
 	}
 }
 
-// --- petit client HTTP Vault et vérification de chaîne, dupliqués depuis
-// modules/vault/api.go et main.go : internal/ n'importe jamais modules/
-// (règle non négociable du cœur), et l'inverse non plus — ce test simule
-// ici « ce qu'ansible ferait », pas le module lui-même.
+// --- small Vault HTTP client and chain verification, duplicated from
+// modules/vault/api.go and main.go: internal/ never imports modules/ (a
+// non-negotiable core rule), nor the other way round — this test simulates
+// "what ansible would do" here, not the module itself.
 
 type vaultTestClient struct {
 	baseURL string
@@ -533,7 +533,7 @@ func (c *vaultTestClient) request(ctx context.Context, method, path, token strin
 	}
 	var parsed map[string]any
 	if err := json.Unmarshal(data, &parsed); err != nil {
-		return resp.StatusCode, nil, fmt.Errorf("réponse non JSON : %s", string(data))
+		return resp.StatusCode, nil, fmt.Errorf("non-JSON response: %s", string(data))
 	}
 	return resp.StatusCode, parsed, nil
 }
@@ -544,12 +544,12 @@ func (c *vaultTestClient) appRoleLogin(ctx context.Context, roleID, secretID str
 		return "", err
 	}
 	if status != http.StatusOK {
-		return "", fmt.Errorf("login approle : statut %d : %v", status, parsed)
+		return "", fmt.Errorf("approle login: status %d: %v", status, parsed)
 	}
 	auth, _ := parsed["auth"].(map[string]any)
 	token, _ := auth["client_token"].(string)
 	if token == "" {
-		return "", fmt.Errorf("login approle : pas de client_token")
+		return "", fmt.Errorf("approle login: no client_token")
 	}
 	return token, nil
 }
@@ -562,7 +562,7 @@ func (c *vaultTestClient) issueCert(ctx context.Context, token, pkiMount, role, 
 		return testIssuedCert{}, err
 	}
 	if status != http.StatusOK {
-		return testIssuedCert{}, fmt.Errorf("issue : statut %d : %v", status, parsed)
+		return testIssuedCert{}, fmt.Errorf("issue: status %d: %v", status, parsed)
 	}
 	d, _ := parsed["data"].(map[string]any)
 	cert, _ := d["certificate"].(string)
@@ -576,7 +576,7 @@ func (c *vaultTestClient) kvWrite(ctx context.Context, token, mount, path, value
 		return err
 	}
 	if status != http.StatusOK {
-		return fmt.Errorf("kv write : statut %d : %v", status, parsed)
+		return fmt.Errorf("kv write: status %d: %v", status, parsed)
 	}
 	return nil
 }
@@ -590,7 +590,7 @@ func (c *vaultTestClient) kvRead(ctx context.Context, token, mount, path string)
 		return "", false, nil
 	}
 	if status != http.StatusOK {
-		return "", false, fmt.Errorf("kv read : statut %d : %v", status, parsed)
+		return "", false, fmt.Errorf("kv read: status %d: %v", status, parsed)
 	}
 	outer, _ := parsed["data"].(map[string]any)
 	inner, _ := outer["data"].(map[string]any)
@@ -601,8 +601,8 @@ func (c *vaultTestClient) kvRead(ctx context.Context, token, mount, path string)
 	return value, ok, nil
 }
 
-// verifyChainForTest vérifie cryptographiquement que chainPEM (feuille +
-// intermédiaire(s)) remonte à rootPEM.
+// verifyChainForTest checks cryptographically that chainPEM (leaf +
+// intermediate(s)) chains up to rootPEM.
 func verifyChainForTest(chainPEM, rootPEM string) bool {
 	roots := x509.NewCertPool()
 	if !roots.AppendCertsFromPEM([]byte(rootPEM)) {

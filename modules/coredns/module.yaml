@@ -1,7 +1,7 @@
 apiVersion: genesis/module/v1
 name: coredns
 version: 0.1.0
-description: "DNS graine (docs/07-mvp-modules.md) : dns.zone/v1 et dns.resolver/v1 en phase graine, zone regeneree a chaque UpsertRecord"
+description: "Seed DNS (docs/07-mvp-modules.md): dns.zone/v1 and dns.resolver/v1 in the seed phase, zone regenerated on every UpsertRecord"
 layer: foundation
 core: ">=0.1.0 <0.3.0"
 protocol: 1

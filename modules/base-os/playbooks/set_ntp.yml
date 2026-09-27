@@ -1,14 +1,14 @@
 ---
-# SetNTP (functions/os/base/v1) : pointe la synchronisation d'horloge de la
-# VM vers le fournisseur actif (docs/03-module-contract.md, appelé aussi en
-# Repoint). systemd-timesyncd : présent par défaut sur l'image cloud Debian
-# (docs/01-vision-scope.md) tant que le module chrony (J6) ne l'a pas
-# remplacé sur les VM qui l'hébergent.
+# SetNTP (functions/os/base/v1): points the VM's clock synchronisation to the
+# active provider (docs/03-module-contract.md, also called during Repoint).
+# systemd-timesyncd: present by default on the Debian cloud image
+# (docs/01-vision-scope.md) until the chrony module (M6) replaces it on the
+# VMs that host it.
 - hosts: target
   gather_facts: false
   become: true
   tasks:
-    - name: configurer les serveurs NTP
+    - name: configure the NTP servers
       ansible.builtin.lineinfile:
         path: /etc/systemd/timesyncd.conf
         regexp: '^#?NTP='
@@ -16,7 +16,7 @@
         create: true
       register: timesyncd_conf
 
-    - name: redémarrer systemd-timesyncd
+    - name: restart systemd-timesyncd
       ansible.builtin.systemd:
         name: systemd-timesyncd
         state: restarted

@@ -15,23 +15,22 @@ import (
 	"time"
 )
 
-// vaultClient parle directement à l'API REST de Vault (docs/07-mvp-modules.md),
-// même principe que modules/powerdns/api.go et modules/proxmox/proxmoxapi :
-// un module appelle l'API du produit qu'il pilote directement, ansible se
-// limite à l'installation/configuration système.
+// vaultClient talks directly to Vault's REST API (docs/07-mvp-modules.md), the
+// same principle as modules/powerdns/api.go and modules/proxmox/proxmoxapi: a
+// module calls the API of the product it drives directly, and ansible is
+// limited to system installation/configuration.
 type vaultClient struct {
 	baseURL string
 	http    *http.Client
 }
 
-// newVaultClient fait confiance UNIQUEMENT à rootCAPEM (la racine step-ca
-// qui a signé le certificat serveur de Vault), pas au magasin système —
-// Vault est son propre service interne, jamais exposé publiquement dans ce
-// MVP (docs/01-vision-scope.md).
+// newVaultClient trusts ONLY rootCAPEM (the step-ca root that signed Vault's
+// server certificate), not the system store — Vault is its own internal
+// service, never exposed publicly in this MVP (docs/01-vision-scope.md).
 func newVaultClient(baseURL, rootCAPEM string) (*vaultClient, error) {
 	pool := x509.NewCertPool()
 	if !pool.AppendCertsFromPEM([]byte(rootCAPEM)) {
-		return nil, fmt.Errorf("racine CA illisible pour le client Vault")
+		return nil, fmt.Errorf("unreadable CA root for the Vault client")
 	}
 	return &vaultClient{
 		baseURL: baseURL,
@@ -47,13 +46,13 @@ func (c *vaultClient) request(ctx context.Context, method, path, token string, b
 	if body != nil {
 		b, err := json.Marshal(body)
 		if err != nil {
-			return 0, nil, fmt.Errorf("encodage de la requête Vault : %w", err)
+			return 0, nil, fmt.Errorf("encoding the Vault request: %w", err)
 		}
 		reader = bytes.NewReader(b)
 	}
 	req, err := http.NewRequestWithContext(ctx, method, c.baseURL+path, reader)
 	if err != nil {
-		return 0, nil, fmt.Errorf("construction de la requête Vault : %w", err)
+		return 0, nil, fmt.Errorf("building the Vault request: %w", err)
 	}
 	if token != "" {
 		req.Header.Set("X-Vault-Token", token)
@@ -63,19 +62,19 @@ func (c *vaultClient) request(ctx context.Context, method, path, token string, b
 	}
 	resp, err := c.http.Do(req)
 	if err != nil {
-		return 0, nil, fmt.Errorf("requête Vault %s %s : %w", method, path, err)
+		return 0, nil, fmt.Errorf("vault request %s %s: %w", method, path, err)
 	}
 	defer func() { _ = resp.Body.Close() }()
 	data, err := io.ReadAll(resp.Body)
 	if err != nil {
-		return resp.StatusCode, nil, fmt.Errorf("lecture de la réponse Vault %s %s : %w", method, path, err)
+		return resp.StatusCode, nil, fmt.Errorf("reading the Vault response %s %s: %w", method, path, err)
 	}
 	if len(data) == 0 {
 		return resp.StatusCode, nil, nil
 	}
 	var parsed map[string]any
 	if err := json.Unmarshal(data, &parsed); err != nil {
-		return resp.StatusCode, nil, fmt.Errorf("décodage de la réponse Vault %s %s : %s", method, path, string(data))
+		return resp.StatusCode, nil, fmt.Errorf("decoding the Vault response %s %s: %s", method, path, string(data))
 	}
 	return resp.StatusCode, parsed, nil
 }
@@ -98,10 +97,10 @@ func (c *vaultClient) sealStatus(ctx context.Context) (initialized, sealed bool,
 	return initialized, sealed, nil
 }
 
-// active indique si ce nœud est le leader Raft actif — juste après le
-// descellement, un court instant s'écoule avant l'élection même en
-// mono-nœud (observé manuellement : les premiers appels échouent avec
-// "local node not active but active cluster node not found").
+// active reports whether this node is the active Raft leader — right after
+// unsealing, a short moment passes before the election, even with a single
+// node (observed by hand: the first calls fail with "local node not active but
+// active cluster node not found").
 func (c *vaultClient) active(ctx context.Context) (bool, error) {
 	status, _, err := c.request(ctx, http.MethodGet, "/v1/sys/health", "", nil)
 	if err != nil {
@@ -118,7 +117,7 @@ func (c *vaultClient) init(ctx context.Context, shares, threshold int) (unsealKe
 		return nil, "", err
 	}
 	if status != http.StatusOK {
-		return nil, "", fmt.Errorf("init Vault : statut %d : %v", status, parsed)
+		return nil, "", fmt.Errorf("vault init: status %d: %v", status, parsed)
 	}
 	keysRaw, _ := parsed["keys_base64"].([]any)
 	keys := make([]string, 0, len(keysRaw))
@@ -135,7 +134,7 @@ func (c *vaultClient) unseal(ctx context.Context, key string) (sealed bool, err 
 		return true, err
 	}
 	if status != http.StatusOK {
-		return true, fmt.Errorf("unseal Vault : statut %d : %v", status, parsed)
+		return true, fmt.Errorf("vault unseal: status %d: %v", status, parsed)
 	}
 	sealed, _ = parsed["sealed"].(bool)
 	return sealed, nil
@@ -166,7 +165,7 @@ func (c *vaultClient) ensureMount(ctx context.Context, token, path, engineType s
 		return err
 	}
 	if status != http.StatusNoContent && status != http.StatusOK {
-		return fmt.Errorf("montage de %q (%s) : statut %d : %v", path, engineType, status, parsed)
+		return fmt.Errorf("mounting %q (%s): status %d: %v", path, engineType, status, parsed)
 	}
 	return nil
 }
@@ -177,7 +176,7 @@ func (c *vaultClient) tuneMaxLeaseTTL(ctx context.Context, token, path, ttl stri
 		return err
 	}
 	if status != http.StatusNoContent && status != http.StatusOK {
-		return fmt.Errorf("réglage du TTL max de %q : statut %d : %v", path, status, parsed)
+		return fmt.Errorf("setting the max TTL of %q: status %d: %v", path, status, parsed)
 	}
 	return nil
 }
@@ -190,11 +189,11 @@ func (c *vaultClient) generateIntermediateCSR(ctx context.Context, token, pkiPat
 		return "", err
 	}
 	if status != http.StatusOK {
-		return "", fmt.Errorf("génération du CSR intermédiaire : statut %d : %v", status, parsed)
+		return "", fmt.Errorf("generating the intermediate CSR: status %d: %v", status, parsed)
 	}
 	csr, _ := dataField(parsed)["csr"].(string)
 	if csr == "" {
-		return "", fmt.Errorf("génération du CSR intermédiaire : réponse sans csr")
+		return "", fmt.Errorf("generating the intermediate CSR: response without csr")
 	}
 	return csr, nil
 }
@@ -207,7 +206,7 @@ func (c *vaultClient) setSignedIntermediate(ctx context.Context, token, pkiPath,
 		return err
 	}
 	if status != http.StatusOK && status != http.StatusNoContent {
-		return fmt.Errorf("import de l'intermédiaire signé : statut %d : %v", status, parsed)
+		return fmt.Errorf("importing the signed intermediate: status %d: %v", status, parsed)
 	}
 	return nil
 }
@@ -221,7 +220,7 @@ func (c *vaultClient) configurePKIURLs(ctx context.Context, token, pkiPath, base
 		return err
 	}
 	if status != http.StatusOK && status != http.StatusNoContent {
-		return fmt.Errorf("configuration des URLs PKI : statut %d : %v", status, parsed)
+		return fmt.Errorf("configuring the PKI URLs: status %d: %v", status, parsed)
 	}
 	return nil
 }
@@ -234,7 +233,7 @@ func (c *vaultClient) ensurePKIRole(ctx context.Context, token, pkiPath, role st
 		return err
 	}
 	if status != http.StatusOK && status != http.StatusNoContent {
-		return fmt.Errorf("création du rôle PKI %q : statut %d : %v", role, status, parsed)
+		return fmt.Errorf("creating PKI role %q: status %d: %v", role, status, parsed)
 	}
 	return nil
 }
@@ -245,12 +244,11 @@ type issuedCert struct {
 	PrivateKeyPEM string
 }
 
-// issueCert sépare les SAN IP des SAN DNS : l'API Vault PKI a deux champs
-// distincts (alt_names pour les noms DNS, ip_sans pour les adresses IP) —
-// une IP passée dans alt_names est silencieusement ignorée (bug réel
-// rencontré en testant Handover : la VM cible est adressée par IP,
-// "127.0.0.1" en test, jamais reconnue comme SAN tant qu'elle n'est pas
-// dans ip_sans).
+// issueCert separates IP SANs from DNS SANs: the Vault PKI API has two
+// distinct fields (alt_names for DNS names, ip_sans for IP addresses) — an IP
+// passed in alt_names is silently ignored (a real bug met while testing
+// Handover: the target VM is addressed by IP, "127.0.0.1" in tests, never
+// recognised as a SAN as long as it is not in ip_sans).
 func (c *vaultClient) issueCert(ctx context.Context, token, pkiPath, role, commonName string, sans []string, ttl string) (issuedCert, error) {
 	body := map[string]any{"common_name": commonName}
 	var dnsNames, ipAddrs []string
@@ -275,7 +273,7 @@ func (c *vaultClient) issueCert(ctx context.Context, token, pkiPath, role, commo
 		return issuedCert{}, err
 	}
 	if status != http.StatusOK {
-		return issuedCert{}, fmt.Errorf("émission du certificat pour %q : statut %d : %v", commonName, status, parsed)
+		return issuedCert{}, fmt.Errorf("issuing the certificate for %q: status %d: %v", commonName, status, parsed)
 	}
 	d := dataField(parsed)
 	cert, _ := d["certificate"].(string)
@@ -297,7 +295,7 @@ func (c *vaultClient) signCSR(ctx context.Context, token, pkiPath, role, csrPEM,
 		return issuedCert{}, err
 	}
 	if status != http.StatusOK {
-		return issuedCert{}, fmt.Errorf("signature du CSR : statut %d : %v", status, parsed)
+		return issuedCert{}, fmt.Errorf("signing the CSR: status %d: %v", status, parsed)
 	}
 	d := dataField(parsed)
 	cert, _ := d["certificate"].(string)
@@ -320,7 +318,7 @@ func (c *vaultClient) enableAppRole(ctx context.Context, token string) error {
 		return err
 	}
 	if status != http.StatusNoContent && status != http.StatusOK {
-		return fmt.Errorf("activation d'approle : statut %d : %v", status, parsed)
+		return fmt.Errorf("enabling approle: status %d: %v", status, parsed)
 	}
 	return nil
 }
@@ -331,7 +329,7 @@ func (c *vaultClient) writePolicy(ctx context.Context, token, name, policyHCL st
 		return err
 	}
 	if status != http.StatusNoContent && status != http.StatusOK {
-		return fmt.Errorf("écriture de la policy %q : statut %d : %v", name, status, parsed)
+		return fmt.Errorf("writing policy %q: status %d: %v", name, status, parsed)
 	}
 	return nil
 }
@@ -344,7 +342,7 @@ func (c *vaultClient) ensureAppRoleRole(ctx context.Context, token, name string,
 		return err
 	}
 	if status != http.StatusNoContent && status != http.StatusOK {
-		return fmt.Errorf("création du rôle AppRole %q : statut %d : %v", name, status, parsed)
+		return fmt.Errorf("creating AppRole role %q: status %d: %v", name, status, parsed)
 	}
 	return nil
 }
@@ -355,7 +353,7 @@ func (c *vaultClient) readRoleID(ctx context.Context, token, name string) (strin
 		return "", err
 	}
 	if status != http.StatusOK {
-		return "", fmt.Errorf("lecture du role_id de %q : statut %d : %v", name, status, parsed)
+		return "", fmt.Errorf("reading the role_id of %q: status %d: %v", name, status, parsed)
 	}
 	roleID, _ := dataField(parsed)["role_id"].(string)
 	return roleID, nil
@@ -367,7 +365,7 @@ func (c *vaultClient) generateSecretID(ctx context.Context, token, name string) 
 		return "", err
 	}
 	if status != http.StatusOK {
-		return "", fmt.Errorf("génération du secret_id de %q : statut %d : %v", name, status, parsed)
+		return "", fmt.Errorf("generating the secret_id of %q: status %d: %v", name, status, parsed)
 	}
 	secretID, _ := dataField(parsed)["secret_id"].(string)
 	return secretID, nil
@@ -381,12 +379,12 @@ func (c *vaultClient) appRoleLogin(ctx context.Context, roleID, secretID string)
 		return "", err
 	}
 	if status != http.StatusOK {
-		return "", fmt.Errorf("login AppRole : statut %d : %v", status, parsed)
+		return "", fmt.Errorf("AppRole login: status %d: %v", status, parsed)
 	}
 	auth, _ := parsed["auth"].(map[string]any)
 	token, _ := auth["client_token"].(string)
 	if token == "" {
-		return "", fmt.Errorf("login AppRole : réponse sans client_token")
+		return "", fmt.Errorf("AppRole login: response without client_token")
 	}
 	return token, nil
 }
@@ -397,7 +395,7 @@ func (c *vaultClient) revokeSelf(ctx context.Context, token string) error {
 		return err
 	}
 	if status != http.StatusNoContent && status != http.StatusOK {
-		return fmt.Errorf("révocation du token : statut %d : %v", status, parsed)
+		return fmt.Errorf("revoking the token: status %d: %v", status, parsed)
 	}
 	return nil
 }
@@ -410,7 +408,7 @@ func (c *vaultClient) kvWrite(ctx context.Context, token, mount, path, value str
 		return err
 	}
 	if status != http.StatusOK {
-		return fmt.Errorf("écriture KV %q : statut %d : %v", path, status, parsed)
+		return fmt.Errorf("KV write %q: status %d: %v", path, status, parsed)
 	}
 	return nil
 }
@@ -424,7 +422,7 @@ func (c *vaultClient) kvRead(ctx context.Context, token, mount, path string) (va
 		return "", false, nil
 	}
 	if status != http.StatusOK {
-		return "", false, fmt.Errorf("lecture KV %q : statut %d : %v", path, status, parsed)
+		return "", false, fmt.Errorf("KV read %q: status %d: %v", path, status, parsed)
 	}
 	d := dataField(dataField(parsed))
 	if d == nil {
