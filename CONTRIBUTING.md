@@ -66,7 +66,7 @@ Ne signalez jamais une vulnérabilité dans une issue publique : voir [`SECURITY
 - **cœur** : tag `vX.Y.Z`, `CHANGELOG.md` à la racine, version reportée dans `internal/version` (comparée à la contrainte `core` des modules) ;
 - **SDK** : tag `sdk/vX.Y.Z` (convention des sous-modules Go), `sdk/CHANGELOG.md`.
 
-Avant 1.0, un `feat` incrémente le patch et un changement cassant le mineur : la contrainte `core: ">=0.1.0 <0.2.0"` des modules reste valable tant que rien ne casse. La publication de binaires (GoReleaser) viendra plus tard.
+Avant 1.0, un `feat` incrémente le patch et un changement cassant le mineur. Une release mineure change la version comparée à la contrainte `core` des modules : **dans la PR qui introduit une rupture**, relever la borne haute de la contrainte des modules du dépôt (`modules/*/module.yaml` et le modèle de `scaffold`) si la rupture ne les empêche pas de fonctionner avec le nouveau cœur, sinon la PR de release échoue en CI. Les modules de test (`test/modules/*`) n'ont pas de borne haute. La publication de binaires (GoReleaser) viendra plus tard.
 
 ## Dépendances
 

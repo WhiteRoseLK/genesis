@@ -3,7 +3,7 @@ name: test-a
 version: 0.1.0
 description: "module de test J4 : racine de la chaine test-a -> test-b -> test-c, phase graine + passation"
 layer: platform
-core: ">=0.1.0 <0.2.0"
+core: ">=0.1.0"
 protocol: 1
 
 capabilities: [test-a]

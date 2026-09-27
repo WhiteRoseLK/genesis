@@ -20,7 +20,7 @@ func installedModule(name string, opts ...func(*sdk.ManifestFile)) modulehost.In
 	m := &sdk.ManifestFile{
 		Name:    name,
 		Version: "0.1.0",
-		Core:    ">=0.1.0 <0.2.0",
+		Core:    ">=0.1.0",
 	}
 	for _, opt := range opts {
 		opt(m)

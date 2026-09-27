@@ -19,7 +19,7 @@ func writeFakeInstalledModule(t *testing.T, searchPath, name, version string) {
 		"version: " + version + "\n" +
 		"description: \"module de test\"\n" +
 		"layer: foundation\n" +
-		"core: \">=0.1.0 <0.2.0\"\n" +
+		"core: \">=0.1.0\"\n" +
 		"protocol: 1\n" +
 		"capabilities: []\n" +
 		"provides: []\n" +

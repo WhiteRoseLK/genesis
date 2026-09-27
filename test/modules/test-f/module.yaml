@@ -3,7 +3,7 @@ name: test-f
 version: 0.1.0
 description: "module de test J6 : reprend test.e/v1 en phase cible (passation croisée depuis test-e)"
 layer: platform
-core: ">=0.1.0 <0.2.0"
+core: ">=0.1.0"
 protocol: 1
 
 capabilities: [test-f]

@@ -3,7 +3,7 @@ name: proxmox
 version: 0.1.0
 description: "module compute (docs/07-modules-mvp.md) : fournit compute.vm/v1 sur un cluster Proxmox VE existant"
 layer: platform
-core: ">=0.1.0 <0.2.0"
+core: ">=0.1.0 <0.3.0"
 protocol: 1
 
 capabilities: [compute]
