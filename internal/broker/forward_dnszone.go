@@ -10,9 +10,9 @@ import (
 	dnszonev1 "github.com/WhiteRoseLK/genesis/sdk/go/gen/functions/dns/zone/v1"
 )
 
-// ForwardDNSZone enregistre un DnsZoneServer qui relaie chaque appel vers
-// conn, la connexion dispensée du module qui fournit dns.zone/v1 (coredns
-// en phase graine, powerdns en cible).
+// ForwardDNSZone registers a DnsZoneServer that relays each call to conn, the
+// dispensed connection of the module currently providing dns.zone/v1 (coredns
+// in the seed phase, powerdns as the target).
 func ForwardDNSZone(s *grpc.Server, conn *grpc.ClientConn) {
 	dnszonev1.RegisterDnsZoneServer(s, &forwardingDNSZone{client: dnszonev1.NewDnsZoneClient(conn)})
 }

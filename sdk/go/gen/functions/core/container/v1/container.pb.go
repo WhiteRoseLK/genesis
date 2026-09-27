@@ -4,9 +4,10 @@
 // 	protoc        (unknown)
 // source: functions/core/container/v1/container.proto
 
-// Fonction core.container/v1 (docs/03-module-contract.md) : fournie
-// nativement par le cœur, sur la graine. Runtime détecté (docker ou podman,
-// docs/04-spec.md : seed.container_runtime) piloté en ligne de commande.
+// Function core.container/v1 (docs/03-module-contract.md): provided
+// natively by the core, on the seed. The detected runtime (docker or
+// podman, docs/04-spec.md: seed.container_runtime) is driven through its
+// command line.
 
 package containerv1
 
@@ -85,11 +86,11 @@ func (x *Mount) GetReadOnly() bool {
 	return false
 }
 
-// File est un fichier échangé avec un conteneur bloquant, par la couche du
-// conteneur : jamais écrit sur le disque de la graine (clés, mots de passe).
+// File is a file exchanged with a blocking container, through the
+// container's layer: never written to the seed's disk (keys, passwords).
 type File struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
-	Path          string                 `protobuf:"bytes,1,opt,name=path,proto3" json:"path,omitempty"` // chemin absolu dans le conteneur
+	Path          string                 `protobuf:"bytes,1,opt,name=path,proto3" json:"path,omitempty"` // absolute path in the container
 	Content       []byte                 `protobuf:"bytes,2,opt,name=content,proto3" json:"content,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
@@ -141,19 +142,19 @@ func (x *File) GetContent() []byte {
 
 type RunRequest struct {
 	state   protoimpl.MessageState `protogen:"open.v1"`
-	Name    string                 `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"` // optionnel, généré si absent
+	Name    string                 `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"` // optional, generated when empty
 	Image   string                 `protobuf:"bytes,2,opt,name=image,proto3" json:"image,omitempty"`
 	Command []string               `protobuf:"bytes,3,rep,name=command,proto3" json:"command,omitempty"`
 	Env     map[string]string      `protobuf:"bytes,4,rep,name=env,proto3" json:"env,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
 	Mounts  []*Mount               `protobuf:"bytes,5,rep,name=mounts,proto3" json:"mounts,omitempty"`
-	// detach=false (par défaut) : Run bloque jusqu'à la fin du conteneur et
-	// renvoie sa sortie (ex. exécuter ansible-playbook). detach=true : Run
-	// démarre un service et rend la main immédiatement (ex. CoreDNS en J6),
-	// à piloter ensuite avec Stop/Status.
+	// detach=false (default): Run blocks until the container exits and
+	// returns its output (e.g. running ansible-playbook). detach=true: Run
+	// starts a service and returns immediately (e.g. CoreDNS in M6), to be
+	// driven afterwards with Stop/Status.
 	Detach bool `protobuf:"varint,6,opt,name=detach,proto3" json:"detach,omitempty"`
-	// files : déposés dans le conteneur avant son démarrage. collect : relus
-	// après sa fin, renvoyés dans RunResponse.collected si exit_code == 0.
-	// Mode bloquant (detach=false) seulement.
+	// files: placed in the container before it starts. collect: read back
+	// after it exits, returned in RunResponse.collected if exit_code == 0.
+	// Blocking mode (detach=false) only.
 	Files         []*File  `protobuf:"bytes,7,rep,name=files,proto3" json:"files,omitempty"`
 	Collect       []string `protobuf:"bytes,8,rep,name=collect,proto3" json:"collect,omitempty"`
 	unknownFields protoimpl.UnknownFields
@@ -249,10 +250,10 @@ func (x *RunRequest) GetCollect() []string {
 type RunResponse struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	ContainerId   string                 `protobuf:"bytes,1,opt,name=container_id,json=containerId,proto3" json:"container_id,omitempty"`
-	ExitCode      int32                  `protobuf:"varint,2,opt,name=exit_code,json=exitCode,proto3" json:"exit_code,omitempty"` // valide seulement si detach=false
+	ExitCode      int32                  `protobuf:"varint,2,opt,name=exit_code,json=exitCode,proto3" json:"exit_code,omitempty"` // only valid if detach=false
 	Stdout        string                 `protobuf:"bytes,3,opt,name=stdout,proto3" json:"stdout,omitempty"`
 	Stderr        string                 `protobuf:"bytes,4,opt,name=stderr,proto3" json:"stderr,omitempty"`
-	Ip            string                 `protobuf:"bytes,5,opt,name=ip,proto3" json:"ip,omitempty"` // adresse IP du conteneur sur son réseau, valide si detach=true
+	Ip            string                 `protobuf:"bytes,5,opt,name=ip,proto3" json:"ip,omitempty"` // container IP address on its network, valid if detach=true
 	Collected     []*File                `protobuf:"bytes,6,rep,name=collected,proto3" json:"collected,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache

@@ -11,10 +11,9 @@ import (
 	fleetagentv1 "github.com/WhiteRoseLK/genesis/sdk/go/gen/functions/fleet/agent/v1"
 )
 
-// ForwardFleetAgent enregistre un FleetAgentServer qui relaie chaque appel
-// vers TOUTES les connexions fournies (docs/09-decisions.md ADR-017) —
-// contrairement aux forwarders "actif unique" (forward_*.go), qui ne
-// relaient jamais que vers une seule connexion.
+// ForwardFleetAgent registers a FleetAgentServer that relays each call to ALL
+// the provided connections (docs/09-decisions.md ADR-017) — unlike the "single
+// active" forwarders (forward_*.go), which only ever relay to one connection.
 func ForwardFleetAgent(s *grpc.Server, conns []*grpc.ClientConn) {
 	fleetagentv1.RegisterFleetAgentServer(s, &fanoutFleetAgent{conns: conns})
 }
@@ -28,7 +27,7 @@ func (f *fanoutFleetAgent) Install(ctx context.Context, req *fleetagentv1.Instal
 	for i, conn := range f.conns {
 		client := fleetagentv1.NewFleetAgentClient(conn)
 		if _, err := client.Install(ctx, req); err != nil {
-			return nil, fmt.Errorf("fleet.agent/v1.Install (fournisseur %d/%d) : %w", i+1, len(f.conns), err)
+			return nil, fmt.Errorf("fleet.agent/v1.Install (provider %d/%d): %w", i+1, len(f.conns), err)
 		}
 	}
 	return &fleetagentv1.InstallResponse{}, nil

@@ -31,14 +31,14 @@ func sourceModuleDir(t *testing.T) string {
 func useTempHomeKeepingGoCache(t *testing.T) (home string) {
 	t.Helper()
 
-	// Lire les vraies valeurs AVANT de faker $HOME : `go env` en dérive ses
-	// défauts (GOPATH=$HOME/go...), donc les interroger après aurait
-	// simplement renvoyé les chemins fictifs.
+	// Read the real values BEFORE faking $HOME: `go env` derives its defaults
+	// from it (GOPATH=$HOME/go...), so querying them afterwards would simply
+	// return the fake paths.
 	real := map[string]string{}
 	for _, name := range []string{"GOMODCACHE", "GOCACHE", "GOPATH"} {
 		out, err := exec.Command("go", "env", name).Output()
 		if err != nil {
-			t.Fatalf("go env %s : %v", name, err)
+			t.Fatalf("go env %s: %v", name, err)
 		}
 		real[name] = strings.TrimSpace(string(out))
 	}
@@ -58,48 +58,48 @@ func TestModulesInstallListVerify(t *testing.T) {
 
 	installOut, err := runCLI(t, "modules", "install", sourceModuleDir(t), "--lock-file", lockFile)
 	if err != nil {
-		t.Fatalf("modules install : %v\n%s", err, installOut)
+		t.Fatalf("modules install: %v\n%s", err, installOut)
 	}
 	if !strings.Contains(installOut, "panicking@0.1.0") {
-		t.Errorf("sortie install = %q, attendu la mention panicking@0.1.0", installOut)
+		t.Errorf("install output = %q, want panicking@0.1.0 mentioned", installOut)
 	}
 	if _, err := os.Stat(lockFile); err != nil {
-		t.Errorf("genesis.lock absent après install : %v", err)
+		t.Errorf("genesis.lock missing after install: %v", err)
 	}
 
 	listOut, err := runCLI(t, "modules", "list")
 	if err != nil {
-		t.Fatalf("modules list : %v", err)
+		t.Fatalf("modules list: %v", err)
 	}
 	if !strings.Contains(listOut, "panicking") {
-		t.Errorf("modules list = %q, attendu panicking", listOut)
+		t.Errorf("modules list = %q, want panicking", listOut)
 	}
 
 	verifyOut, err := runCLI(t, "modules", "verify", "--lock-file", lockFile)
 	if err != nil {
-		t.Fatalf("modules verify : %v\n%s", err, verifyOut)
+		t.Fatalf("modules verify: %v\n%s", err, verifyOut)
 	}
-	if !strings.Contains(verifyOut, "1 module(s) vérifié") {
-		t.Errorf("modules verify = %q, attendu la confirmation d'1 module vérifié", verifyOut)
+	if !strings.Contains(verifyOut, "1 module(s) verified") {
+		t.Errorf("modules verify = %q, want confirmation of 1 verified module", verifyOut)
 	}
 }
 
-// TestModulesVerifyRejectsTamperedBinary est le critère d'acceptation du
-// jalon J3 (doc 08) : un module dont l'empreinte diffère du lock est refusé.
+// TestModulesVerifyRejectsTamperedBinary is the M3 acceptance criterion (doc
+// 08): a module whose digest differs from the lock is refused.
 func TestModulesVerifyRejectsTamperedBinary(t *testing.T) {
 	home := useTempHomeKeepingGoCache(t)
 	t.Setenv("GENESIS_MODULE_PATH", "")
 	lockFile := filepath.Join(t.TempDir(), "genesis.lock")
 
 	if _, err := runCLI(t, "modules", "install", sourceModuleDir(t), "--lock-file", lockFile); err != nil {
-		t.Fatalf("modules install : %v", err)
+		t.Fatalf("modules install: %v", err)
 	}
 
 	binaryName := fmt.Sprintf("module-%s-%s", runtime.GOOS, runtime.GOARCH)
 	binaryPath := filepath.Join(home, ".local", "share", "genesis", "modules", "panicking", "0.1.0", binaryName)
 	f, err := os.OpenFile(binaryPath, os.O_APPEND|os.O_WRONLY, 0o755)
 	if err != nil {
-		t.Fatalf("ouverture du binaire installé : %v", err)
+		t.Fatalf("opening the installed binary: %v", err)
 	}
 	if _, err := f.WriteString("tampered"); err != nil {
 		t.Fatal(err)
@@ -109,6 +109,6 @@ func TestModulesVerifyRejectsTamperedBinary(t *testing.T) {
 	}
 
 	if _, err := runCLI(t, "modules", "verify", "--lock-file", lockFile); err == nil {
-		t.Fatal("modules verify sur un binaire modifié : succès inattendu, devait être refusé")
+		t.Fatal("modules verify on a modified binary: unexpected success, should have been refused")
 	}
 }

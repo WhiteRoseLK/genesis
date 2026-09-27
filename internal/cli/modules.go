@@ -21,7 +21,7 @@ import (
 func newModulesCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "modules",
-		Short: "Gère les modules installés (list, install, verify, scaffold)",
+		Short: "Manage installed modules (list, install, verify, scaffold)",
 	}
 	cmd.AddCommand(
 		newModulesListCmd(),
@@ -35,7 +35,7 @@ func newModulesCmd() *cobra.Command {
 func newModulesListCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "list",
-		Short: "Liste les modules installés",
+		Short: "List installed modules",
 	}
 	cmd.RunE = func(cmd *cobra.Command, args []string) error {
 		found, err := modulehost.Discover(modulehost.SearchPaths())
@@ -44,7 +44,7 @@ func newModulesListCmd() *cobra.Command {
 		}
 		out := cmd.OutOrStdout()
 		if len(found) == 0 {
-			_, err := fmt.Fprintln(out, "aucun module installé.")
+			_, err := fmt.Fprintln(out, "no module installed.")
 			return err
 		}
 		for _, m := range found {
@@ -59,11 +59,11 @@ func newModulesListCmd() *cobra.Command {
 
 func newModulesInstallCmd() *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "install <répertoire-source>",
-		Short: "Compile et installe un module depuis son répertoire source (docs/10-adding-a-module.md)",
+		Use:   "install <source-directory>",
+		Short: "Build and install a module from its source directory (docs/10-adding-a-module.md)",
 		Args:  cobra.ExactArgs(1),
 	}
-	cmd.Flags().String("lock-file", "genesis.lock", "chemin du fichier de verrouillage, à côté de la spec (doc 02)")
+	cmd.Flags().String("lock-file", "genesis.lock", "path of the lock file, next to the spec (doc 02)")
 	cmd.RunE = func(cmd *cobra.Command, args []string) error {
 		sourceDir := args[0]
 		lockPath, err := cmd.Flags().GetString("lock-file")
@@ -82,7 +82,7 @@ func newModulesInstallCmd() *cobra.Command {
 		}
 		destDir := filepath.Join(installRoot, manifest.Name, manifest.Version)
 		if err := os.MkdirAll(destDir, 0o750); err != nil {
-			return fmt.Errorf("création de %s : %w", destDir, err)
+			return fmt.Errorf("creating %s: %w", destDir, err)
 		}
 
 		destBinary := filepath.Join(destDir, modulehost.BinaryName())
@@ -90,7 +90,7 @@ func newModulesInstallCmd() *cobra.Command {
 		build.Dir = sourceDir
 		build.Env = append(os.Environ(), "CGO_ENABLED=0")
 		if out, err := build.CombinedOutput(); err != nil {
-			return fmt.Errorf("compilation de %s : %w\n%s", sourceDir, err, out)
+			return fmt.Errorf("compilation de %s: %w\n%s", sourceDir, err, out)
 		}
 
 		if err := copyFile(filepath.Join(sourceDir, "module.yaml"), filepath.Join(destDir, "module.yaml")); err != nil {
@@ -121,7 +121,7 @@ func newModulesInstallCmd() *cobra.Command {
 			return err
 		}
 
-		_, err = fmt.Fprintf(cmd.OutOrStdout(), "module %s@%s installé dans %s (empreinte %s), %s mis à jour.\n",
+		_, err = fmt.Fprintf(cmd.OutOrStdout(), "module %s@%s installed in %s (digest %s), %s updated.\n",
 			manifest.Name, manifest.Version, destDir, fingerprint, lockPath)
 		return err
 	}
@@ -131,9 +131,9 @@ func newModulesInstallCmd() *cobra.Command {
 func newModulesVerifyCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "verify",
-		Short: "Vérifie l'empreinte des modules installés contre genesis.lock",
+		Short: "Verify the digests of installed modules against genesis.lock",
 	}
-	cmd.Flags().String("lock-file", "genesis.lock", "chemin du fichier de verrouillage")
+	cmd.Flags().String("lock-file", "genesis.lock", "path of the lock file")
 	cmd.RunE = func(cmd *cobra.Command, args []string) error {
 		lockPath, err := cmd.Flags().GetString("lock-file")
 		if err != nil {
@@ -152,7 +152,7 @@ func newModulesVerifyCmd() *cobra.Command {
 		for _, m := range found {
 			fingerprint, err := modulehost.Fingerprint(m.BinaryPath)
 			if err != nil {
-				failures = append(failures, fmt.Sprintf("%s : %v", m.Name, err))
+				failures = append(failures, fmt.Sprintf("%s: %v", m.Name, err))
 				continue
 			}
 			if err := lock.Verify(m.Name, m.Version, fingerprint); err != nil {
@@ -160,10 +160,10 @@ func newModulesVerifyCmd() *cobra.Command {
 			}
 		}
 		if len(failures) > 0 {
-			return fmt.Errorf("module(s) refusé(s) :\n%s", strings.Join(failures, "\n"))
+			return fmt.Errorf("module(s) refused:\n%s", strings.Join(failures, "\n"))
 		}
 
-		_, err = fmt.Fprintf(cmd.OutOrStdout(), "%d module(s) vérifié(s), toutes les empreintes correspondent à %s.\n", len(found), lockPath)
+		_, err = fmt.Fprintf(cmd.OutOrStdout(), "%d module(s) verified, every digest matches %s.\n", len(found), lockPath)
 		return err
 	}
 	return cmd
@@ -171,11 +171,11 @@ func newModulesVerifyCmd() *cobra.Command {
 
 func newModulesScaffoldCmd() *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "scaffold <nom>",
-		Short: "Génère modules/<nom>/ (à exécuter depuis la racine du dépôt, docs/10-adding-a-module.md)",
+		Use:   "scaffold <name>",
+		Short: "Generate modules/<name>/ (run from the repository root, docs/10-adding-a-module.md)",
 		Args:  cobra.ExactArgs(1),
 	}
-	cmd.Flags().StringSlice("provides", nil, "fonctions fournies (ex. dns.zone/v1,dns.resolver/v1)")
+	cmd.Flags().StringSlice("provides", nil, "provided functions (e.g. dns.zone/v1,dns.resolver/v1)")
 	_ = cmd.MarkFlagRequired("provides")
 	cmd.RunE = func(cmd *cobra.Command, args []string) error {
 		name := args[0]
@@ -191,7 +191,7 @@ func newModulesScaffoldCmd() *cobra.Command {
 		if err != nil {
 			return err
 		}
-		_, err = fmt.Fprintf(cmd.OutOrStdout(), "module %s généré dans %s (compile, ajouté au workspace Go).\n", name, dir)
+		_, err = fmt.Fprintf(cmd.OutOrStdout(), "module %s generated in %s (builds, added to the Go workspace).\n", name, dir)
 		return err
 	}
 	return cmd
@@ -205,21 +205,21 @@ func dirExists(path string) bool {
 func copyFile(src, dst string) error {
 	in, err := os.Open(src)
 	if err != nil {
-		return fmt.Errorf("lecture de %s : %w", src, err)
+		return fmt.Errorf("lecture de %s: %w", src, err)
 	}
 	defer func() { _ = in.Close() }()
 
 	if err := os.MkdirAll(filepath.Dir(dst), 0o750); err != nil {
-		return fmt.Errorf("création de %s : %w", filepath.Dir(dst), err)
+		return fmt.Errorf("creating %s: %w", filepath.Dir(dst), err)
 	}
 	out, err := os.Create(dst)
 	if err != nil {
-		return fmt.Errorf("écriture de %s : %w", dst, err)
+		return fmt.Errorf("writing %s: %w", dst, err)
 	}
 	defer func() { _ = out.Close() }()
 
 	if _, err := io.Copy(out, in); err != nil {
-		return fmt.Errorf("copie de %s vers %s : %w", src, dst, err)
+		return fmt.Errorf("copying %s to %s: %w", src, dst, err)
 	}
 	return nil
 }

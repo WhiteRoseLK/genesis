@@ -14,27 +14,27 @@ func TestMasterKeyEnsureIdempotent(t *testing.T) {
 
 	first, created, err := provider.Ensure(ctx)
 	if err != nil {
-		t.Fatalf("premier Ensure : %v", err)
+		t.Fatalf("first Ensure: %v", err)
 	}
 	if !created {
-		t.Error("premier Ensure : created = false, attendu true (première génération)")
+		t.Error("first Ensure: created = false, want true (first generation)")
 	}
 
 	second, created, err := provider.Ensure(ctx)
 	if err != nil {
-		t.Fatalf("second Ensure : %v", err)
+		t.Fatalf("second Ensure: %v", err)
 	}
 	if created {
-		t.Error("second Ensure : created = true, attendu false (clé déjà présente)")
+		t.Error("second Ensure: created = true, want false (key already present)")
 	}
 	if first.String() != second.String() {
-		t.Error("la clé maîtresse a changé entre les deux Ensure")
+		t.Error("the master key changed between the two Ensure calls")
 	}
 }
 
 func TestMasterKeyLoadWithoutInit(t *testing.T) {
 	provider := FileMasterKeyProvider{StateDir: t.TempDir()}
 	if _, err := provider.Load(context.Background()); err == nil {
-		t.Fatal("Load sans init préalable : succès inattendu")
+		t.Fatal("Load without a prior init: unexpected success")
 	}
 }

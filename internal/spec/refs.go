@@ -10,9 +10,9 @@ import (
 
 var refPattern = regexp.MustCompile(`^(env|file|vault)://\S+$`)
 
-// validateSecretRefs interdit tout secret littéral : toute clé finissant par
-// "_ref" doit être une référence env://, file:// ou vault:// (docs/04-spec.md,
-// règle "Aucun secret littéral").
+// validateSecretRefs forbids any literal secret: every key ending in "_ref"
+// must be an env://, file:// or vault:// reference (docs/04-spec.md, rule "No
+// literal secret").
 func validateSecretRefs(node any, path string) []error {
 	switch v := node.(type) {
 	case map[string]any:
@@ -24,7 +24,7 @@ func validateSecretRefs(node any, path string) []error {
 				if !ok || !refPattern.MatchString(s) {
 					errs = append(errs, &ValidationError{
 						Path:    childPath,
-						Message: "doit être une référence env://, file:// ou vault:// (aucun secret littéral)",
+						Message: "must be an env://, file:// or vault:// reference (no literal secret)",
 					})
 					continue
 				}

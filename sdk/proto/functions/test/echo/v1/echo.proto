@@ -1,8 +1,8 @@
 syntax = "proto3";
 
-// Fonction de test générique, réutilisée sous des noms différents
-// (test.a/v1, test.b/v1...) par test/modules/test-* pour exercer le
-// résolveur/planificateur/broker sans logique métier (docs/08-milestones.md, J4).
+// Generic test function, reused under different names (test.a/v1,
+// test.b/v1...) by test/modules/test-* to exercise the
+// resolver/planner/broker without business logic (docs/08-milestones.md, M4).
 package functions.test.echo.v1;
 
 option go_package = "github.com/WhiteRoseLK/genesis/sdk/go/gen/functions/test/echo/v1;echov1";
@@ -17,6 +17,6 @@ message CallRequest {
 
 message CallResponse {
   string message = 1;
-  string from = 2;   // nom du module qui répond
-  string phase = 3;  // "seed" | "target", pour vérifier le Handover
+  string from = 2;   // name of the module that answers
+  string phase = 3;  // "seed" | "target", to check the Handover
 }

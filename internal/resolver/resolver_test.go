@@ -82,13 +82,13 @@ func TestResolveExplicitModule(t *testing.T) {
 
 	resolved, err := Resolve(env, installed)
 	if err != nil {
-		t.Fatalf("Resolve : %v", err)
+		t.Fatalf("Resolve: %v", err)
 	}
 	if resolved.CapabilityModule["compute"] != "proxmox" {
-		t.Errorf("CapabilityModule[compute] = %q, attendu proxmox", resolved.CapabilityModule["compute"])
+		t.Errorf("CapabilityModule[compute] = %q, want proxmox", resolved.CapabilityModule["compute"])
 	}
 	if resolved.Modules["proxmox"].AutoAdded {
-		t.Error("proxmox demandé explicitement, ne devrait pas être AutoAdded")
+		t.Error("proxmox was requested explicitly and should not be AutoAdded")
 	}
 }
 
@@ -98,10 +98,10 @@ func TestResolveSingleInstalledIsImplicitDefault(t *testing.T) {
 
 	resolved, err := Resolve(env, installed)
 	if err != nil {
-		t.Fatalf("Resolve : %v", err)
+		t.Fatalf("Resolve: %v", err)
 	}
 	if resolved.CapabilityModule["compute"] != "proxmox" {
-		t.Errorf("CapabilityModule[compute] = %q, attendu proxmox (seul module installé)", resolved.CapabilityModule["compute"])
+		t.Errorf("CapabilityModule[compute] = %q, want proxmox (the only installed module)", resolved.CapabilityModule["compute"])
 	}
 }
 
@@ -112,7 +112,7 @@ func TestResolveAmbiguousCapabilityWithoutDefaultFails(t *testing.T) {
 		installedModule("bind", withCapabilities("dns")),
 	}
 	if _, err := Resolve(env, installed); err == nil {
-		t.Fatal("capacité ambiguë sans défaut : succès inattendu")
+		t.Fatal("ambiguous capability without a default: unexpected success")
 	}
 }
 
@@ -124,10 +124,10 @@ func TestResolveAmbiguousCapabilityWithDefaultSucceeds(t *testing.T) {
 	}
 	resolved, err := Resolve(env, installed)
 	if err != nil {
-		t.Fatalf("Resolve : %v", err)
+		t.Fatalf("Resolve: %v", err)
 	}
 	if resolved.CapabilityModule["dns"] != "powerdns" {
-		t.Errorf("CapabilityModule[dns] = %q, attendu powerdns (module par défaut)", resolved.CapabilityModule["dns"])
+		t.Errorf("CapabilityModule[dns] = %q, want powerdns (default module)", resolved.CapabilityModule["dns"])
 	}
 }
 
@@ -143,17 +143,17 @@ func TestResolveAutoAddsRequiredFunctionProvider(t *testing.T) {
 
 	resolved, err := Resolve(env, installed)
 	if err != nil {
-		t.Fatalf("Resolve : %v", err)
+		t.Fatalf("Resolve: %v", err)
 	}
 	proxmoxModule, ok := resolved.Modules["proxmox"]
 	if !ok {
-		t.Fatal("proxmox n'a pas été ajouté automatiquement")
+		t.Fatal("proxmox was not added automatically")
 	}
 	if !proxmoxModule.AutoAdded {
-		t.Error("proxmox aurait dû être marqué AutoAdded")
+		t.Error("proxmox should have been marked AutoAdded")
 	}
 	if provider, _ := resolved.ProviderFor("compute.vm/v1", ""); provider != "proxmox" {
-		t.Errorf("ProviderFor(compute.vm/v1) = %q, attendu proxmox", provider)
+		t.Errorf("ProviderFor(compute.vm/v1) = %q, want proxmox", provider)
 	}
 }
 
@@ -167,10 +167,10 @@ func TestResolveMissingRequiredFunctionFails(t *testing.T) {
 	}
 	_, err := Resolve(env, installed)
 	if err == nil {
-		t.Fatal("fonction requise sans fournisseur : succès inattendu")
+		t.Fatal("required function without a provider: unexpected success")
 	}
 	if !strings.Contains(err.Error(), "compute.vm/v1") {
-		t.Errorf("erreur = %q, attendu qu'elle mentionne compute.vm/v1", err.Error())
+		t.Errorf("error = %q, want it to mention compute.vm/v1", err.Error())
 	}
 }
 
@@ -184,10 +184,10 @@ func TestResolveMissingOptionalFunctionSucceeds(t *testing.T) {
 	}
 	resolved, err := Resolve(env, installed)
 	if err != nil {
-		t.Fatalf("fonction optionnelle absente : erreur inattendue : %v", err)
+		t.Fatalf("missing optional function: unexpected error: %v", err)
 	}
 	if _, ok := resolved.ProviderFor("platform.cluster/v1", ""); ok {
-		t.Error("une fonction optionnelle absente ne devrait pas apparaître dans FunctionProviders")
+		t.Error("a missing optional function should not appear in FunctionProviders")
 	}
 }
 
@@ -197,13 +197,13 @@ func TestResolveIncompatibleCoreVersionFails(t *testing.T) {
 		installedModule("proxmox", withCapabilities("compute"), withCore(">=9.0.0 <10.0.0")),
 	}
 	if _, err := Resolve(env, installed); err == nil {
-		t.Fatal("contrainte core incompatible : succès inattendu")
+		t.Fatal("incompatible core constraint: unexpected success")
 	}
 }
 
-// TestResolveMutualRequirementTerminates vérifie que la fermeture des
-// dépendances ne boucle pas indéfiniment quand deux modules déjà résolus se
-// requièrent mutuellement (le point fixe doit être atteint proprement).
+// TestResolveMutualRequirementTerminates checks that the dependency closure
+// does not loop forever when two already resolved modules require each other
+// (the fixed point must be reached cleanly).
 func TestResolveMutualRequirementTerminates(t *testing.T) {
 	env := &spec.Environment{
 		Capabilities: map[string]spec.Capability{
@@ -234,19 +234,19 @@ func TestResolveMutualRequirementTerminates(t *testing.T) {
 	select {
 	case <-done:
 	case <-timeout():
-		t.Fatal("Resolve n'a pas terminé (boucle infinie suspectée)")
+		t.Fatal("Resolve did not terminate (suspected infinite loop)")
 	}
 	if err != nil {
-		t.Fatalf("Resolve : %v", err)
+		t.Fatalf("Resolve: %v", err)
 	}
 	if len(resolved.Modules) != 2 {
-		t.Errorf("modules résolus = %v, attendu 2", resolved.Modules)
+		t.Errorf("resolved modules = %v, want 2", resolved.Modules)
 	}
 }
 
-// TestResolveSeedAndTargetProvidersCoexist reflète le schéma de bootstrap du
-// doc 05 : CoreDNS fournit dns.zone/v1 en phase graine, PowerDNS en phase
-// cible — les deux à la fois, ce n'est pas un conflit à résoudre.
+// TestResolveSeedAndTargetProvidersCoexist reflects the bootstrap pattern of
+// doc 05: CoreDNS provides dns.zone/v1 in the seed phase, PowerDNS in the
+// target phase — both at once, which is not a conflict to resolve.
 func TestResolveSeedAndTargetProvidersCoexist(t *testing.T) {
 	env := &spec.Environment{
 		Capabilities: map[string]spec.Capability{
@@ -257,8 +257,8 @@ func TestResolveSeedAndTargetProvidersCoexist(t *testing.T) {
 		installedModule("powerdns",
 			withCapabilities("dns"),
 			withProvidesPhases("dns.zone/v1", "target"),
-			// Vault a besoin d'un certificat TLS initial signé par la graine
-			// avant même que la cible existe (docs/03, exemple pki.issuer@seed).
+			// Vault needs an initial TLS certificate signed by the seed before
+			// the target even exists (docs/03, pki.issuer@seed example).
 			withRequires("seed", sdk.RequireEntry{Function: "dns.zone/v1@seed"}),
 		),
 		installedModule("coredns", withProvidesPhases("dns.zone/v1", "seed")),
@@ -266,21 +266,21 @@ func TestResolveSeedAndTargetProvidersCoexist(t *testing.T) {
 
 	resolved, err := Resolve(env, installed)
 	if err != nil {
-		t.Fatalf("Resolve : %v", err)
+		t.Fatalf("Resolve: %v", err)
 	}
 	if target, _ := resolved.ProviderFor("dns.zone/v1", "target"); target != "powerdns" {
-		t.Errorf("ProviderFor(dns.zone/v1, target) = %q, attendu powerdns", target)
+		t.Errorf("ProviderFor(dns.zone/v1, target) = %q, want powerdns", target)
 	}
 	if seed, _ := resolved.ProviderFor("dns.zone/v1", "seed"); seed != "coredns" {
-		t.Errorf("ProviderFor(dns.zone/v1, seed) = %q, attendu coredns", seed)
+		t.Errorf("ProviderFor(dns.zone/v1, seed) = %q, want coredns", seed)
 	}
 	if _, ok := resolved.Modules["coredns"]; !ok {
-		t.Error("coredns aurait dû être ajouté automatiquement pour dns.zone/v1@seed")
+		t.Error("coredns should have been added automatically for dns.zone/v1@seed")
 	}
 }
 
-// TestResolveCarriesCapabilityConfigToModule vérifie que la config résolue
-// de la spec est bien transmise au module (StepRequest.config, doc02/J5).
+// TestResolveCarriesCapabilityConfigToModule checks that the spec's resolved
+// config is passed to the module (StepRequest.config, doc 02/M5).
 func TestResolveCarriesCapabilityConfigToModule(t *testing.T) {
 	env := &spec.Environment{
 		Capabilities: map[string]spec.Capability{
@@ -294,10 +294,10 @@ func TestResolveCarriesCapabilityConfigToModule(t *testing.T) {
 
 	resolved, err := Resolve(env, installed)
 	if err != nil {
-		t.Fatalf("Resolve : %v", err)
+		t.Fatalf("Resolve: %v", err)
 	}
 	cfg := resolved.Modules["proxmox"].Config
 	if cfg["endpoint"] != "https://pve01:8006" || cfg["node"] != "pve01" {
-		t.Errorf("Config = %+v, attendu endpoint/node de la spec", cfg)
+		t.Errorf("Config = %+v, want the spec's endpoint/node", cfg)
 	}
 }

@@ -133,7 +133,7 @@ func (m *teleportModule) Validate(context.Context, *modulev1.ValidateRequest) (*
 
 func (m *teleportModule) Check(_ context.Context, req *modulev1.StepRequest) (*modulev1.CheckResult, error) {
 	m.brokerToken = req.GetBrokerToken()
-	return &modulev1.CheckResult{Status: modulev1.CheckResult_STATUS_CONFORME}, nil
+	return &modulev1.CheckResult{Status: modulev1.CheckResult_STATUS_COMPLIANT}, nil
 }
 
 // dial dial la session de broker au plus une fois -- même précaution que

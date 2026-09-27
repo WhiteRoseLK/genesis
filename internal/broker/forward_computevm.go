@@ -10,9 +10,9 @@ import (
 	computevmv1 "github.com/WhiteRoseLK/genesis/sdk/go/gen/functions/compute/vm/v1"
 )
 
-// ForwardComputeVM enregistre un ComputeVMServer qui relaie chaque appel
-// vers conn, la connexion dispensée du module qui fournit compute.vm/v1
-// actuellement (fake-compute en J4, proxmox à partir de J5).
+// ForwardComputeVM registers a ComputeVMServer that relays each call to conn,
+// the dispensed connection of the module currently providing compute.vm/v1
+// (fake-compute in M4, proxmox from M5).
 func ForwardComputeVM(s *grpc.Server, conn *grpc.ClientConn) {
 	computevmv1.RegisterComputeVMServer(s, &forwardingComputeVM{client: computevmv1.NewComputeVMClient(conn)})
 }

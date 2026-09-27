@@ -113,7 +113,7 @@ func (m *proxmoxModule) Check(ctx context.Context, req *modulev1.StepRequest) (*
 	if _, err := client.Version(ctx); err != nil {
 		return nil, fmt.Errorf("connexion à Proxmox : %w", err)
 	}
-	return &modulev1.CheckResult{Status: modulev1.CheckResult_STATUS_CONFORME}, nil
+	return &modulev1.CheckResult{Status: modulev1.CheckResult_STATUS_COMPLIANT}, nil
 }
 
 func (m *proxmoxModule) stepOK(req *modulev1.StepRequest) (*modulev1.StepResult, error) {

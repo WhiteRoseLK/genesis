@@ -1,13 +1,13 @@
 .PHONY: build test test-race test-docker pull-images lint proto proto-check e2e mod-check vuln licenses tools
 
-# Modules Go du monorepo, un par go.mod (cœur, sdk, modules/*, test/modules/*).
-# Découverts automatiquement : ajouter un module ne doit nécessiter aucune
-# modification hors de son répertoire (docs/02-architecture.md), donc pas de
-# liste codée en dur ici — voir genesis modules scaffold (docs/10).
+# Go modules of the monorepo, one per go.mod (core, sdk, modules/*, test/modules/*).
+# Discovered automatically: adding a module must not require any change outside
+# its directory (docs/02-architecture.md), hence no hard-coded list here — see
+# genesis modules scaffold (docs/10).
 GO_MODULES := $(shell find . -name go.mod -not -path './.git/*' -exec dirname {} \; | sed 's|^\./||' | sort)
 
-# Outils de développement, versions épinglées (installés par `make tools`
-# dans .bin/, prioritaire sur le PATH).
+# Development tools, pinned versions (installed by `make tools` into .bin/,
+# which takes precedence over the PATH).
 GOLANGCI_LINT_VERSION   := v2.13.2
 BUF_VERSION             := v1.73.0
 PROTOC_GEN_GO_VERSION   := v1.36.12
@@ -15,15 +15,15 @@ PROTOC_GEN_GRPC_VERSION := v1.6.2
 GOVULNCHECK_VERSION     := v1.8.0
 GO_LICENSES_VERSION     := v2.0.1
 TOOLS_BIN := $(CURDIR)/.bin
-# Outils compilés avec la chaîne Go du projet (go.mod), pas celle du système :
-# golangci-lint et govulncheck doivent comprendre la version de Go ciblée.
+# Tools are built with the project's Go toolchain (go.mod), not the system's:
+# golangci-lint and govulncheck must understand the targeted Go version.
 GO_TOOLCHAIN := $(shell go env GOVERSION)
 export PATH := $(TOOLS_BIN):$(PATH)
 
-# Licences de dépendances compatibles avec Apache-2.0 (docs/09-decisions.md, ADR-009).
+# Dependency licenses compatible with Apache-2.0 (docs/09-decisions.md, ADR-009).
 ALLOWED_LICENSES := Apache-2.0,BSD-2-Clause,BSD-3-Clause,MIT,ISC,MPL-2.0
 
-# Binaires livrés : CGO_ENABLED=0, linux/amd64 et linux/arm64
+# Shipped binaries: CGO_ENABLED=0, linux/amd64 and linux/arm64
 # (ex. `make build GOARCH=arm64`).
 GOOS   ?= linux
 GOARCH ?= amd64
@@ -36,43 +36,43 @@ tools:
 	GOTOOLCHAIN=$(GO_TOOLCHAIN) GOBIN=$(TOOLS_BIN) go install golang.org/x/vuln/cmd/govulncheck@$(GOVULNCHECK_VERSION)
 	GOTOOLCHAIN=$(GO_TOOLCHAIN) GOBIN=$(TOOLS_BIN) go install github.com/google/go-licenses/v2@$(GO_LICENSES_VERSION)
 
-# -o /dev/null : vérifie la compilation sans déposer de binaire dans le
-# répertoire du module (un module = un paquet main, que `go build ./...`
-# écrirait sous le nom du module).
+# -o /dev/null: checks that the code compiles without leaving a binary in the
+# module's directory (a module = a main package, which `go build ./...` would
+# write under the module's name).
 build:
 	@set -e; for m in $(GO_MODULES); do \
 		echo "==> go build $(GOOS)/$(GOARCH) ($$m)"; \
 		(cd $$m && CGO_ENABLED=0 GOOS=$(GOOS) GOARCH=$(GOARCH) go build -o /dev/null ./...); \
 	done
 
-# Tests unitaires : sans réseau ni démon de conteneurs.
+# Unit tests: no network, no container daemon.
 test:
 	@set -e; for m in $(GO_MODULES); do \
 		echo "==> go test ($$m)"; \
 		(cd $$m && go test ./...); \
 	done
 
-# Mêmes tests avec le détecteur de concurrence : exige CGO, contrairement aux
-# binaires livrés (CGO_ENABLED=0) ; ne concerne que l'exécution des tests.
+# Same tests with the race detector: requires CGO, unlike the shipped
+# binaries (CGO_ENABLED=0); only affects how the tests run.
 test-race:
 	@set -e; for m in $(GO_MODULES); do \
 		echo "==> go test -race ($$m)"; \
 		(cd $$m && CGO_ENABLED=1 go test -race ./...); \
 	done
 
-# Tests d'intégration contre de vrais conteneurs (build tag `docker`) :
-# nécessitent un démon docker ou podman et tirent des images.
+# Integration tests against real containers (`docker` build tag): need a
+# docker or podman daemon and pull images.
 test-docker:
 	@set -e; for m in $(GO_MODULES); do \
 		echo "==> go test -tags docker ($$m)"; \
 		(cd $$m && go test -tags docker ./...); \
 	done
 
-# Images épinglées (dépôt:tag@sha256:…) trouvées dans le code Go : aucune
-# liste à maintenir, un nouveau module est couvert d'office. Tirées d'avance
-# avec reprises espacées : une limite de débit passagère d'un registre
-# (toomanyrequests) ne fait plus échouer les tests d'intégration, et un
-# registre durablement indisponible est signalé comme tel.
+# Pinned images (repo:tag@sha256:…) found in the Go code: no list to
+# maintain, a new module is covered automatically. Pulled ahead of time with
+# spaced-out retries: a registry's temporary rate limit (toomanyrequests) no
+# longer fails the integration tests, and a registry that stays unavailable
+# is reported as such.
 CONTAINER_RUNTIME ?= docker
 PULL_ATTEMPTS     ?= 5
 PINNED_IMAGES = $(shell grep -rhoE '"[a-z0-9./-]+:[A-Za-z0-9._-]+@sha256:[0-9a-f]{64}"' --include=*.go . | tr -d '"' | sort -u)
@@ -82,17 +82,17 @@ pull-images:
 		i=1; \
 		until $(CONTAINER_RUNTIME) pull -q $$img >/dev/null; do \
 			if [ $$i -ge $(PULL_ATTEMPTS) ]; then \
-				echo "échec : $$img inaccessible après $(PULL_ATTEMPTS) essais (registre indisponible ou limite de débit)" >&2; \
+				echo "failed: $$img unreachable after $(PULL_ATTEMPTS) attempts (registry unavailable or rate limited)" >&2; \
 				exit 1; \
 			fi; \
-			echo "==> nouvel essai dans $$((i * 30)) s : $$img"; \
+			echo "==> retrying in $$((i * 30)) s: $$img"; \
 			sleep $$((i * 30)); i=$$((i + 1)); \
 		done; \
 		echo "==> $$img"; \
 	done
 
-# Chaque go.mod doit se suffire à lui-même (hors espace de travail go.work) et
-# être à jour (go mod tidy) : un module tiers ou `go install` n'a pas go.work.
+# Each go.mod must be self-contained (outside the go.work workspace) and up to
+# date (go mod tidy): a third-party module or `go install` has no go.work.
 mod-check:
 	@set -e; for m in $(GO_MODULES); do \
 		echo "==> go mod tidy -diff + build hors workspace ($$m)"; \
@@ -105,28 +105,28 @@ lint:
 		(cd $$m && golangci-lint run ./...); \
 	done
 
-# Le protocole module/v1 (sdk/proto) existe depuis le jalon J3 (docs/08-milestones.md).
+# The module/v1 protocol (sdk/proto) exists since milestone M3 (docs/08-milestones.md).
 proto:
 	@if [ -z "$$(find sdk/proto -name '*.proto' 2>/dev/null)" ]; then \
-		echo "aucun fichier .proto pour le moment"; \
+		echo "no .proto file yet"; \
 	else \
 		cd sdk/proto && buf generate; \
 	fi
 
-# Le code généré est commité : il doit correspondre aux .proto (buf lint +
-# régénération sans écart).
+# The generated code is committed: it must match the .proto files (buf lint +
+# regeneration with no diff).
 proto-check: proto
 	cd sdk/proto && buf lint
 	git diff --exit-code -- sdk/go/gen
 
-# Vulnérabilités connues atteignables depuis le code (base de données Go).
+# Known vulnerabilities reachable from the code (Go vulnerability database).
 vuln:
 	@set -e; for m in $(GO_MODULES); do \
 		echo "==> govulncheck ($$m)"; \
 		(cd $$m && GOWORK=off govulncheck ./...); \
 	done
 
-# Licences des dépendances tierces (les paquets du dépôt sont ignorés).
+# Third-party dependency licenses (the repository's own packages are ignored).
 licenses:
 	@set -e; for m in $(GO_MODULES); do \
 		echo "==> go-licenses ($$m)"; \
@@ -134,6 +134,6 @@ licenses:
 			--allowed_licenses=$(ALLOWED_LICENSES) 2>&1) || { echo "$$out" | grep -v '^W0\|\.s$$'; exit 1; }; \
 	done
 
-# Nécessite un Proxmox : ne jamais lancer sans demande explicite (CLAUDE.md).
+# Needs a Proxmox: never run without an explicit request (CLAUDE.md).
 e2e:
 	go test -tags integration ./test/e2e/...

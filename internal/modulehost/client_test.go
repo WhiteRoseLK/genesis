@@ -12,9 +12,9 @@ import (
 	modulev1 "github.com/WhiteRoseLK/genesis/sdk/go/gen/module/v1"
 )
 
-// buildPanickingModule compile test/modules/panicking (docs/02-architecture.md :
-// module de test) vers un binaire temporaire nommé comme l'attend le layout
-// d'installation, et le retourne.
+// buildPanickingModule builds test/modules/panicking (docs/02-architecture.md:
+// test module) into a temporary binary named as the installation layout
+// expects, and returns it.
 func buildPanickingModule(t *testing.T) string {
 	t.Helper()
 
@@ -28,45 +28,45 @@ func buildPanickingModule(t *testing.T) string {
 	build := exec.Command("go", "build", "-o", binaryPath, ".")
 	build.Dir = sourceDir
 	if out, err := build.CombinedOutput(); err != nil {
-		t.Fatalf("compilation du module de test panicking : %v\n%s", err, out)
+		t.Fatalf("building the panicking test module: %v\n%s", err, out)
 	}
 	return binaryPath
 }
 
-// TestModuleCrashProducesCleanError est le critère d'acceptation du jalon J3
-// (doc 08) : un module qui plante pendant une étape produit une erreur
-// propre sans arrêter le cœur — le process de test doit rester vivant et
-// obtenir une erreur exploitable, pas un panic qui remonte jusqu'ici.
+// TestModuleCrashProducesCleanError is the M3 acceptance criterion (doc 08): a
+// module that crashes during a step produces a clean error without stopping
+// the core — the test process must stay alive and get a usable error, not a
+// panic that travels up to here.
 func TestModuleCrashProducesCleanError(t *testing.T) {
 	binaryPath := buildPanickingModule(t)
 
 	client, err := Launch(binaryPath, nil)
 	if err != nil {
-		t.Fatalf("Launch : %v", err)
+		t.Fatalf("Launch: %v", err)
 	}
 	defer client.Close()
 
 	ctx := context.Background()
 
-	// Le module répond normalement à Describe avant de planter sur Check.
+	// The module answers Describe normally before crashing on Check.
 	manifest, err := client.Describe(ctx)
 	if err != nil {
-		t.Fatalf("Describe : %v", err)
+		t.Fatalf("Describe: %v", err)
 	}
 	if manifest.GetName() != "panicking" {
-		t.Fatalf("Describe().Name = %q, attendu %q", manifest.GetName(), "panicking")
+		t.Fatalf("Describe().Name = %q, want %q", manifest.GetName(), "panicking")
 	}
 
 	_, err = client.Module().Check(ctx, &modulev1.StepRequest{RunId: "test"})
 	if err == nil {
-		t.Fatal("Check sur un module qui panique : succès inattendu")
+		t.Fatal("Check on a panicking module: unexpected success")
 	}
-	t.Logf("erreur propre obtenue comme attendu : %v", err)
+	t.Logf("clean error obtained as expected: %v", err)
 
-	// Le cœur (ce process de test) est toujours vivant ici : c'est le point
-	// du test. Une seconde requête sur la même connexion doit échouer
-	// proprement aussi, pas provoquer un nouveau crash caché.
+	// The core (this test process) is still alive here: that is the point of
+	// the test. A second request on the same connection must also fail
+	// cleanly, not cause another hidden crash.
 	if _, err := client.Describe(ctx); err == nil {
-		t.Log("Describe après crash a réussi (le plugin a pu redémarrer) — acceptable, le cœur n'a pas planté")
+		t.Log("Describe after the crash succeeded (the plugin may have restarted) — acceptable, the core did not crash")
 	}
 }

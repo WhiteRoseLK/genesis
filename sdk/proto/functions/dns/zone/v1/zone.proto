@@ -1,7 +1,7 @@
 syntax = "proto3";
 
-// Fonction dns.zone/v1 (docs/03-module-contract.md) : fournisseurs MVP
-// coredns (seed) et powerdns (target).
+// Function dns.zone/v1 (docs/03-module-contract.md): MVP providers
+// coredns (seed) and powerdns (target).
 package functions.dns.zone.v1;
 
 option go_package = "github.com/WhiteRoseLK/genesis/sdk/go/gen/functions/dns/zone/v1;dnszonev1";

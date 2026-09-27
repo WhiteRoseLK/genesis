@@ -115,9 +115,9 @@ func (m *stepCAModule) Check(_ context.Context, req *modulev1.StepRequest) (*mod
 	m.brokerToken = req.GetBrokerToken()
 	flags := sdk.StateMap(req.GetState())
 	if boolFlag(flags, "seeded") || boolFlag(flags, "retired") {
-		return &modulev1.CheckResult{Status: modulev1.CheckResult_STATUS_CONFORME}, nil
+		return &modulev1.CheckResult{Status: modulev1.CheckResult_STATUS_COMPLIANT}, nil
 	}
-	return &modulev1.CheckResult{Status: modulev1.CheckResult_STATUS_A_FAIRE}, nil
+	return &modulev1.CheckResult{Status: modulev1.CheckResult_STATUS_TODO}, nil
 }
 
 // dial dial la session de broker au plus une fois (Dial ne réussit qu'une

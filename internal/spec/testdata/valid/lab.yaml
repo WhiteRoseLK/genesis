@@ -23,7 +23,7 @@ sizes:
   medium: { cpu: 2, memory_mb: 4096, disk_gb: 30 }
 
 capabilities:
-  compute:                       # la plateforme de virtualisation est une capacité comme les autres
+  compute:                       # the virtualisation platform is a capability like any other
     module: proxmox
     config:
       endpoint: https://pve01.home.arpa:8006
@@ -44,7 +44,7 @@ capabilities:
       root_ca: { common_name: Lab Root CA, validity: 10y }
       default_cert_ttl: 90d
   secrets:
-    module: vault                # même module que pki → même instance
+    module: vault                # same module as pki → same instance
   bastion:
     module: openssh-bastion
     config:

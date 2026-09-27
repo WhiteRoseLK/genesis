@@ -2,8 +2,8 @@
 
 package spec
 
-// Défauts déduits de l'exemple complet du doc 04 ; seule valeur de profile
-// prise en charge à l'itération 1 (ADR-008).
+// Defaults taken from the full example of doc 04; the only profile value
+// supported in iteration 1 (ADR-008).
 const (
 	defaultProfile          = "connected"
 	defaultStateDir         = "/var/lib/genesis"

@@ -4,9 +4,9 @@
 // 	protoc        (unknown)
 // source: functions/test/echo/v1/echo.proto
 
-// Fonction de test générique, réutilisée sous des noms différents
-// (test.a/v1, test.b/v1...) par test/modules/test-* pour exercer le
-// résolveur/planificateur/broker sans logique métier (docs/08-milestones.md, J4).
+// Generic test function, reused under different names (test.a/v1,
+// test.b/v1...) by test/modules/test-* to exercise the
+// resolver/planner/broker without business logic (docs/08-milestones.md, M4).
 
 package echov1
 
@@ -72,8 +72,8 @@ func (x *CallRequest) GetMessage() string {
 type CallResponse struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Message       string                 `protobuf:"bytes,1,opt,name=message,proto3" json:"message,omitempty"`
-	From          string                 `protobuf:"bytes,2,opt,name=from,proto3" json:"from,omitempty"`   // nom du module qui répond
-	Phase         string                 `protobuf:"bytes,3,opt,name=phase,proto3" json:"phase,omitempty"` // "seed" | "target", pour vérifier le Handover
+	From          string                 `protobuf:"bytes,2,opt,name=from,proto3" json:"from,omitempty"`   // name of the module that answers
+	Phase         string                 `protobuf:"bytes,3,opt,name=phase,proto3" json:"phase,omitempty"` // "seed" | "target", to check the Handover
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }

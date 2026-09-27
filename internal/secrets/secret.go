@@ -1,28 +1,27 @@
 // SPDX-License-Identifier: Apache-2.0
 
-// Package secrets génère, stocke et distribue les secrets de l'outil
-// (docs/06-secrets-state.md). L'utilisateur ne fournit que les identifiants
-// de l'hyperviseur ; tout le reste est généré.
+// Package secrets generates, stores and distributes the tool's secrets
+// (docs/06-secrets-state.md). The user provides only the hypervisor
+// credentials; everything else is generated.
 package secrets
 
 import "log/slog"
 
-// Secret porte une valeur sensible. String() et MarshalJSON() la masquent
-// systématiquement (docs/06 "Redaction") ; seul ExposeSecret y accède,
-// pour marquer explicitement dans le code chaque endroit qui manipule la
-// valeur en clair.
+// Secret carries a sensitive value. String() and MarshalJSON() always mask it
+// (docs/06 "Redaction"); only ExposeSecret accesses it, to explicitly mark in
+// the code every place that handles the plaintext value.
 type Secret struct {
 	value string
 }
 
-// NewSecret enveloppe une valeur sensible.
+// NewSecret wraps a sensitive value.
 func NewSecret(value string) Secret {
 	return Secret{value: value}
 }
 
-// ExposeSecret retourne la valeur en clair. Nom volontairement explicite :
-// à n'utiliser que là où la valeur doit réellement être manipulée (chiffrement,
-// `secrets get`), jamais pour du logging ou un message d'erreur.
+// ExposeSecret returns the plaintext value. The name is deliberately explicit:
+// use it only where the value really has to be handled (encryption, `secrets
+// get`), never for logging or an error message.
 func (s Secret) ExposeSecret() string {
 	return s.value
 }
@@ -35,9 +34,9 @@ func (s Secret) MarshalJSON() ([]byte, error) {
 	return []byte(`"***"`), nil
 }
 
-// LogValue redacte la valeur pour slog.LogValuer (Go 1.21+) : tout attribut
-// slog portant un Secret est automatiquement masqué, même sans passer par
-// le handler de redaction de redact.go.
+// LogValue redacts the value for slog.LogValuer (Go 1.21+): any slog attribute
+// carrying a Secret is masked automatically, even without going through the
+// redacting handler of redact.go.
 func (s Secret) LogValue() slog.Value {
 	return slog.StringValue("***")
 }

@@ -4,8 +4,8 @@
 // 	protoc        (unknown)
 // source: functions/pki/issuer/v1/issuer.proto
 
-// Fonction pki.issuer/v1 (docs/03-module-contract.md) : fournisseurs MVP
-// step-ca (J7, seed) et vault (J7, target).
+// Function pki.issuer/v1 (docs/03-module-contract.md): MVP providers
+// step-ca (M7, seed) and vault (M7, target).
 
 package pkiissuerv1
 
@@ -64,7 +64,7 @@ type IssueCertRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	CommonName    string                 `protobuf:"bytes,1,opt,name=common_name,json=commonName,proto3" json:"common_name,omitempty"`
 	Sans          []string               `protobuf:"bytes,2,rep,name=sans,proto3" json:"sans,omitempty"`
-	TtlSeconds    int64                  `protobuf:"varint,3,opt,name=ttl_seconds,json=ttlSeconds,proto3" json:"ttl_seconds,omitempty"` // 0 : durée par défaut du fournisseur
+	TtlSeconds    int64                  `protobuf:"varint,3,opt,name=ttl_seconds,json=ttlSeconds,proto3" json:"ttl_seconds,omitempty"` // 0: the provider's default lifetime
 	Extra         map[string]string      `protobuf:"bytes,4,rep,name=extra,proto3" json:"extra,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
@@ -131,16 +131,16 @@ func (x *IssueCertRequest) GetExtra() map[string]string {
 type SignCSRRequest struct {
 	state      protoimpl.MessageState `protogen:"open.v1"`
 	CsrPem     string                 `protobuf:"bytes,1,opt,name=csr_pem,json=csrPem,proto3" json:"csr_pem,omitempty"`
-	TtlSeconds int64                  `protobuf:"varint,2,opt,name=ttl_seconds,json=ttlSeconds,proto3" json:"ttl_seconds,omitempty"` // 0 : durée par défaut du fournisseur
+	TtlSeconds int64                  `protobuf:"varint,2,opt,name=ttl_seconds,json=ttlSeconds,proto3" json:"ttl_seconds,omitempty"` // 0: the provider's default lifetime
 	Extra      map[string]string      `protobuf:"bytes,3,rep,name=extra,proto3" json:"extra,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
-	// is_ca : signe le CSR comme certificat intermédiaire (CA) plutôt que
-	// feuille — nécessaire pour qu'un autre pki.issuer/v1 (ex. vault) obtienne
-	// son propre intermédiaire signé par celui-ci (docs/07-mvp-modules.md :
-	// "pki_int signé par la racine").
+	// is_ca: signs the CSR as an intermediate (CA) certificate rather than a
+	// leaf — needed for another pki.issuer/v1 (e.g. vault) to get its own
+	// intermediate signed by this one (docs/07-mvp-modules.md: "pki_int
+	// signed by the root").
 	IsCa bool `protobuf:"varint,4,opt,name=is_ca,json=isCa,proto3" json:"is_ca,omitempty"`
-	// path_len_constraint : profondeur d'intermédiaires supplémentaires que
-	// le certificat émis pourra lui-même signer (0 : uniquement des feuilles).
-	// Ignoré si is_ca est faux.
+	// path_len_constraint: how many further levels of intermediates the
+	// issued certificate may itself sign (0: leaves only). Ignored if is_ca
+	// is false.
 	PathLenConstraint int32 `protobuf:"varint,5,opt,name=path_len_constraint,json=pathLenConstraint,proto3" json:"path_len_constraint,omitempty"`
 	unknownFields     protoimpl.UnknownFields
 	sizeCache         protoimpl.SizeCache
@@ -211,16 +211,16 @@ func (x *SignCSRRequest) GetPathLenConstraint() int32 {
 	return 0
 }
 
-// Certificate : private_key_pem n'est renseigné que par IssueCert (le
-// fournisseur a généré la paire) — SignCSR renvoie une clé vide, la clé
-// privée du CSR reste chez l'appelant (docs/03 §4 règle 5 : un module ne
-// génère/stocke de secret que via core.secrets/v1, jamais en dehors ; la
-// clé privée d'un IssueCert doit donc être remise à l'appelant, qui la
-// range lui-même via core.secrets/v1 s'il doit la conserver).
+// Certificate: private_key_pem is only set by IssueCert (the provider
+// generated the pair) — SignCSR returns an empty key, the CSR's private key
+// stays with the caller (docs/03 §4 rule 5: a module generates/stores
+// secrets only through core.secrets/v1, never elsewhere; the private key of
+// an IssueCert must therefore be handed to the caller, which stores it
+// itself through core.secrets/v1 if it needs to keep it).
 type Certificate struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	CertPem       string                 `protobuf:"bytes,1,opt,name=cert_pem,json=certPem,proto3" json:"cert_pem,omitempty"`
-	ChainPem      string                 `protobuf:"bytes,2,opt,name=chain_pem,json=chainPem,proto3" json:"chain_pem,omitempty"` // cert + intermédiaire(s), sans la racine
+	ChainPem      string                 `protobuf:"bytes,2,opt,name=chain_pem,json=chainPem,proto3" json:"chain_pem,omitempty"` // cert + intermediate(s), without the root
 	PrivateKeyPem string                 `protobuf:"bytes,3,opt,name=private_key_pem,json=privateKeyPem,proto3" json:"private_key_pem,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
@@ -282,7 +282,7 @@ type SignSSHRequest struct {
 	PublicKeyOpenssh string                 `protobuf:"bytes,1,opt,name=public_key_openssh,json=publicKeyOpenssh,proto3" json:"public_key_openssh,omitempty"`
 	KeyId            string                 `protobuf:"bytes,2,opt,name=key_id,json=keyId,proto3" json:"key_id,omitempty"`
 	Principals       []string               `protobuf:"bytes,3,rep,name=principals,proto3" json:"principals,omitempty"`
-	HostCert         bool                   `protobuf:"varint,4,opt,name=host_cert,json=hostCert,proto3" json:"host_cert,omitempty"` // certificat host si vrai, utilisateur sinon
+	HostCert         bool                   `protobuf:"varint,4,opt,name=host_cert,json=hostCert,proto3" json:"host_cert,omitempty"` // host certificate if true, user certificate otherwise
 	TtlSeconds       int64                  `protobuf:"varint,5,opt,name=ttl_seconds,json=ttlSeconds,proto3" json:"ttl_seconds,omitempty"`
 	Extra            map[string]string      `protobuf:"bytes,6,rep,name=extra,proto3" json:"extra,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
 	unknownFields    protoimpl.UnknownFields
@@ -407,7 +407,7 @@ func (x *SSHCertificate) GetCertificateOpenssh() string {
 
 type CAChainResponse struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
-	ChainPem      string                 `protobuf:"bytes,1,opt,name=chain_pem,json=chainPem,proto3" json:"chain_pem,omitempty"` // intermédiaire + racine, PEM
+	ChainPem      string                 `protobuf:"bytes,1,opt,name=chain_pem,json=chainPem,proto3" json:"chain_pem,omitempty"` // intermediate + root, PEM
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }

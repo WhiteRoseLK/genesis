@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: Apache-2.0
 
-// Package runner pilote le runtime de conteneurs (docker ou podman) de la
-// graine en ligne de commande — docs/02-architecture.md : "les runners sont
-// exposés aux modules comme fonctions intégrées" (core.container/v1,
-// core.ansible/v1). Orchestrer l'outil existant plutôt que réimplémenter un
-// client de l'API Docker (ADR-002, même logique appliquée aux runners).
+// Package runner drives the seed's container runtime (docker or podman)
+// through its command line — docs/02-architecture.md: "runners are exposed to
+// modules as built-in functions" (core.container/v1, core.ansible/v1). It
+// orchestrates the existing tool rather than re-implementing a Docker API
+// client (ADR-002, the same logic applied to runners).
 package runner
 
 import (
@@ -21,14 +21,14 @@ import (
 	"strings"
 )
 
-// ContainerRuntime pilote un binaire docker/podman déjà installé sur la
-// graine (docs/04-spec.md : seed.container_runtime).
+// ContainerRuntime drives a docker/podman binary already installed on the seed
+// (docs/04-spec.md: seed.container_runtime).
 type ContainerRuntime struct {
 	binary string
 }
 
-// DetectContainerRuntime cherche preferred ("docker", "podman") ou, si vide
-// ou "auto", le premier des deux trouvé sur le PATH.
+// DetectContainerRuntime looks for preferred ("docker", "podman") or, if empty
+// or "auto", the first of the two found on the PATH.
 func DetectContainerRuntime(preferred string) (*ContainerRuntime, error) {
 	candidates := []string{"docker", "podman"}
 	if preferred != "" && preferred != "auto" {
@@ -39,67 +39,67 @@ func DetectContainerRuntime(preferred string) (*ContainerRuntime, error) {
 			return &ContainerRuntime{binary: path}, nil
 		}
 	}
-	return nil, fmt.Errorf("aucun runtime de conteneur trouvé parmi %v (installer docker ou podman)", candidates)
+	return nil, fmt.Errorf("no container runtime found among %v (install docker or podman)", candidates)
 }
 
-// Ping vérifie que le démon du runtime répond (le binaire seul ne suffit pas :
-// le client docker peut être installé sans démon joignable).
+// Ping checks that the runtime's daemon answers (the binary alone is not
+// enough: the docker client may be installed without a reachable daemon).
 func (r *ContainerRuntime) Ping(ctx context.Context) error {
 	cmd := exec.CommandContext(ctx, r.binary, "info")
 	var stderr bytes.Buffer
 	cmd.Stderr = &stderr
 	if err := cmd.Run(); err != nil {
-		return fmt.Errorf("%s info : %w\n%s", r.binary, err, stderr.String())
+		return fmt.Errorf("%s info: %w\n%s", r.binary, err, stderr.String())
 	}
 	return nil
 }
 
-// Mount est un montage bind host -> conteneur.
+// Mount is a host -> container bind mount.
 type Mount struct {
 	HostPath      string
 	ContainerPath string
 	ReadOnly      bool
 }
 
-// RunOptions décrit un conteneur à démarrer.
+// RunOptions describes a container to start.
 type RunOptions struct {
 	Name    string
 	Image   string
 	Command []string
 	Env     map[string]string
 	Mounts  []Mount
-	// Tmpfs : points de montage en mémoire (option `--tmpfs`), pour les
-	// fichiers qui ne doivent jamais toucher le disque de la graine.
+	// Tmpfs: in-memory mount points (`--tmpfs` option), for files that must
+	// never touch the seed's disk.
 	Tmpfs []string
-	// Stdin : envoyé sur l'entrée standard du conteneur (option `-i`),
-	// seulement en mode bloquant.
+	// Stdin: sent to the container's standard input (`-i` option), in blocking
+	// mode only.
 	Stdin []byte
-	// Files : fichiers déposés dans le conteneur avant son démarrage (chemin
-	// absolu -> contenu). Ils sont copiés dans la couche du conteneur, jamais
-	// écrits sur le disque de la graine : réservé au mode bloquant.
+	// Files: files placed in the container before it starts (absolute path ->
+	// content). They are copied into the container's layer, never written to
+	// the seed's disk: blocking mode only.
 	Files map[string][]byte
-	// Collect : fichiers relus dans le conteneur après sa fin (chemins
-	// absolus), renvoyés dans RunResult.Collected. Mode bloquant seulement.
+	// Collect: files read back from the container after it exits (absolute
+	// paths), returned in RunResult.Collected. Blocking mode only.
 	Collect []string
-	// Detach : voir docs/proto core.container/v1 RunRequest.
+	// Detach: see the core.container/v1 RunRequest proto.
 	Detach bool
 }
 
-// RunResult est le résultat de Run.
+// RunResult is the result of Run.
 type RunResult struct {
 	ContainerID string
 	ExitCode    int
 	Stdout      string
 	Stderr      string
-	// Collected : contenu des fichiers demandés par RunOptions.Collect.
+	// Collected: content of the files requested by RunOptions.Collect.
 	Collected map[string][]byte
 }
 
-// Run démarre un conteneur. Non détaché (par défaut) : bloque jusqu'à sa fin
-// et renvoie sa sortie. Détaché : rend la main immédiatement avec l'ID.
+// Run starts a container. Not detached (default): blocks until it exits and
+// returns its output. Detached: returns immediately with the ID.
 func (r *ContainerRuntime) Run(ctx context.Context, opts RunOptions) (*RunResult, error) {
 	if opts.Detach && (len(opts.Files) > 0 || len(opts.Collect) > 0) {
-		return nil, errors.New("les options Files et Collect ne sont possibles qu'en mode bloquant (Detach=false)")
+		return nil, errors.New("the Files and Collect options are only available in blocking mode (Detach=false)")
 	}
 	if len(opts.Files) > 0 || len(opts.Collect) > 0 {
 		return r.runWithFiles(ctx, opts)
@@ -128,27 +128,27 @@ func (r *ContainerRuntime) Run(ctx context.Context, opts RunOptions) (*RunResult
 
 	if opts.Detach {
 		if runErr != nil {
-			return nil, fmt.Errorf("%s run -d %s : %w\n%s", r.binary, opts.Image, runErr, stderr.String())
+			return nil, fmt.Errorf("%s run -d %s: %w\n%s", r.binary, opts.Image, runErr, stderr.String())
 		}
 		return &RunResult{ContainerID: strings.TrimSpace(stdout.String())}, nil
 	}
 
 	exitCode, err := exitCodeOf(runErr)
 	if err != nil {
-		return nil, fmt.Errorf("%s run %s : %w\n%s", r.binary, opts.Image, err, stderr.String())
+		return nil, fmt.Errorf("%s run %s: %w\n%s", r.binary, opts.Image, err, stderr.String())
 	}
 	return &RunResult{ExitCode: exitCode, Stdout: stdout.String(), Stderr: stderr.String()}, nil
 }
 
-// containerArgs complète args (run/create) avec les options communes, puis
-// l'image et la commande, et renvoie l'environnement du processus runtime.
+// containerArgs completes args (run/create) with the common options, then the
+// image and the command, and returns the environment of the runtime process.
 func containerArgs(args []string, opts RunOptions) ([]string, []string) {
 	if opts.Name != "" {
 		args = append(args, "--name", opts.Name)
 	}
-	// `-e NOM` sans valeur : le runtime lit la valeur dans son propre
-	// environnement. Les valeurs (potentiellement secrètes) n'apparaissent
-	// ainsi jamais dans la ligne de commande, visible de tous via ps.
+	// `-e NAME` without a value: the runtime reads the value from its own
+	// environment. The (possibly secret) values thus never appear on the
+	// command line, which anyone can see through ps.
 	env := os.Environ()
 	for k, v := range opts.Env {
 		args = append(args, "-e", k)
@@ -169,8 +169,8 @@ func containerArgs(args []string, opts RunOptions) ([]string, []string) {
 	return args, env
 }
 
-// exitCodeOf distingue « le conteneur a fini avec un code non nul » (pas une
-// erreur du runtime) d'un vrai échec d'exécution du binaire.
+// exitCodeOf distinguishes "the container exited with a non-zero code" (not a
+// runtime error) from a real failure to run the binary.
 func exitCodeOf(runErr error) (int, error) {
 	if runErr == nil {
 		return 0, nil
@@ -182,10 +182,10 @@ func exitCodeOf(runErr error) (int, error) {
 	return 0, runErr
 }
 
-// runWithFiles exécute un conteneur bloquant en échangeant des fichiers par
-// la couche du conteneur : create, cp (entrée), start --attach, cp (sortie),
-// rm. Les fichiers (clés, mots de passe) ne passent jamais par un répertoire
-// de la graine, et l'UID interne du conteneur n'a pas d'importance.
+// runWithFiles runs a blocking container while exchanging files through the
+// container's layer: create, cp (in), start --attach, cp (out), rm. The files
+// (keys, passwords) never go through a directory of the seed, and the
+// container's internal UID does not matter.
 func (r *ContainerRuntime) runWithFiles(ctx context.Context, opts RunOptions) (*RunResult, error) {
 	args, env := containerArgs([]string{"create"}, opts)
 	var stdout, stderr bytes.Buffer
@@ -194,7 +194,7 @@ func (r *ContainerRuntime) runWithFiles(ctx context.Context, opts RunOptions) (*
 	create.Stdout = &stdout
 	create.Stderr = &stderr
 	if err := create.Run(); err != nil {
-		return nil, fmt.Errorf("%s create %s : %w\n%s", r.binary, opts.Image, err, stderr.String())
+		return nil, fmt.Errorf("%s create %s: %w\n%s", r.binary, opts.Image, err, stderr.String())
 	}
 	id := strings.TrimSpace(stdout.String())
 	defer func() { _ = r.Stop(context.WithoutCancel(ctx), id) }()
@@ -216,7 +216,7 @@ func (r *ContainerRuntime) runWithFiles(ctx context.Context, opts RunOptions) (*
 	start.Stderr = &stderr
 	exitCode, err := exitCodeOf(start.Run())
 	if err != nil {
-		return nil, fmt.Errorf("%s start %s : %w\n%s", r.binary, opts.Image, err, stderr.String())
+		return nil, fmt.Errorf("%s start %s: %w\n%s", r.binary, opts.Image, err, stderr.String())
 	}
 	result := &RunResult{ContainerID: id, ExitCode: exitCode, Stdout: stdout.String(), Stderr: stderr.String()}
 	if exitCode != 0 {
@@ -231,14 +231,14 @@ func (r *ContainerRuntime) runWithFiles(ctx context.Context, opts RunOptions) (*
 		}
 		content, err := firstTarFile(&archive)
 		if err != nil {
-			return nil, fmt.Errorf("lecture de %s dans le conteneur : %w", path, err)
+			return nil, fmt.Errorf("reading %s in the container: %w", path, err)
 		}
 		result.Collected[path] = content
 	}
 	return result, nil
 }
 
-// exec lance une sous-commande du runtime (stdin/stdout facultatifs).
+// exec runs a runtime subcommand (stdin/stdout optional).
 func (r *ContainerRuntime) exec(ctx context.Context, stdin io.Reader, stdout io.Writer, args ...string) error {
 	cmd := exec.CommandContext(ctx, r.binary, args...)
 	cmd.Stdin = stdin
@@ -246,22 +246,21 @@ func (r *ContainerRuntime) exec(ctx context.Context, stdin io.Reader, stdout io.
 	var stderr bytes.Buffer
 	cmd.Stderr = &stderr
 	if err := cmd.Run(); err != nil {
-		return fmt.Errorf("%s %s : %w\n%s", r.binary, strings.Join(args[:1], " "), err, stderr.String())
+		return fmt.Errorf("%s %s: %w\n%s", r.binary, strings.Join(args[:1], " "), err, stderr.String())
 	}
 	return nil
 }
 
-// tarFiles construit une archive à extraire à la racine du conteneur. Les
-// répertoires parents sont créés en 1777 : l'utilisateur interne du
-// conteneur, quel qu'il soit, doit pouvoir y écrire ses fichiers de sortie.
-// Ces droits ne concernent que la couche du conteneur, invisible des autres
-// utilisateurs de la graine.
+// tarFiles builds an archive to extract at the container's root. Parent
+// directories are created as 1777: the container's internal user, whoever it
+// is, must be able to write its output files there. These permissions only
+// apply to the container's layer, invisible to the seed's other users.
 func tarFiles(files map[string][]byte) ([]byte, error) {
 	paths := make([]string, 0, len(files))
 	dirs := map[string]bool{}
 	for p := range files {
 		if !strings.HasPrefix(p, "/") {
-			return nil, fmt.Errorf("chemin de fichier %q : absolu attendu", p)
+			return nil, fmt.Errorf("file path %q: must be absolute", p)
 		}
 		paths = append(paths, p)
 		for d := path.Dir(p); d != "/"; d = path.Dir(d) {
@@ -272,7 +271,7 @@ func tarFiles(files map[string][]byte) ([]byte, error) {
 	for d := range dirs {
 		dirList = append(dirList, d)
 	}
-	sort.Strings(dirList) // parents avant enfants
+	sort.Strings(dirList) // parents before children
 	sort.Strings(paths)
 
 	var buf bytes.Buffer
@@ -297,14 +296,14 @@ func tarFiles(files map[string][]byte) ([]byte, error) {
 	return buf.Bytes(), nil
 }
 
-// firstTarFile renvoie le contenu du premier fichier ordinaire de l'archive
-// (`docker cp <id>:<fichier> -` produit une archive d'un seul fichier).
+// firstTarFile returns the content of the first regular file of the archive
+// (`docker cp <id>:<file> -` produces a single-file archive).
 func firstTarFile(r io.Reader) ([]byte, error) {
 	tr := tar.NewReader(r)
 	for {
 		h, err := tr.Next()
 		if err != nil {
-			return nil, fmt.Errorf("aucun fichier dans l'archive : %w", err)
+			return nil, fmt.Errorf("no file in the archive: %w", err)
 		}
 		if h.Typeflag == tar.TypeReg {
 			return io.ReadAll(tr)
@@ -312,25 +311,25 @@ func firstTarFile(r io.Reader) ([]byte, error) {
 	}
 }
 
-// Stop arrête et supprime un conteneur détaché. "docker stop" seul ne
-// libère pas le nom du conteneur (bug trouvé en construisant J6 :
-// fake-compute.DeleteVM puis EnsureVM du même nom échouait avec "Conflict.
-// The container name ... is already in use") — Stop doit vraiment vouloir
-// dire "ce conteneur peut disparaître", pas juste "en pause" : rien
-// n'appelle Status après Stop pour vouloir l'inspecter encore.
+// Stop stops and removes a detached container. "docker stop" alone does not
+// free the container name (bug found while building M6: fake-compute.DeleteVM
+// followed by EnsureVM with the same name failed with "Conflict. The container
+// name ... is already in use") — Stop must really mean "this container may go
+// away", not just "paused": nothing calls Status after Stop to inspect it
+// again.
 func (r *ContainerRuntime) Stop(ctx context.Context, containerID string) error {
 	cmd := exec.CommandContext(ctx, r.binary, "rm", "-f", containerID)
 	var stderr bytes.Buffer
 	cmd.Stderr = &stderr
 	if err := cmd.Run(); err != nil {
-		return fmt.Errorf("%s rm -f %s : %w\n%s", r.binary, containerID, err, stderr.String())
+		return fmt.Errorf("%s rm -f %s: %w\n%s", r.binary, containerID, err, stderr.String())
 	}
 	return nil
 }
 
-// InspectIP retourne l'adresse IP du conteneur sur son réseau (le premier
-// réseau trouvé — suffisant tant qu'un conteneur n'est attaché qu'à un seul
-// réseau, ce qui est le cas de tout ce que le cœur démarre aujourd'hui).
+// InspectIP returns the container's IP address on its network (the first
+// network found — enough as long as a container is attached to a single
+// network, which is the case for everything the core starts today).
 func (r *ContainerRuntime) InspectIP(ctx context.Context, containerID string) (string, error) {
 	cmd := exec.CommandContext(ctx, r.binary, "inspect", "-f",
 		"{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}", containerID)
@@ -338,31 +337,31 @@ func (r *ContainerRuntime) InspectIP(ctx context.Context, containerID string) (s
 	cmd.Stdout = &stdout
 	cmd.Stderr = &stderr
 	if err := cmd.Run(); err != nil {
-		return "", fmt.Errorf("%s inspect %s : %w\n%s", r.binary, containerID, err, stderr.String())
+		return "", fmt.Errorf("%s inspect %s: %w\n%s", r.binary, containerID, err, stderr.String())
 	}
 	ip := strings.TrimSpace(stdout.String())
 	if ip == "" {
-		return "", fmt.Errorf("aucune adresse IP trouvée pour %s", containerID)
+		return "", fmt.Errorf("no IP address found for %s", containerID)
 	}
 	return ip, nil
 }
 
-// Status inspecte l'état d'un conteneur.
+// Status inspects a container's state.
 func (r *ContainerRuntime) Status(ctx context.Context, containerID string) (state string, exitCode int, err error) {
 	cmd := exec.CommandContext(ctx, r.binary, "inspect", "--format", "{{.State.Status}} {{.State.ExitCode}}", containerID)
 	var stdout, stderr bytes.Buffer
 	cmd.Stdout = &stdout
 	cmd.Stderr = &stderr
 	if runErr := cmd.Run(); runErr != nil {
-		return "unknown", 0, fmt.Errorf("%s inspect %s : %w\n%s", r.binary, containerID, runErr, stderr.String())
+		return "unknown", 0, fmt.Errorf("%s inspect %s: %w\n%s", r.binary, containerID, runErr, stderr.String())
 	}
 	fields := strings.Fields(strings.TrimSpace(stdout.String()))
 	if len(fields) != 2 {
-		return "unknown", 0, fmt.Errorf("sortie inattendue de %s inspect %s : %q", r.binary, containerID, stdout.String())
+		return "unknown", 0, fmt.Errorf("unexpected output from %s inspect %s: %q", r.binary, containerID, stdout.String())
 	}
 	var code int
 	if _, scanErr := fmt.Sscanf(fields[1], "%d", &code); scanErr != nil {
-		return fields[0], 0, fmt.Errorf("code de sortie invalide dans %q : %w", stdout.String(), scanErr)
+		return fields[0], 0, fmt.Errorf("invalid exit code in %q: %w", stdout.String(), scanErr)
 	}
 	return fields[0], code, nil
 }

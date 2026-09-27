@@ -11,9 +11,9 @@ import (
 	containerv1 "github.com/WhiteRoseLK/genesis/sdk/go/gen/functions/core/container/v1"
 )
 
-// NativeContainer construit le fournisseur core.container/v1, natif au cœur
-// (docs/02-architecture.md : "les runners sont exposés aux modules comme
-// fonctions intégrées").
+// NativeContainer builds the core.container/v1 provider, native to the core
+// (docs/02-architecture.md: "runners are exposed to modules as built-in
+// functions").
 func NativeContainer(rt *runner.ContainerRuntime) nativeFactory {
 	return func(_ string) func(*grpc.Server) {
 		return func(s *grpc.Server) {
@@ -61,15 +61,15 @@ func (c *containerServer) Run(ctx context.Context, req *containerv1.RunRequest) 
 
 	var ip string
 	if req.GetDetach() {
-		// L'IP n'a de sens que pour un service qui continue de tourner ;
-		// une erreur ici (réseau pas encore attribué) ne doit pas faire
-		// échouer tout Run, le conteneur est bel et bien démarré.
+		// The IP only matters for a service that keeps running; an error here
+		// (network not assigned yet) must not fail the whole Run, the
+		// container has indeed started.
 		ip, _ = c.runtime.InspectIP(ctx, result.ContainerID)
 	}
 
 	return &containerv1.RunResponse{
 		ContainerId: result.ContainerID,
-		ExitCode:    int32(result.ExitCode), //nolint:gosec // G115 : code de sortie d'un processus, dans [0, 255]
+		ExitCode:    int32(result.ExitCode), //nolint:gosec // G115: a process exit code, within [0, 255]
 		Stdout:      result.Stdout,
 		Stderr:      result.Stderr,
 		Ip:          ip,
@@ -89,5 +89,5 @@ func (c *containerServer) Status(ctx context.Context, req *containerv1.StatusReq
 	if err != nil {
 		return nil, err
 	}
-	return &containerv1.StatusResponse{State: state, ExitCode: int32(exitCode)}, nil //nolint:gosec // G115 : code de sortie, dans [0, 255]
+	return &containerv1.StatusResponse{State: state, ExitCode: int32(exitCode)}, nil //nolint:gosec // G115: an exit code, within [0, 255]
 }

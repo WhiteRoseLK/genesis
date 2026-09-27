@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
-// Package sdk est la seule dépendance autorisée pour un module
-// (docs/02-architecture.md, docs/03-module-contract.md) : le protocole
-// module/v1 généré (sdk/go/gen), Serve pour l'exposer en plugin go-plugin,
-// et le chargement du manifest module.yaml.
+// Package sdk is the only dependency allowed for a module
+// (docs/02-architecture.md, docs/03-module-contract.md): the generated
+// module/v1 protocol (sdk/go/gen), Serve to expose it as a go-plugin plugin,
+// and loading of the module.yaml manifest.
 package sdk

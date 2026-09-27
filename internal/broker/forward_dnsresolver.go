@@ -10,8 +10,9 @@ import (
 	dnsresolverv1 "github.com/WhiteRoseLK/genesis/sdk/go/gen/functions/dns/resolver/v1"
 )
 
-// ForwardDNSResolver enregistre un DnsResolverServer qui relaie chaque appel
-// vers conn, la connexion dispensée du module qui fournit dns.resolver/v1.
+// ForwardDNSResolver registers a DnsResolverServer that relays each call to
+// conn, the dispensed connection of the module currently providing
+// dns.resolver/v1.
 func ForwardDNSResolver(s *grpc.Server, conn *grpc.ClientConn) {
 	dnsresolverv1.RegisterDnsResolverServer(s, &forwardingDNSResolver{client: dnsresolverv1.NewDnsResolverClient(conn)})
 }

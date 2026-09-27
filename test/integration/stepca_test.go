@@ -56,7 +56,7 @@ func launchStepCAWithStore(t *testing.T, rt *runner.ContainerRuntime, store *sec
 	if err != nil {
 		t.Fatalf("Check : %v", err)
 	}
-	if checkResp.GetStatus() != modulev1.CheckResult_STATUS_A_FAIRE {
+	if checkResp.GetStatus() != modulev1.CheckResult_STATUS_TODO {
 		t.Fatalf("Check().Status = %v, attendu A_FAIRE (pas encore amorcé)", checkResp.GetStatus())
 	}
 

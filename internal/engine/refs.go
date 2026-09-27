@@ -8,11 +8,11 @@ import (
 	"strings"
 )
 
-// resolveRefs remplace chaque clé "*_ref" (docs/04-spec.md : références
-// env://, file://, vault:// — la seule exception à "zéro secret fourni",
-// doc01 : les identifiants de l'hyperviseur, fournis par référence) par la
-// clé sans le suffixe, avec la valeur résolue. Un module ne voit donc jamais
-// le schéma de référence, seulement la valeur.
+// resolveRefs replaces each "*_ref" key (docs/04-spec.md: env://, file://,
+// vault:// references — the only exception to "zero secrets provided",
+// doc 01: the hypervisor credentials, provided by reference) with the key
+// without the suffix, holding the resolved value. A module therefore never
+// sees the reference scheme, only the value.
 func resolveRefs(m map[string]any) (map[string]any, error) {
 	out := make(map[string]any, len(m))
 	for k, v := range m {
@@ -27,7 +27,7 @@ func resolveRefs(m map[string]any) (map[string]any, error) {
 			if strings.HasSuffix(k, "_ref") {
 				resolvedValue, err := resolveRef(val)
 				if err != nil {
-					return nil, fmt.Errorf("%s : %w", k, err)
+					return nil, fmt.Errorf("%s: %w", k, err)
 				}
 				out[strings.TrimSuffix(k, "_ref")] = resolvedValue
 				continue
@@ -46,19 +46,19 @@ func resolveRef(ref string) (string, error) {
 		name := strings.TrimPrefix(ref, "env://")
 		value, ok := os.LookupEnv(name)
 		if !ok {
-			return "", fmt.Errorf("variable d'environnement %s absente", name)
+			return "", fmt.Errorf("environment variable %s is not set", name)
 		}
 		return value, nil
 	case strings.HasPrefix(ref, "file://"):
 		path := strings.TrimPrefix(ref, "file://")
 		data, err := os.ReadFile(path)
 		if err != nil {
-			return "", fmt.Errorf("lecture de %s : %w", path, err)
+			return "", fmt.Errorf("lecture de %s: %w", path, err)
 		}
 		return strings.TrimSpace(string(data)), nil
 	case strings.HasPrefix(ref, "vault://"):
-		return "", fmt.Errorf("référence vault:// pas encore prise en charge (prévu au jalon J7)")
+		return "", fmt.Errorf("vault:// references are not supported yet")
 	default:
-		return "", fmt.Errorf("référence %q : schéma non reconnu (attendu env://, file://, vault://)", ref)
+		return "", fmt.Errorf("reference %q: unknown scheme (expected env://, file://, vault://)", ref)
 	}
 }

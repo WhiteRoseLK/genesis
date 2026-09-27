@@ -4,9 +4,9 @@ package scaffold
 
 import "text/template"
 
-// go.mod complet : le module se construit aussi hors de l'espace de travail
-// (GOWORK=off), comme tous les modules du dépôt (ADR-022). Le replace pointe
-// vers le SDK du dépôt tant qu'il n'est pas publié en version taguée.
+// Complete go.mod: the module also builds outside the workspace
+// (GOWORK=off), like every module in the repository (ADR-022). The replace
+// points to the repository's SDK until it is published as a tagged version.
 var goModTemplate = template.Must(template.New("go.mod").Parse(
 	`module {{.ModulePath}}
 
@@ -21,7 +21,7 @@ var moduleYAMLTemplate = template.Must(template.New("module.yaml").Parse(
 	`apiVersion: genesis/module/v1
 name: {{.Name}}
 version: 0.1.0
-description: "TODO: décrire {{.Name}}"
+description: "TODO: describe {{.Name}}"
 layer: foundation
 core: ">=0.1.0 <0.3.0"
 protocol: 1
@@ -72,8 +72,8 @@ import (
 //go:embed module.yaml
 var manifestYAML []byte
 
-// {{.Name}} implémente modulev1.ModuleServer. Chaque étape est un stub tant
-// qu'elle n'a pas été écrite (docs/10-adding-a-module.md, étape 3).
+// {{.Name}} implements modulev1.ModuleServer. Each step is a stub until it
+// has been written (docs/10-adding-a-module.md, step 3).
 type {{.Name}}Module struct {
 	modulev1.UnimplementedModuleServer
 	manifest *modulev1.Manifest
@@ -88,7 +88,7 @@ func (m *{{.Name}}Module) Validate(context.Context, *modulev1.ValidateRequest) (
 }
 
 func notImplemented(step string) error {
-	return status.Errorf(codes.Unimplemented, "{{.Name}} : étape %s pas encore implémentée", step)
+	return status.Errorf(codes.Unimplemented, "{{.Name}}: step %s not implemented yet", step)
 }
 
 func (m *{{.Name}}Module) Check(context.Context, *modulev1.StepRequest) (*modulev1.CheckResult, error) {
@@ -148,12 +148,12 @@ import (
 	"github.com/WhiteRoseLK/genesis/sdk/go/moduletest"
 )
 
-// TestConformance : suite de conformité du SDK (docs/10-adding-a-module.md,
-// étape 5). À lancer via 'go test ./... -run Conformance'.
+// TestConformance: the SDK conformance suite (docs/10-adding-a-module.md,
+// step 5). Run it with 'go test ./... -run Conformance'.
 func TestConformance(t *testing.T) {
 	mf, err := sdk.LoadManifest("module.yaml")
 	if err != nil {
-		t.Fatalf("chargement de module.yaml : %v", err)
+		t.Fatalf("loading module.yaml: %v", err)
 	}
 	impl := &{{.Name}}Module{manifest: mf.ToProto()}
 	moduletest.RunConformance(t, impl, "module.yaml")

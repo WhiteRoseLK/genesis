@@ -10,8 +10,8 @@ import (
 	echov1 "github.com/WhiteRoseLK/genesis/sdk/go/gen/functions/test/echo/v1"
 )
 
-// ForwardEcho enregistre un EchoServer qui relaie chaque appel vers conn —
-// fonction de test générique (test.a/v1, test.b/v1...), docs/08-milestones.md J4.
+// ForwardEcho registers an EchoServer that relays each call to conn — the
+// generic test function (test.a/v1, test.b/v1...), docs/08-milestones.md M4.
 func ForwardEcho(s *grpc.Server, conn *grpc.ClientConn) {
 	echov1.RegisterEchoServer(s, &forwardingEcho{client: echov1.NewEchoClient(conn)})
 }

@@ -1,7 +1,7 @@
 syntax = "proto3";
 
-// Fonction compute.vm/v1 (docs/03-module-contract.md) : fournisseurs MVP
-// proxmox (J5) et fake-compute (J4, registre mémoire).
+// Function compute.vm/v1 (docs/03-module-contract.md): MVP providers
+// proxmox (M5) and fake-compute (M4, in-memory registry).
 package functions.compute.vm.v1;
 
 import "google/protobuf/timestamp.proto";
@@ -24,10 +24,10 @@ message EnsureImageResponse {}
 
 message EnsureVMRequest {
   string name = 1;
-  string env = 2; // tag genesis-env=<nom>, clé d'idempotence (docs/07)
+  string env = 2; // tag genesis-env=<name>, idempotence key (docs/07)
   string size = 3;
   map<string, string> extra = 4;
-  // cloud-init (docs/07-mvp-modules.md : "IP, clé SSH de service, utilisateur genesis").
+  // cloud-init (docs/07-mvp-modules.md: "IP, service SSH key, genesis user").
   string ip = 5;
   string gateway = 6;
   string ssh_public_key = 7;
@@ -39,10 +39,9 @@ message VM {
   string name = 2;
   string ip = 3;
   string status = 4;
-  // ssh_port : 22 pour une vraie VM ; peut différer pour un fournisseur qui
-  // simule des VM en conteneurs (fake-compute) — les modules qui s'y
-  // connectent (os.base/v1.Target, etc.) doivent utiliser ce port, pas
-  // supposer 22.
+  // ssh_port: 22 for a real VM; may differ for a provider that simulates
+  // VMs as containers (fake-compute) — modules that connect to it
+  // (os.base/v1.Target, etc.) must use this port, not assume 22.
   int32 ssh_port = 5;
 }
 

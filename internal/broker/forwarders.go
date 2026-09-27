@@ -8,10 +8,10 @@ import (
 	"google.golang.org/grpc"
 )
 
-// knownForwarders associe chaque fonction "officielle" du SDK (docs/03-module-contract.md
-// §3) fournie par un module à son forwarder. Grandit avec les jalons qui
-// ajoutent de vraies fonctions (compute.vm/v1 en J4 ; dns.zone/v1,
-// pki.issuer/v1... suivront avec leurs modules, J5+).
+// knownForwarders maps each "official" SDK function
+// (docs/03-module-contract.md §3) provided by a module to its forwarder. It
+// grows with the milestones that add real functions (compute.vm/v1 in M4;
+// dns.zone/v1, pki.issuer/v1... followed with their modules, M5+).
 var knownForwarders = map[string]func(*grpc.Server, *grpc.ClientConn){
 	"compute.vm/v1":   ForwardComputeVM,
 	"os.base/v1":      ForwardOSBase,
@@ -22,9 +22,9 @@ var knownForwarders = map[string]func(*grpc.Server, *grpc.ClientConn){
 	"secrets.kv/v1":   ForwardSecretsKV,
 }
 
-// ForwarderFor retourne le forwarder à utiliser pour function fournie par un
-// module. Les fonctions de test génériques (test.*/v1, docs/08-milestones.md J4)
-// partagent toutes le service Echo, sans entrée dédiée dans knownForwarders.
+// ForwarderFor returns the forwarder to use for a function provided by a
+// module. The generic test functions (test.*/v1, docs/08-milestones.md M4) all
+// share the Echo service, with no dedicated entry in knownForwarders.
 func ForwarderFor(function string) (func(*grpc.Server, *grpc.ClientConn), bool) {
 	if f, ok := knownForwarders[function]; ok {
 		return f, true
@@ -35,14 +35,14 @@ func ForwarderFor(function string) (func(*grpc.Server, *grpc.ClientConn), bool) 
 	return nil, false
 }
 
-// knownFleetForwarders associe chaque fonction « de parc » (ADR-017) à son
-// forwarder fan-out (une connexion par fournisseur installé, tous appelés).
+// knownFleetForwarders maps each "fleet" function (ADR-017) to its fan-out
+// forwarder (one connection per installed provider, all of them called).
 var knownFleetForwarders = map[string]func(*grpc.Server, []*grpc.ClientConn){
 	"fleet.agent/v1": ForwardFleetAgent,
 }
 
-// fleetForwarderFor retourne le forwarder fan-out à utiliser pour une
-// fonction « de parc ».
+// fleetForwarderFor returns the fan-out forwarder to use for a "fleet"
+// function.
 func fleetForwarderFor(function string) (func(*grpc.Server, []*grpc.ClientConn), bool) {
 	f, ok := knownFleetForwarders[function]
 	return f, ok

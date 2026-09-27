@@ -41,7 +41,7 @@ func installChainModules(t *testing.T, lockFile string) {
 	t.Helper()
 	for _, name := range []string{"test-a", "test-b", "test-c"} {
 		if out, err := runCLI(t, "modules", "install", testModuleSourceDir(t, name), "--lock-file", lockFile); err != nil {
-			t.Fatalf("modules install %s : %v\n%s", name, err, out)
+			t.Fatalf("modules install %s: %v\n%s", name, err, out)
 		}
 	}
 }
@@ -54,17 +54,17 @@ func TestPlanListsChainInOrder(t *testing.T) {
 	specFile := writeChainSpec(t)
 	out, err := runCLI(t, "plan", "-f", specFile)
 	if err != nil {
-		t.Fatalf("plan : %v\n%s", err, out)
+		t.Fatalf("plan: %v\n%s", err, out)
 	}
 
 	posA := strings.Index(out, "test-a")
 	posB := strings.Index(out, "test-b")
 	posC := strings.Index(out, "test-c")
 	if posA < 0 || posB < 0 || posC < 0 {
-		t.Fatalf("plan = %q, attendu les 3 modules", out)
+		t.Fatalf("plan = %q, want the 3 modules", out)
 	}
 	if posA >= posB || posB >= posC {
-		t.Errorf("plan = %q, attendu l'ordre test-a puis test-b puis test-c", out)
+		t.Errorf("plan = %q, want the order test-a then test-b then test-c", out)
 	}
 }
 
@@ -75,27 +75,27 @@ func TestApplyRunsAndSecondApplyIsNoop(t *testing.T) {
 
 	stateDir := filepath.Join(t.TempDir(), "state")
 	if _, err := runCLI(t, "init", "--state-dir", stateDir); err != nil {
-		t.Fatalf("init : %v", err)
+		t.Fatalf("init: %v", err)
 	}
 
 	specFile := writeChainSpec(t)
 
 	firstOut, err := runCLI(t, "apply", "-f", specFile, "--state-dir", stateDir, "--auto-approve")
 	if err != nil {
-		t.Fatalf("premier apply : %v\n%s", err, firstOut)
+		t.Fatalf("first apply: %v\n%s", err, firstOut)
 	}
-	if !strings.Contains(firstOut, "apply terminé") {
-		t.Errorf("sortie du premier apply = %q, attendu la confirmation de fin", firstOut)
+	if !strings.Contains(firstOut, "apply complete") {
+		t.Errorf("output of the first apply = %q, want the completion message", firstOut)
 	}
-	if !strings.Contains(firstOut, "graine retirée") || !strings.Contains(firstOut, "master.key") {
-		t.Errorf("sortie du premier apply = %q, attendu le retrait de la graine et la liste à conserver hors ligne", firstOut)
+	if !strings.Contains(firstOut, "seed retired") || !strings.Contains(firstOut, "master.key") {
+		t.Errorf("output of the first apply = %q, want the seed retirement and the list of what to keep offline", firstOut)
 	}
 
 	secondOut, err := runCLI(t, "apply", "-f", specFile, "--state-dir", stateDir, "--auto-approve")
 	if err != nil {
-		t.Fatalf("second apply : %v\n%s", err, secondOut)
+		t.Fatalf("second apply: %v\n%s", err, secondOut)
 	}
-	if !strings.Contains(secondOut, "apply terminé") {
-		t.Errorf("sortie du second apply = %q, attendu la confirmation de fin", secondOut)
+	if !strings.Contains(secondOut, "apply complete") {
+		t.Errorf("output of the second apply = %q, want the completion message", secondOut)
 	}
 }

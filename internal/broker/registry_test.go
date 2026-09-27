@@ -16,9 +16,9 @@ import (
 	echov1 "github.com/WhiteRoseLK/genesis/sdk/go/gen/functions/test/echo/v1"
 )
 
-// serveInMemory démarre s sur un listener en mémoire (bufconn) et retourne
-// une connexion cliente dessus, comme le ferait un Dial réel — utile pour
-// tester le routage du broker sans process go-plugin réel.
+// serveInMemory starts s on an in-memory listener (bufconn) and returns a
+// client connection to it, as a real Dial would — useful to test the broker's
+// routing without a real go-plugin process.
 func serveInMemory(t *testing.T, s *grpc.Server) *grpc.ClientConn {
 	t.Helper()
 	lis := bufconn.Listen(1024 * 1024)
@@ -30,14 +30,14 @@ func serveInMemory(t *testing.T, s *grpc.Server) *grpc.ClientConn {
 		grpc.WithTransportCredentials(insecure.NewCredentials()),
 	)
 	if err != nil {
-		t.Fatalf("connexion en mémoire : %v", err)
+		t.Fatalf("in-memory connection: %v", err)
 	}
 	t.Cleanup(func() { _ = conn.Close() })
 	return conn
 }
 
-// echoProvider est un fournisseur test.*/v1 minimal, jouant le rôle d'un
-// module fournisseur réel (dispensé normalement via go-plugin).
+// echoProvider is a minimal test.*/v1 provider, playing the role of a real
+// provider module (normally dispensed through go-plugin).
 type echoProvider struct {
 	echov1.UnimplementedEchoServer
 	name string
@@ -54,8 +54,8 @@ func newEchoProviderConn(t *testing.T, name string) *grpc.ClientConn {
 	return serveInMemory(t, s)
 }
 
-// TestBuildSessionRoutesDeclaredFunction vérifie qu'une fonction déclarée
-// (allowed) est bien routée vers son fournisseur actif.
+// TestBuildSessionRoutesDeclaredFunction checks that a declared (allowed)
+// function is routed to its active provider.
 func TestBuildSessionRoutesDeclaredFunction(t *testing.T) {
 	providerConn := newEchoProviderConn(t, "test-a")
 
@@ -66,51 +66,51 @@ func TestBuildSessionRoutesDeclaredFunction(t *testing.T) {
 	sessionConn := serveInMemory(t, sessionServer)
 
 	client := echov1.NewEchoClient(sessionConn)
-	resp, err := client.Call(context.Background(), &echov1.CallRequest{Message: "salut"})
+	resp, err := client.Call(context.Background(), &echov1.CallRequest{Message: "hello"})
 	if err != nil {
-		t.Fatalf("Call sur une fonction déclarée : %v", err)
+		t.Fatalf("Call on a declared function: %v", err)
 	}
-	if resp.GetFrom() != "test-a" || resp.GetMessage() != "echo: salut" {
-		t.Errorf("réponse = %+v, attendu from=test-a message=\"echo: salut\"", resp)
+	if resp.GetFrom() != "test-a" || resp.GetMessage() != "echo: hello" {
+		t.Errorf("response = %+v, want from=test-a message=\"echo: hello\"", resp)
 	}
 }
 
-// TestBuildSessionRefusesUndeclaredFunction est le critère d'acceptation du
-// jalon J4 (doc 08) : "appel d'une fonction non déclarée refusé par le
-// broker". La fonction a bien un fournisseur actif (test-a existe), mais
-// n'est pas dans le `allowed` de l'appelant : elle n'est jamais enregistrée
-// sur sa session, l'appel échoue donc avec Unimplemented.
+// TestBuildSessionRefusesUndeclaredFunction is the M4 acceptance criterion
+// (doc 08): "a call to an undeclared function is refused by the broker". The
+// function does have an active provider (test-a exists), but it is not in the
+// caller's `allowed`: it is never registered on its session, so the call fails
+// with Unimplemented.
 func TestBuildSessionRefusesUndeclaredFunction(t *testing.T) {
 	providerConn := newEchoProviderConn(t, "test-a")
 
 	r := NewRegistry()
 	r.SetModuleProvider("test.a/v1", providerConn, ForwardEcho)
 
-	// test-c ne déclare PAS test.a/v1 dans son requires.
+	// test-c does NOT declare test.a/v1 in its requires.
 	sessionServer := r.BuildSession("test-c", []string{})
 	sessionConn := serveInMemory(t, sessionServer)
 
 	client := echov1.NewEchoClient(sessionConn)
-	_, err := client.Call(context.Background(), &echov1.CallRequest{Message: "salut"})
+	_, err := client.Call(context.Background(), &echov1.CallRequest{Message: "hello"})
 	if err == nil {
-		t.Fatal("Call sur une fonction non déclarée : succès inattendu, devait être refusé")
+		t.Fatal("Call on an undeclared function: unexpected success, should have been refused")
 	}
 	if status.Code(err) != codes.Unimplemented {
-		t.Errorf("code = %v, attendu %v (Unimplemented)", status.Code(err), codes.Unimplemented)
+		t.Errorf("code = %v, want %v (Unimplemented)", status.Code(err), codes.Unimplemented)
 	}
 }
 
 func TestHasProvider(t *testing.T) {
 	r := NewRegistry()
 	if r.HasProvider("test.a/v1") {
-		t.Error("HasProvider avant tout enregistrement : true inattendu")
+		t.Error("HasProvider before any registration: unexpected true")
 	}
 	r.SetModuleProvider("test.a/v1", newEchoProviderConn(t, "test-a"), ForwardEcho)
 	if !r.HasProvider("test.a/v1") {
-		t.Error("HasProvider après SetModuleProvider : false inattendu")
+		t.Error("HasProvider after SetModuleProvider: unexpected false")
 	}
 	r.Unset("test.a/v1")
 	if r.HasProvider("test.a/v1") {
-		t.Error("HasProvider après Unset : true inattendu")
+		t.Error("HasProvider after Unset: unexpected true")
 	}
 }

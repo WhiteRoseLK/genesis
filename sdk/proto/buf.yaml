@@ -5,13 +5,16 @@ lint:
   use:
     - STANDARD
   except:
-    # docs/03-module-contract.md fixe délibérément ce contrat : un service
-    # "Module" (pas "ModuleService"), et StepRequest/StepResult partagés par
-    # toutes les étapes du cycle de vie plutôt qu'un message par RPC.
+    # docs/03-module-contract.md deliberately defines this contract: a
+    # "Module" service (not "ModuleService"), and StepRequest/StepResult
+    # shared by every lifecycle step rather than one message per RPC.
     - SERVICE_SUFFIX
     - RPC_REQUEST_RESPONSE_UNIQUE
     - RPC_REQUEST_STANDARD_NAME
     - RPC_RESPONSE_STANDARD_NAME
+    # CheckResult.Status keeps its original French value names as deprecated
+    # aliases of the English ones (ADR-054), until a breaking release.
+    - ENUM_NO_ALLOW_ALIAS
 breaking:
   use:
     - FILE

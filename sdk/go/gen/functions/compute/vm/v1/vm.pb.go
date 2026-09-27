@@ -4,8 +4,8 @@
 // 	protoc        (unknown)
 // source: functions/compute/vm/v1/vm.proto
 
-// Fonction compute.vm/v1 (docs/03-module-contract.md) : fournisseurs MVP
-// proxmox (J5) et fake-compute (J4, registre mémoire).
+// Function compute.vm/v1 (docs/03-module-contract.md): MVP providers
+// proxmox (M5) and fake-compute (M4, in-memory registry).
 
 package computevmv1
 
@@ -108,10 +108,10 @@ func (*EnsureImageResponse) Descriptor() ([]byte, []int) {
 type EnsureVMRequest struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	Name  string                 `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
-	Env   string                 `protobuf:"bytes,2,opt,name=env,proto3" json:"env,omitempty"` // tag genesis-env=<nom>, clé d'idempotence (docs/07)
+	Env   string                 `protobuf:"bytes,2,opt,name=env,proto3" json:"env,omitempty"` // tag genesis-env=<name>, idempotence key (docs/07)
 	Size  string                 `protobuf:"bytes,3,opt,name=size,proto3" json:"size,omitempty"`
 	Extra map[string]string      `protobuf:"bytes,4,rep,name=extra,proto3" json:"extra,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
-	// cloud-init (docs/07-mvp-modules.md : "IP, clé SSH de service, utilisateur genesis").
+	// cloud-init (docs/07-mvp-modules.md: "IP, service SSH key, genesis user").
 	Ip            string `protobuf:"bytes,5,opt,name=ip,proto3" json:"ip,omitempty"`
 	Gateway       string `protobuf:"bytes,6,opt,name=gateway,proto3" json:"gateway,omitempty"`
 	SshPublicKey  string `protobuf:"bytes,7,opt,name=ssh_public_key,json=sshPublicKey,proto3" json:"ssh_public_key,omitempty"`
@@ -212,10 +212,9 @@ type VM struct {
 	Name   string                 `protobuf:"bytes,2,opt,name=name,proto3" json:"name,omitempty"`
 	Ip     string                 `protobuf:"bytes,3,opt,name=ip,proto3" json:"ip,omitempty"`
 	Status string                 `protobuf:"bytes,4,opt,name=status,proto3" json:"status,omitempty"`
-	// ssh_port : 22 pour une vraie VM ; peut différer pour un fournisseur qui
-	// simule des VM en conteneurs (fake-compute) — les modules qui s'y
-	// connectent (os.base/v1.Target, etc.) doivent utiliser ce port, pas
-	// supposer 22.
+	// ssh_port: 22 for a real VM; may differ for a provider that simulates
+	// VMs as containers (fake-compute) — modules that connect to it
+	// (os.base/v1.Target, etc.) must use this port, not assume 22.
 	SshPort       int32 `protobuf:"varint,5,opt,name=ssh_port,json=sshPort,proto3" json:"ssh_port,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache

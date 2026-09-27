@@ -1,6 +1,6 @@
 syntax = "proto3";
 
-// Fonction time.ntp/v1 (docs/03-module-contract.md) : fournisseur MVP chrony (target).
+// Function time.ntp/v1 (docs/03-module-contract.md): MVP provider chrony (target).
 package functions.time.ntp.v1;
 
 option go_package = "github.com/WhiteRoseLK/genesis/sdk/go/gen/functions/time/ntp/v1;timentpv1";

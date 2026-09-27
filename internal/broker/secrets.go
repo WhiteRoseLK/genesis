@@ -15,11 +15,10 @@ import (
 	secretsv1 "github.com/WhiteRoseLK/genesis/sdk/go/gen/functions/core/secrets/v1"
 )
 
-// NativeSecrets construit le fournisseur core.secrets/v1, natif au cœur
-// (jamais un module, docs/03-module-contract.md). L'appelant ne peut lire
-// (Get) qu'un secret dont il est owner ou consumer (docs/02-architecture.md :
-// "un module... ne peut lire que ses propres secrets et ceux explicitement
-// partagés").
+// NativeSecrets builds the core.secrets/v1 provider, native to the core (never
+// a module, docs/03-module-contract.md). The caller can only read (Get) a
+// secret it owns or consumes (docs/02-architecture.md: "a module... can read
+// only its own secrets and those explicitly shared").
 func NativeSecrets(store secrets.Store) nativeFactory {
 	return func(caller string) func(*grpc.Server) {
 		return func(s *grpc.Server) {
@@ -40,7 +39,7 @@ func (s *secretsServer) Ensure(ctx context.Context, req *secretsv1.EnsureRequest
 		meta.Owner = s.caller
 	}
 	if meta.Owner != s.caller {
-		return nil, status.Errorf(codes.PermissionDenied, "module %q ne peut pas créer un secret pour le compte de %q", s.caller, meta.Owner)
+		return nil, status.Errorf(codes.PermissionDenied, "module %q cannot create a secret on behalf of %q", s.caller, meta.Owner)
 	}
 	gen, err := generatorFunc(req.GetGenerator())
 	if err != nil {
@@ -59,7 +58,7 @@ func (s *secretsServer) Get(ctx context.Context, req *secretsv1.GetRequest) (*se
 		return nil, status.Error(codes.NotFound, err.Error())
 	}
 	if !s.authorized(meta) {
-		return nil, status.Errorf(codes.PermissionDenied, "module %q n'est pas autorisé à lire le secret %q", s.caller, ref)
+		return nil, status.Errorf(codes.PermissionDenied, "module %q is not allowed to read secret %q", s.caller, ref)
 	}
 	value, err := s.store.Get(ctx, ref)
 	if err != nil {
@@ -74,7 +73,7 @@ func (s *secretsServer) Put(ctx context.Context, req *secretsv1.PutRequest) (*se
 		meta.Owner = s.caller
 	}
 	if meta.Owner != s.caller {
-		return nil, status.Errorf(codes.PermissionDenied, "module %q ne peut pas écrire un secret pour le compte de %q", s.caller, meta.Owner)
+		return nil, status.Errorf(codes.PermissionDenied, "module %q cannot write a secret on behalf of %q", s.caller, meta.Owner)
 	}
 	if err := s.store.Put(ctx, secrets.Ref(req.GetRef()), secrets.NewSecret(req.GetValue()), meta); err != nil {
 		return nil, status.Error(codes.Internal, err.Error())
@@ -114,7 +113,7 @@ func generatorFunc(g secretsv1.Generator) (secrets.Generator, error) {
 	case secretsv1.Generator_GENERATOR_SSH_KEYPAIR:
 		return secrets.GenerateSSHKeyPair(), nil
 	default:
-		return nil, fmt.Errorf("générateur %v inconnu", g)
+		return nil, fmt.Errorf("unknown generator %v", g)
 	}
 }
 

@@ -15,7 +15,7 @@ import (
 func newInitCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "init",
-		Short: "Vérifie les prérequis graine et initialise l'état local et la clé maîtresse",
+		Short: "Check the seed prerequisites and initialise the local state and the master key",
 	}
 	cmd.RunE = func(cmd *cobra.Command, args []string) error {
 		stateDir, err := cmd.Flags().GetString("state-dir")
@@ -37,13 +37,13 @@ func newInitCmd() *cobra.Command {
 			return err
 		}
 		if created {
-			if _, err := fmt.Fprintln(out, "Clé maîtresse générée. Sauvegardez-la maintenant : elle ne sera plus jamais affichée."); err != nil {
+			if _, err := fmt.Fprintln(out, "Master key generated. Back it up now: it will never be displayed again."); err != nil {
 				return err
 			}
 			if _, err := fmt.Fprintln(out, identity.String()); err != nil {
 				return err
 			}
-		} else if _, err := fmt.Fprintf(out, "Déjà initialisé : clé maîtresse existante dans %s.\n", stateDir); err != nil {
+		} else if _, err := fmt.Fprintf(out, "Already initialised: existing master key in %s.\n", stateDir); err != nil {
 			return err
 		}
 
@@ -56,7 +56,7 @@ func newInitCmd() *cobra.Command {
 			}
 		}
 
-		_, err = fmt.Fprintf(out, "state_dir prêt : %s\n", stateDir)
+		_, err = fmt.Fprintf(out, "state_dir ready: %s\n", stateDir)
 		return err
 	}
 	return cmd

@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
-// Package cli assemble les commandes du CLI genesis (voir docs/02-architecture.md).
+// Package cli assembles the commands of the genesis CLI (see
+// docs/02-architecture.md).
 package cli
 
 import (
@@ -12,28 +13,28 @@ import (
 	"github.com/WhiteRoseLK/genesis/internal/version"
 )
 
-// Execute construit l'arbre de commandes et l'exécute.
+// Execute builds the command tree and runs it.
 func Execute() {
 	if err := NewRootCmd().Execute(); err != nil {
 		os.Exit(1)
 	}
 }
 
-// defaultStateDir est le répertoire d'état par défaut (docs/04-spec.md,
-// docs/06-secrets-state.md), utilisé tant qu'aucune spec n'a été chargée
-// (ex. `genesis init`, avant que seed.state_dir ne soit connu).
+// defaultStateDir is the default state directory (docs/04-spec.md,
+// docs/06-secrets-state.md), used as long as no spec has been loaded (e.g.
+// `genesis init`, before seed.state_dir is known).
 const defaultStateDir = "/var/lib/genesis"
 
-// NewRootCmd construit la commande racine `genesis` et tous ses enfants.
+// NewRootCmd builds the root `genesis` command and all its children.
 func NewRootCmd() *cobra.Command {
 	root := &cobra.Command{
 		Use:           "genesis",
-		Short:         "Construit un socle d'environnement autonome à partir d'une spec YAML",
+		Short:         "Build a self-sufficient environment foundation from a YAML spec",
 		Version:       version.Version,
 		SilenceUsage:  true,
 		SilenceErrors: false,
 	}
-	root.PersistentFlags().String("state-dir", defaultStateDir, "répertoire d'état de la graine (docs/06-secrets-state.md)")
+	root.PersistentFlags().String("state-dir", defaultStateDir, "state directory of the seed (docs/06-secrets-state.md)")
 
 	root.AddCommand(
 		newInitCmd(),
@@ -49,8 +50,8 @@ func NewRootCmd() *cobra.Command {
 	return root
 }
 
-// notImplemented retourne une erreur explicite pour une commande dont
-// l'implémentation est prévue à un jalon ultérieur (docs/08-milestones.md).
+// notImplemented returns an explicit error for a command whose implementation
+// is planned for a later milestone (docs/08-milestones.md).
 func notImplemented(cmd *cobra.Command, milestone string) error {
-	return fmt.Errorf("commande %q : pas encore implémentée (prévue au %s, voir docs/08-milestones.md)", cmd.CommandPath(), milestone)
+	return fmt.Errorf("command %q: not implemented yet (planned for %s, see docs/08-milestones.md)", cmd.CommandPath(), milestone)
 }

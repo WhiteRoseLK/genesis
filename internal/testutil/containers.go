@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 
-// Package testutil regroupe les aides partagées par les tests.
+// Package testutil groups the helpers shared by the tests.
 package testutil
 
 import (
@@ -11,20 +11,20 @@ import (
 	"github.com/WhiteRoseLK/genesis/internal/runner"
 )
 
-// RequireRuntime renvoie le runtime de conteneurs de la machine et fait
-// échouer le test si aucun démon n'est joignable. Les tests qui l'appellent
-// portent le build tag `docker` (make test-docker) : les lancer sans démon
-// est une erreur de l'environnement, pas une raison de les ignorer.
+// RequireRuntime returns the machine's container runtime and fails the test if
+// no daemon is reachable. The tests that call it carry the `docker` build tag
+// (make test-docker): running them without a daemon is an environment error,
+// not a reason to skip them.
 func RequireRuntime(t testing.TB) *runner.ContainerRuntime {
 	t.Helper()
 	rt, err := runner.DetectContainerRuntime("auto")
 	if err != nil {
-		t.Fatalf("tests `docker` : %v", err)
+		t.Fatalf("tests `docker`: %v", err)
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 	if err := rt.Ping(ctx); err != nil {
-		t.Fatalf("tests `docker` : démon de conteneurs injoignable (démarrer docker ou podman) : %v", err)
+		t.Fatalf("`docker` tests: container daemon unreachable (start docker or podman): %v", err)
 	}
 	return rt
 }

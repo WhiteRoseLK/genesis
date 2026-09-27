@@ -11,7 +11,8 @@ import (
 	modulev1 "github.com/WhiteRoseLK/genesis/sdk/go/gen/module/v1"
 )
 
-// ManifestFile est la forme YAML de module.yaml (docs/03-module-contract.md §1).
+// ManifestFile is the YAML form of module.yaml (docs/03-module-contract.md
+// §1).
 type ManifestFile struct {
 	APIVersion   string                    `yaml:"apiVersion"`
 	Name         string                    `yaml:"name"`
@@ -22,33 +23,33 @@ type ManifestFile struct {
 	Protocol     int32                     `yaml:"protocol"`
 	Capabilities []string                  `yaml:"capabilities"`
 	Provides     []FunctionRef             `yaml:"provides"`
-	Requires     map[string][]RequireEntry `yaml:"requires"` // clé : "seed" | "target"
+	Requires     map[string][]RequireEntry `yaml:"requires"` // key: "seed" | "target"
 	ConfigSchema string                    `yaml:"config_schema"`
 	Secrets      []SecretDecl              `yaml:"secrets"`
 	Resources    []ResourceDecl            `yaml:"resources"`
 	Defaults     map[string]bool           `yaml:"defaults"`
 }
 
-// FunctionRef est une fonction fournie par le module, avec les phases où
-// elle l'est (ex. "pki.issuer/v1", phases: [seed, target]).
+// FunctionRef is a function provided by the module, with the phases in which
+// it is provided (e.g. "pki.issuer/v1", phases: [seed, target]).
 type FunctionRef struct {
 	Function string   `yaml:"function"`
 	Phases   []string `yaml:"phases"`
-	// Fleet : fonction « de parc » (docs/09-decisions.md ADR-017) — tous
-	// les fournisseurs installés sont appelés (diffusion), pas un seul
-	// fournisseur actif choisi/repointable comme le reste des fonctions.
+	// Fleet: a "fleet" function (docs/09-decisions.md ADR-017) — every
+	// installed provider is called (fan-out), not a single chosen/repointable
+	// active provider as for the other functions.
 	Fleet bool `yaml:"fleet,omitempty"`
 }
 
-// RequireEntry est une fonction requise par le module. Le YAML accepte soit
-// une simple chaîne ("compute.vm/v1"), soit un objet {function, optional}
-// (docs/10-adding-a-module.md, dépendances optionnelles).
+// RequireEntry is a function required by the module. The YAML accepts either a
+// plain string ("compute.vm/v1") or an object {function, optional}
+// (docs/10-adding-a-module.md, optional dependencies).
 type RequireEntry struct {
 	Function string `yaml:"function"`
 	Optional bool   `yaml:"optional"`
 }
 
-// UnmarshalYAML accepte la forme courte (chaîne) et la forme longue (objet).
+// UnmarshalYAML accepts the short form (string) and the long form (object).
 func (r *RequireEntry) UnmarshalYAML(value *yaml.Node) error {
 	if value.Kind == yaml.ScalarNode {
 		r.Function = value.Value
@@ -77,31 +78,31 @@ type ResourceDecl struct {
 	Size  string `yaml:"size"`
 }
 
-// LoadManifest lit et décode module.yaml.
+// LoadManifest reads and decodes module.yaml.
 func LoadManifest(path string) (*ManifestFile, error) {
 	raw, err := os.ReadFile(path)
 	if err != nil {
-		return nil, fmt.Errorf("lecture de %s : %w", path, err)
+		return nil, fmt.Errorf("lecture de %s: %w", path, err)
 	}
 	m, err := ParseManifest(raw)
 	if err != nil {
-		return nil, fmt.Errorf("%s : %w", path, err)
+		return nil, fmt.Errorf("%s: %w", path, err)
 	}
 	return m, nil
 }
 
-// ParseManifest décode le contenu YAML d'un module.yaml déjà lu (utile à un
-// module qui embarque son propre manifest via go:embed, docs/10).
+// ParseManifest decodes the YAML content of an already read module.yaml
+// (useful for a module that embeds its own manifest with go:embed, docs/10).
 func ParseManifest(data []byte) (*ManifestFile, error) {
 	var m ManifestFile
 	if err := yaml.Unmarshal(data, &m); err != nil {
-		return nil, fmt.Errorf("YAML invalide : %w", err)
+		return nil, fmt.Errorf("invalid YAML: %w", err)
 	}
 	return &m, nil
 }
 
-// ToProto convertit le manifest YAML en message protobuf Manifest, tel que
-// renvoyé par Describe().
+// ToProto converts the YAML manifest into the protobuf Manifest message, as
+// returned by Describe().
 func (m *ManifestFile) ToProto() *modulev1.Manifest {
 	provides := make([]*modulev1.FunctionRef, len(m.Provides))
 	for i, p := range m.Provides {

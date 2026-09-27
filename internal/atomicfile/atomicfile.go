@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: Apache-2.0
 
-// Package atomicfile écrit des fichiers sans jamais laisser un état
-// partiellement écrit visible (docs/06-secrets-state.md : "écritures atomiques"),
-// utilisé par internal/secrets, internal/state et internal/modulelock.
+// Package atomicfile writes files without ever leaving a partially written
+// state visible (docs/06-secrets-state.md: "atomic writes"), used by
+// internal/secrets, internal/state and internal/modulelock.
 package atomicfile
 
 import (
@@ -11,29 +11,29 @@ import (
 	"path/filepath"
 )
 
-// Write écrit data dans path via un fichier temporaire suivi d'un rename.
+// Write writes data to path through a temporary file followed by a rename.
 func Write(path string, data []byte, perm os.FileMode) error {
 	dir := filepath.Dir(path)
 	tmp, err := os.CreateTemp(dir, ".tmp-*")
 	if err != nil {
-		return fmt.Errorf("création du fichier temporaire dans %s : %w", dir, err)
+		return fmt.Errorf("creating a temporary file in %s: %w", dir, err)
 	}
 	tmpPath := tmp.Name()
-	defer func() { _ = os.Remove(tmpPath) }() // no-op si le rename a réussi
+	defer func() { _ = os.Remove(tmpPath) }() // no-op if the rename succeeded
 
 	if _, err := tmp.Write(data); err != nil {
 		_ = tmp.Close()
-		return fmt.Errorf("écriture de %s : %w", tmpPath, err)
+		return fmt.Errorf("writing %s: %w", tmpPath, err)
 	}
 	if err := tmp.Chmod(perm); err != nil {
 		_ = tmp.Close()
-		return fmt.Errorf("permissions de %s : %w", tmpPath, err)
+		return fmt.Errorf("permissions de %s: %w", tmpPath, err)
 	}
 	if err := tmp.Close(); err != nil {
-		return fmt.Errorf("fermeture de %s : %w", tmpPath, err)
+		return fmt.Errorf("closing %s: %w", tmpPath, err)
 	}
 	if err := os.Rename(tmpPath, path); err != nil {
-		return fmt.Errorf("renommage de %s vers %s : %w", tmpPath, path, err)
+		return fmt.Errorf("renaming %s to %s: %w", tmpPath, path, err)
 	}
 	return nil
 }

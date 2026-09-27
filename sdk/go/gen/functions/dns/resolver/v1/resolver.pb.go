@@ -4,8 +4,8 @@
 // 	protoc        (unknown)
 // source: functions/dns/resolver/v1/resolver.proto
 
-// Fonction dns.resolver/v1 (docs/03-module-contract.md) : fournisseurs MVP
-// coredns (seed) et powerdns (target).
+// Function dns.resolver/v1 (docs/03-module-contract.md): MVP providers
+// coredns (seed) and powerdns (target).
 
 package dnsresolverv1
 
