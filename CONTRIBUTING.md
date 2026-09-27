@@ -2,6 +2,8 @@
 
 Les règles d'architecture et les règles non négociables sont dans [`CLAUDE.md`](CLAUDE.md) et [`docs/`](docs/) : ce document ne décrit que le processus de développement (ADR-021).
 
+En participant, vous acceptez le [code de conduite](CODE_OF_CONDUCT.md).
+
 ## Environnement
 
 - Go (version de `go.mod`), `make`, Docker ou Podman (tests d'intégration). Les autres outils (`golangci-lint`, `buf`, générateurs protobuf, `govulncheck`, `go-licenses`) sont installés aux versions épinglées par `make tools`, dans `.bin/`.

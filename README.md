@@ -186,7 +186,7 @@ Au-delà de l'itération 1 : mode déconnecté (air-gap), supervision, forge log
 
 ## 🤝 Contribuer
 
-Les contributions passent par des PR atomiques, fusionnées en squash, avec un titre en Conventional Commits : voir [CONTRIBUTING.md](CONTRIBUTING.md). Une vulnérabilité se signale en privé, jamais dans une issue publique : voir [SECURITY.md](SECURITY.md).
+Les contributions passent par des PR atomiques, fusionnées en squash, avec un titre en Conventional Commits : voir [CONTRIBUTING.md](CONTRIBUTING.md). Toute participation est soumise au [code de conduite](CODE_OF_CONDUCT.md). Une vulnérabilité se signale en privé, jamais dans une issue publique : voir [SECURITY.md](SECURITY.md).
 
 Le projet est développé avec l'aide de Claude Code : règles dans [CLAUDE.md](CLAUDE.md) et [`.claude/rules/`](.claude/rules/), commande `/jalon`.
 
