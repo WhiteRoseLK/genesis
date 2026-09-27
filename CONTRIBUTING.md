@@ -1,77 +1,77 @@
-# Contribuer à Genesis
+# Contributing to Genesis
 
-Les règles d'architecture et les règles non négociables sont dans [`CLAUDE.md`](CLAUDE.md) et [`docs/`](docs/) : ce document ne décrit que le processus de développement (ADR-021).
+The architecture rules and the non-negotiable rules are in [`CLAUDE.md`](CLAUDE.md) and [`docs/`](docs/): this document only describes the development process (ADR-021).
 
-En participant, vous acceptez le [code de conduite](CODE_OF_CONDUCT.md).
+By participating, you agree to abide by the [code of conduct](CODE_OF_CONDUCT.md).
 
-## Environnement
+## Environment
 
-- Go (version de `go.mod`), `make`, Docker ou Podman (tests d'intégration). Les autres outils (`golangci-lint`, `buf`, générateurs protobuf, `govulncheck`, `go-licenses`) sont installés aux versions épinglées par `make tools`, dans `.bin/`.
-- Monorepo : chaque module a son propre `go.mod`, complet et utilisable hors du dépôt (ADR-022). L'espace de travail `go.work` sert au développement quotidien. Passez par le `Makefile`, qui parcourt tous les `go.mod`.
+- Go (the version in `go.mod`), `make`, Docker or Podman (integration tests). The other tools (`golangci-lint`, `buf`, protobuf generators, `govulncheck`, `go-licenses`) are installed at pinned versions by `make tools`, into `.bin/`.
+- Monorepo: each module has its own `go.mod`, complete and usable outside the repository (ADR-022). The `go.work` workspace is for everyday development. Go through the `Makefile`, which walks every `go.mod`.
 
-| Commande | Rôle |
+| Command | Role |
 |---|---|
-| `make tools` | Installe les outils de développement épinglés dans `.bin/` |
-| `make build` | Compile tous les modules (`CGO_ENABLED=0`, `GOARCH=amd64` ou `arm64`) |
-| `make test` | Tests unitaires de chaque `go.mod` : sans réseau ni démon de conteneurs |
-| `make test-race` | Mêmes tests avec le détecteur de concurrence (CGO requis pour les tests seulement) |
-| `make test-docker` | Tests d'intégration contre de vrais conteneurs (build tag `docker`) |
-| `make pull-images` | Tire d'avance, avec reprises, les images épinglées dans le code (limites de débit des registres) |
-| `make lint` | `golangci-lint`, règles d'import `depguard` comprises |
-| `make mod-check` | Chaque `go.mod` est à jour et compile hors de `go.work` |
-| `make proto` | Régénère le code protobuf (`buf generate`) : le code généré est commité |
-| `make proto-check` | `buf lint` et code généré à jour (la CI vérifie aussi `buf breaking` contre la branche de base) |
-| `make vuln` | Vulnérabilités connues atteignables (`govulncheck`) |
-| `make licenses` | Licences des dépendances compatibles avec Apache-2.0 |
-| `make e2e` | Bout en bout sur Proxmox : **jamais sans demande explicite** |
+| `make tools` | Installs the pinned development tools into `.bin/` |
+| `make build` | Builds every module (`CGO_ENABLED=0`, `GOARCH=amd64` or `arm64`) |
+| `make test` | Unit tests of each `go.mod`: no network, no container daemon |
+| `make test-race` | Same tests with the race detector (CGO required for the tests only) |
+| `make test-docker` | Integration tests against real containers (`docker` build tag) |
+| `make pull-images` | Pulls the images pinned in the code ahead of time, with retries (registry rate limits) |
+| `make lint` | `golangci-lint`, including the `depguard` import rules |
+| `make mod-check` | Each `go.mod` is up to date and builds outside `go.work` |
+| `make proto` | Regenerates the protobuf code (`buf generate`): the generated code is committed |
+| `make proto-check` | `buf lint` and generated code up to date (CI also runs `buf breaking` against the base branch) |
+| `make vuln` | Known reachable vulnerabilities (`govulncheck`) |
+| `make licenses` | Dependency licenses compatible with Apache-2.0 |
+| `make e2e` | End to end on Proxmox: **never without an explicit request** |
 
 ## Issues
 
-- Chaque sujet part d'une issue : **Bug**, **Évolution** ou **Dette technique** (modèles dans `.github/ISSUE_TEMPLATE/`).
-- Une issue ouverte reçoit `needs-triage`, retiré automatiquement quand un label `priorite:haute|moyenne|basse` est posé.
-- **Jalons** (ADR-049) : chaque jalon de `docs/08-jalons.md` a un [milestone](https://github.com/WhiteRoseLK/genesis/milestones) et une issue parente (label `jalon`) ; chaque PR prévue est une sous-issue, rattachée au milestone. Le [GitHub Project](https://github.com/users/WhiteRoseLK/projects) donne la vue tableau et roadmap.
-- **Décisions** : un choix d'architecture ou de processus se débat dans une issue **« Décision »** (label `decision`). Une fois tranché, la PR qui l'applique ajoute `docs/adr/NNNN-titre.md` (NNNN = numéro de l'issue, modèle `docs/adr/_modele.md`) et sa ligne dans `docs/09-decisions.md`, puis ferme l'issue.
-- **Dette** : une limitation différée volontairement reçoit `dette-technique` ; l'issue est la seule source de vérité pour la dette.
+- Every topic starts from an issue: **Bug**, **Feature** or **Technical debt** (templates in `.github/ISSUE_TEMPLATE/`).
+- A new issue gets `needs-triage`, removed automatically once a `priority:high|medium|low` label is set.
+- **Milestones** (ADR-049): each milestone of `docs/08-milestones.md` has a [GitHub milestone](https://github.com/WhiteRoseLK/genesis/milestones) and a parent issue (label `milestone`); each planned PR is a sub-issue, attached to the GitHub milestone. The [GitHub Project](https://github.com/users/WhiteRoseLK/projects) gives the board and roadmap views.
+- **Decisions**: an architecture or process choice is discussed in a **"Decision"** issue (label `decision`). Once settled, the PR that applies it adds `docs/adr/NNNN-title.md` (NNNN = the issue number, template `docs/adr/_template.md`) and its row in `docs/09-decisions.md`, then closes the issue.
+- **Debt**: a deliberately deferred limitation gets `tech-debt`; the issue is the single source of truth for debt.
 
-## Branches et PR atomiques
+## Branches and atomic PRs
 
-- `main` est protégée : on n'y pousse jamais directement, les checks CI sont obligatoires.
-- **Une PR = un sujet.** Un jalon se découpe en plusieurs PR successives, chacune verte et relisible seule.
-- Nommage : `<type>/<sujet-court>`, ex. `feat/teleport-agent`, `fix/vault-token-cache`, `docs/adr-021`.
-- La PR suit le modèle `.github/PULL_REQUEST_TEMPLATE.md` et lie son issue (`Closes #N`).
-- Fusion **en squash** uniquement, branche supprimée après fusion.
+- `main` is protected: nobody pushes to it directly, and the CI checks are required.
+- **One PR = one topic.** A milestone is split into several successive PRs, each green and reviewable on its own.
+- Naming: `<type>/<short-topic>`, e.g. `feat/teleport-agent`, `fix/vault-token-cache`, `docs/adr-021`.
+- The PR follows the `.github/PULL_REQUEST_TEMPLATE.md` template and links its issue (`Closes #N`).
+- **Squash** merges only, branch deleted after merge.
 
 ## Conventional Commits
 
-Le titre de la PR devient le commit sur `main` : il est validé par la CI et alimente le CHANGELOG.
+The PR title becomes the commit on `main`: CI validates it and it feeds the CHANGELOG.
 
 ```text
-<type>(<scope>): <description courte>
+<type>(<scope>): <short description>
 ```
 
-- **Types** : `feat`, `fix`, `perf`, `refactor`, `revert`, `test`, `docs`, `ci`, `build`, `chore`.
-- **Scope** (facultatif, libre) : couche du cœur (`engine`, `broker`, `resolver`, `spec`…), `sdk`, `proto`, ou le nom du module (`teleport`, `vault`…). Aucune liste n'est maintenue en CI : ajouter un module ne modifie rien hors de son répertoire.
-- Changement cassant (contrat module, format de spec ou d'état, chemins d'import du SDK) : `!` après le scope ou `BREAKING CHANGE:` dans le corps.
+- **Types**: `feat`, `fix`, `perf`, `refactor`, `revert`, `test`, `docs`, `ci`, `build`, `chore`.
+- **Scope** (optional, free-form): core layer (`engine`, `broker`, `resolver`, `spec`…), `sdk`, `proto`, or the module name (`teleport`, `vault`…). CI keeps no list: adding a module changes nothing outside its directory.
+- Breaking change (module contract, spec or state format, SDK import paths): `!` after the scope or `BREAKING CHANGE:` in the body.
 
-## Documentation à tenir à jour dans la même PR
+## Documentation to keep up to date in the same PR
 
-- `docs/adr/` et l'index `docs/09-decisions.md` : une ADR pour toute décision structurante ou nouvelle dépendance lourde, issue de son issue « Décision ».
-- Documents de conception concernés (`docs/0x-*.md`) si le contrat, la spec ou le cycle changent ; `docs/10-ajouter-un-module.md` si la procédure d'ajout de module change.
-- `docs/PROGRESS.md` n'est mis à jour qu'en fin de jalon ; le bilan du jalon va en commentaire de clôture de son issue parente. Le détail de chaque changement vit dans la description de sa PR et dans le CHANGELOG.
+- `docs/adr/` and the `docs/09-decisions.md` index: an ADR for any structural decision or new heavy dependency, coming from its "Decision" issue.
+- The relevant design documents (`docs/0x-*.md`) if the contract, the spec or the lifecycle changes; `docs/10-adding-a-module.md` if the procedure for adding a module changes.
+- `docs/PROGRESS.md` is only updated at the end of a milestone; the milestone summary goes in the closing comment of its parent issue. The details of each change live in its PR description and in the CHANGELOG.
 
-## Sécurité
+## Security
 
-Ne signalez jamais une vulnérabilité dans une issue publique : voir [`SECURITY.md`](SECURITY.md).
+Never report a vulnerability in a public issue: see [`SECURITY.md`](SECURITY.md).
 
 ## Releases
 
-[Release Please](https://github.com/googleapis/release-please) tient à jour une PR de release par paquet :
+[Release Please](https://github.com/googleapis/release-please) keeps one release PR per package up to date:
 
-- **cœur** : tag `vX.Y.Z`, `CHANGELOG.md` à la racine, version reportée dans `internal/version` (comparée à la contrainte `core` des modules) ;
-- **SDK** : tag `sdk/vX.Y.Z` (convention des sous-modules Go), `sdk/CHANGELOG.md`.
+- **core**: `vX.Y.Z` tag, `CHANGELOG.md` at the root, version written to `internal/version` (compared with the modules' `core` constraint);
+- **SDK**: `sdk/vX.Y.Z` tag (Go submodule convention), `sdk/CHANGELOG.md`.
 
-Avant 1.0, un `feat` incrémente le patch et un changement cassant le mineur. Une release mineure change la version comparée à la contrainte `core` des modules : **dans la PR qui introduit une rupture**, relever la borne haute de la contrainte des modules du dépôt (`modules/*/module.yaml` et le modèle de `scaffold`) si la rupture ne les empêche pas de fonctionner avec le nouveau cœur, sinon la PR de release échoue en CI. Les modules de test (`test/modules/*`) n'ont pas de borne haute. La publication de binaires (GoReleaser) viendra plus tard.
+Before 1.0, a `feat` bumps the patch version and a breaking change bumps the minor version. A minor release changes the version compared with the modules' `core` constraint: **in the PR that introduces a breaking change**, raise the upper bound of the constraint of the repository's modules (`modules/*/module.yaml` and the `scaffold` template) if the change does not stop them from working with the new core; otherwise the release PR fails in CI. Test modules (`test/modules/*`) have no upper bound. Binary publishing (GoReleaser) will come later.
 
-## Dépendances
+## Dependencies
 
-Dependabot propose chaque semaine les mises à jour des actions GitHub et de tous les `go.mod` : une PR par dépendance, qui la met à jour dans tous les modules à la fois. Les images de conteneur sont épinglées par version et empreinte dans le code : leur mise à jour est manuelle pour l'instant.
+Dependabot proposes updates to the GitHub Actions and to every `go.mod` each week: one PR per dependency, updating it in every module at once. Container images are pinned by version and digest in the code: updating them is manual for now.

@@ -20,7 +20,7 @@ func Execute() {
 }
 
 // defaultStateDir est le répertoire d'état par défaut (docs/04-spec.md,
-// docs/06-secrets-etat.md), utilisé tant qu'aucune spec n'a été chargée
+// docs/06-secrets-state.md), utilisé tant qu'aucune spec n'a été chargée
 // (ex. `genesis init`, avant que seed.state_dir ne soit connu).
 const defaultStateDir = "/var/lib/genesis"
 
@@ -33,7 +33,7 @@ func NewRootCmd() *cobra.Command {
 		SilenceUsage:  true,
 		SilenceErrors: false,
 	}
-	root.PersistentFlags().String("state-dir", defaultStateDir, "répertoire d'état de la graine (docs/06-secrets-etat.md)")
+	root.PersistentFlags().String("state-dir", defaultStateDir, "répertoire d'état de la graine (docs/06-secrets-state.md)")
 
 	root.AddCommand(
 		newInitCmd(),
@@ -50,7 +50,7 @@ func NewRootCmd() *cobra.Command {
 }
 
 // notImplemented retourne une erreur explicite pour une commande dont
-// l'implémentation est prévue à un jalon ultérieur (docs/08-jalons.md).
+// l'implémentation est prévue à un jalon ultérieur (docs/08-milestones.md).
 func notImplemented(cmd *cobra.Command, milestone string) error {
-	return fmt.Errorf("commande %q : pas encore implémentée (prévue au %s, voir docs/08-jalons.md)", cmd.CommandPath(), milestone)
+	return fmt.Errorf("commande %q : pas encore implémentée (prévue au %s, voir docs/08-milestones.md)", cmd.CommandPath(), milestone)
 }

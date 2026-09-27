@@ -1,6 +1,6 @@
 syntax = "proto3";
 
-// Protocole de cycle de vie module <-> cœur (docs/03-contrat-module.md).
+// Protocole de cycle de vie module <-> cœur (docs/03-module-contract.md).
 // Nommage : package "module.v1" (sans préfixe "genesis.") pour que le
 // répertoire sdk/proto/module/v1/ corresponde au paquet (convention buf).
 package module.v1;
@@ -34,7 +34,7 @@ message FunctionRef {
 // RequireEntry est une fonction requise par le module pour une phase donnée.
 message RequireEntry {
   string function = 1; // ex. "compute.vm/v1", peut porter le suffixe "@seed"/"@target"
-  bool optional = 2; // docs/10-ajouter-un-module.md : dépendances optionnelles
+  bool optional = 2; // docs/10-adding-a-module.md : dépendances optionnelles
 }
 
 message RequireList {
@@ -54,7 +54,7 @@ message ResourceDecl {
   string size = 3;
 }
 
-// Manifest reflète module.yaml (docs/03-contrat-module.md §1).
+// Manifest reflète module.yaml (docs/03-module-contract.md §1).
 message Manifest {
   string api_version = 1;
   string name = 2;
@@ -87,7 +87,7 @@ message Diagnostics {
 }
 
 // StepRequest porte tout ce dont un module a besoin pour exécuter une étape
-// (docs/03-contrat-module.md §2) : le cœur ne laisse rien d'autre y accéder.
+// (docs/03-module-contract.md §2) : le cœur ne laisse rien d'autre y accéder.
 message StepRequest {
   string run_id = 1;
   google.protobuf.Struct config = 2; // configuration résolue du module
@@ -118,7 +118,7 @@ message CheckResult {
 }
 
 // StepResult : le module ne persiste rien lui-même, state est à
-// persister par le cœur, opaque (docs/03-contrat-module.md §2).
+// persister par le cœur, opaque (docs/03-module-contract.md §2).
 message StepResult {
   enum Status {
     STATUS_UNSPECIFIED = 0;

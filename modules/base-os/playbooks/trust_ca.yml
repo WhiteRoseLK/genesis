@@ -1,6 +1,6 @@
 ---
 # TrustCA (functions/os/base/v1) : installe la CA racine dans le magasin de
-# certificats système (image cloud Debian, docs/01-vision-perimetre.md).
+# certificats système (image cloud Debian, docs/01-vision-scope.md).
 - hosts: target
   gather_facts: false
   become: true

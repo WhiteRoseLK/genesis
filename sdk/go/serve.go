@@ -55,7 +55,7 @@ type BrokerClient struct {
 // Dial ouvre la connexion vers la session de broker désignée par token
 // (StepRequest.broker_token). Un appel à une fonction non déclarée dans le
 // requires du module échoue côté serveur avec codes.Unimplemented : c'est le
-// refus du broker (docs/08-jalons.md, critère d'acceptation J4).
+// refus du broker (docs/08-milestones.md, critère d'acceptation J4).
 func (b *BrokerClient) Dial(token string) (*grpc.ClientConn, error) {
 	id, err := strconv.ParseUint(token, 10, 32)
 	if err != nil {
@@ -129,7 +129,7 @@ func ClientPlugins() map[string]plugin.Plugin {
 // Serve démarre le module comme plugin go-plugin : le cycle de vie (impl)
 // et, pour chaque fonction fournie, un plugin "function:<nom>" que le cœur
 // dispense pour router les appels des autres modules (internal/broker) —
-// docs/10-ajouter-un-module.md.
+// docs/10-adding-a-module.md.
 func Serve(impl modulev1.ModuleServer, functions ...FunctionProvider) {
 	plugins := map[string]plugin.Plugin{PluginKey: &modulePlugin{Impl: impl}}
 	for _, f := range functions {

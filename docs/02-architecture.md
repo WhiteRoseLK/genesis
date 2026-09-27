@@ -1,138 +1,138 @@
-# 02 — Architecture modulaire
+# 02 — Modular architecture
 
-## Principe directeur
-Genesis n'est **pas un monolithe**. Il se compose :
-- d'un **cœur** minimal et stable, qui ne connaît aucun produit (ni Proxmox, ni PowerDNS, ni Vault) ;
-- de **modules** indépendants, un par produit, qui implémentent des **fonctions** normalisées.
+## Guiding principle
+Genesis is **not a monolith**. It is made of:
+- a minimal, stable **core** that knows no product (neither Proxmox, nor PowerDNS, nor Vault);
+- independent **modules**, one per product, that implement standardised **functions**.
 
-Ajouter un produit (Bind au lieu de PowerDNS, Nutanix au lieu de Proxmox, GitLab, la construction d'un hyperviseur…) = **écrire un module**, sans modifier le cœur ni les autres modules.
+Adding a product (Bind instead of PowerDNS, Nutanix instead of Proxmox, GitLab, building a hypervisor…) = **writing a module**, without changing the core or the other modules.
 
-## Vocabulaire
-| Terme | Définition | Exemple |
+## Vocabulary
+| Term | Definition | Example |
 |---|---|---|
-| **Fonction** | Service abstrait, défini par une **API versionnée** dans le SDK | `dns.zone/v1`, `compute.vm/v1`, `pki.issuer/v1` |
-| **Capacité** | Ce que l'utilisateur demande dans la spec ; se résout en une ou plusieurs fonctions | `dns` → `dns.zone` + `dns.resolver` |
-| **Module** | Implémentation packagée d'un produit : manifest + binaire plugin + assets | `powerdns`, `proxmox`, `vault` |
-| **Couche** | Étiquette d'affichage et de tri, **jamais une contrainte codée en dur** | `physical`, `platform`, `foundation`, `services` |
-| **Module de parc** | Module dont la fonction fournie a **plusieurs fournisseurs actifs simultanés**, tous appelés (par opposition au mode par défaut, un seul fournisseur actif) — sa présence dans la spec affecte alors toute VM du parc, pas une capacité choisie parmi plusieurs (ADR-017) | `teleport` (`fleet.agent/v1`) |
+| **Function** | Abstract service, defined by a **versioned API** in the SDK | `dns.zone/v1`, `compute.vm/v1`, `pki.issuer/v1` |
+| **Capability** | What the user asks for in the spec; resolves to one or more functions | `dns` → `dns.zone` + `dns.resolver` |
+| **Module** | Packaged implementation of a product: manifest + plugin binary + assets | `powerdns`, `proxmox`, `vault` |
+| **Layer** | A label for display and sorting, **never a hard-coded constraint** | `physical`, `platform`, `foundation`, `services` |
+| **Fleet module** | A module whose provided function has **several providers active at the same time**, all of them called (as opposed to the default mode, a single active provider) — its presence in the spec then affects every VM in the fleet, rather than being one capability chosen among several (ADR-017) | `teleport` (`fleet.agent/v1`) |
 
-L'ordre de construction découle **uniquement** des dépendances entre fonctions. C'est ce qui permet d'insérer plus tard la construction de l'hyperviseur « avant le reste » sans rien réécrire : un module qui fournit la plateforme devient simplement un prédécesseur dans le graphe.
+The build order follows **only** from the dependencies between functions. This is what allows building the hypervisor to be inserted "before everything else" later without rewriting anything: a module that provides the platform simply becomes a predecessor in the graph.
 
-## Vue d'ensemble
+## Overview
 
 ```mermaid
 flowchart TB
-  subgraph CORE[Cœur genesis]
+  subgraph CORE[Genesis core]
     CLI[CLI] --> SPEC[Spec + validation]
-    SPEC --> RES[Résolveur<br/>capacités → modules]
-    RES --> PLAN[Planificateur DAG]
-    PLAN --> ENG[Moteur]
-    ENG --> HOST[Hôte de modules]
-    HOST <--> BROKER[Broker de fonctions]
-    ENG --> STATE[(État)]
+    SPEC --> RES[Resolver<br/>capabilities → modules]
+    RES --> PLAN[DAG planner]
+    PLAN --> ENG[Engine]
+    ENG --> HOST[Module host]
+    HOST <--> BROKER[Function broker]
+    ENG --> STATE[(State)]
     BROKER --> SEC[Secrets]
     BROKER --> RUN[Runners<br/>container · ansible · ssh]
   end
-  HOST <-->|gRPC| M1[module proxmox<br/>fournit compute.vm]
-  HOST <-->|gRPC| M2[module powerdns<br/>fournit dns.zone]
-  HOST <-->|gRPC| M3[module vault<br/>fournit pki.issuer, secrets.kv]
-  HOST <-->|gRPC| M4[module teleport<br/>fournit access.ssh, fleet.agent]
+  HOST <-->|gRPC| M1[proxmox module<br/>provides compute.vm]
+  HOST <-->|gRPC| M2[powerdns module<br/>provides dns.zone]
+  HOST <-->|gRPC| M3[vault module<br/>provides pki.issuer, secrets.kv]
+  HOST <-->|gRPC| M4[teleport module<br/>provides access.ssh, fleet.agent]
 ```
 
-## Comment les modules interagissent
-**Jamais directement.** Un module appelle une *fonction*, pas un autre module :
+## How modules interact
+**Never directly.** A module calls a *function*, not another module:
 
 ```
-module vault  --appelle-->  compute.vm/v1.EnsureVM   --broker-->  module proxmox
-module vault  --appelle-->  dns.zone/v1.UpsertRecord --broker-->  module powerdns (ou coredns en phase graine)
-module bastion--appelle-->  pki.issuer/v1.SignSSH    --broker-->  module vault
+vault module   --calls-->  compute.vm/v1.EnsureVM   --broker-->  proxmox module
+vault module   --calls-->  dns.zone/v1.UpsertRecord --broker-->  powerdns module (or coredns during the seed phase)
+bastion module --calls-->  pki.issuer/v1.SignSSH    --broker-->  vault module
 ```
 
-Le broker route l'appel vers le module qui fournit la fonction **à cet instant** (graine ou cible, doc 05). Conséquences :
-- remplacer PowerDNS par Bind ne touche pas le module Vault ;
-- un module peut être testé seul avec des fonctions simulées ;
-- la passation graine → cible est transparente pour les consommateurs.
+The broker routes the call to the module that provides the function **at that moment** (seed or target, doc 05). Consequences:
+- replacing PowerDNS with Bind does not touch the Vault module;
+- a module can be tested on its own against simulated functions;
+- the seed → target handover is transparent to consumers.
 
-Les secrets passent par le broker via la fonction intégrée `core.secrets/v1` (le cœur décide du backend : fichiers ou Vault).
+Secrets go through the broker via the built-in `core.secrets/v1` function (the core decides the backend: files or Vault).
 
-### Fonctions « de parc » (plusieurs fournisseurs simultanés)
-Le mode par défaut (`dns.zone`, `time.ntp`, `pki.issuer`…) route une fonction vers **un** fournisseur actif à la fois — c'est un choix exclusif entre produits concurrents, repointable lors d'une passation (doc05). Certaines fonctions n'ont pas cette sémantique : leur rôle est d'être appliquées à *toute* VM du parc, et plusieurs peuvent être actives en même temps (ex. `fleet.agent/v1`, fourni par `teleport` et, plus tard, un futur module de supervision/journalisation — ADR-017). Pour ces fonctions, déclarées « à fournisseurs multiples », le broker appelle **tous** les modules installés qui les fournissent, avec le `target` (VM, clé SSH de service) déjà connu de l'appelant — jamais de clé partagée entre modules. Chaque module qui provisionne une VM (`chrony`, `powerdns`, `vault`…) appelle ces fonctions depuis `Configure`, comme il appelle `os.base/v1`. Le projet construisant toujours une infrastructure entière de zéro (jamais un ajout après coup sur un parc déjà en production), le planificateur DAG classique suffit à garantir l'ordre : un module « de parc » est construit avant tout module qui en dépend, sans mécanisme réactif.
+### "Fleet" functions (several simultaneous providers)
+The default mode (`dns.zone`, `time.ntp`, `pki.issuer`…) routes a function to **one** active provider at a time — an exclusive choice between competing products, which can be repointed during a handover (doc 05). Some functions do not have these semantics: their role is to be applied to *every* VM in the fleet, and several can be active at once (e.g. `fleet.agent/v1`, provided by `teleport` and, later, a future monitoring/logging module — ADR-017). For these functions, declared as "multi-provider", the broker calls **every** installed module that provides them, with the `target` (VM, service SSH key) the caller already knows — never a key shared between modules. Every module that provisions a VM (`chrony`, `powerdns`, `vault`…) calls these functions from `Configure`, just as it calls `os.base/v1`. Since the project always builds an entire infrastructure from scratch (never an addition to a fleet already in production), the classic DAG planner is enough to guarantee the order: a "fleet" module is built before any module that depends on it, with no reactive mechanism.
 
-## Composants du cœur
+## Core components
 
 ### Spec (`internal/spec`)
-Charge, applique les défauts, valide la structure. La validation propre à chaque module est **déléguée au module** (`Validate`) à partir du schéma JSON qu'il publie.
+Loads, applies defaults, validates the structure. Module-specific validation is **delegated to the module** (`Validate`) using the JSON schema it publishes.
 
-### Résolveur (`internal/resolver`)
-- Associe chaque capacité demandée à un module (choix explicite dans la spec, sinon module par défaut de la capacité).
-- Ajoute automatiquement les modules requis manquants (fonction requise non fournie) et les signale.
-- Vérifie la compatibilité des versions d'API de fonctions et du cœur.
-- Échoue si une fonction requise n'a aucun fournisseur, ou en a plusieurs sans choix explicite.
+### Resolver (`internal/resolver`)
+- Maps each requested capability to a module (explicit choice in the spec, otherwise the capability's default module).
+- Automatically adds missing required modules (a required function that nothing provides) and reports them.
+- Checks the compatibility of function API versions and of the core.
+- Fails if a required function has no provider, or several without an explicit choice.
 
-### Planificateur (`internal/planner`)
-DAG sur les **fonctions**, étapes par module (`seed.up`, `provision`, `configure`, `verify`, `handover`, `repoint`, `seed.retire`), diff état désiré / état courant, détection de cycles.
+### Planner (`internal/planner`)
+A DAG over **functions**, steps per module (`seed.up`, `provision`, `configure`, `verify`, `handover`, `repoint`, `seed.retire`), desired state / current state diff, cycle detection.
 
-### Moteur (`internal/engine`)
-Exécution, reprise, audit. Parallélisme autorisé plus tard entre branches indépendantes du DAG (le design doit le permettre : aucune variable globale mutable).
+### Engine (`internal/engine`)
+Execution, resumption, audit. Parallelism between independent branches of the DAG may be allowed later (the design must permit it: no mutable global variable).
 
-### Hôte de modules (`internal/modulehost`)
-- Découverte des modules installés, lecture des manifests, lancement des binaires plugins (HashiCorp `go-plugin`, gRPC sur socket locale, handshake avec version de protocole).
-- Surveillance : un module qui plante n'entraîne pas le cœur ; l'étape échoue proprement.
-- Vérification de l'empreinte SHA-256 de chaque module contre `genesis.lock`.
+### Module host (`internal/modulehost`)
+- Discovers installed modules, reads manifests, launches plugin binaries (HashiCorp `go-plugin`, gRPC over a local socket, handshake with a protocol version).
+- Supervision: a crashing module does not take the core down; the step fails cleanly.
+- Verifies each module's SHA-256 digest against `genesis.lock`.
 
-### Broker de fonctions (`internal/broker`)
-Registre `fonction → fournisseur actif`, routage des appels entre modules, contrôle d'accès : un module ne peut appeler **que les fonctions déclarées dans ses `requires`**, et ne peut lire **que ses propres secrets** et ceux explicitement partagés. Deux modes de résolution : fournisseur actif unique (par défaut, repointable) et diffusion vers plusieurs fournisseurs simultanés (fonctions « de parc », voir plus haut, ADR-017).
+### Function broker (`internal/broker`)
+A `function → active provider` registry, routing of calls between modules, access control: a module can call **only the functions declared in its `requires`**, and can read **only its own secrets** and those explicitly shared. Two resolution modes: a single active provider (default, repointable) and fan-out to several simultaneous providers ("fleet" functions, see above, ADR-017).
 
-### État, secrets, runners
-Inchangés (doc 06). Les runners sont exposés aux modules comme fonctions intégrées : `core.ansible/v1`, `core.container/v1`, `core.ssh/v1`. Un module n'a donc pas besoin d'embarquer Ansible ou un client SSH.
+### State, secrets, runners
+See doc 06. Runners are exposed to modules as built-in functions: `core.ansible/v1`, `core.container/v1`, `core.ssh/v1`. A module therefore does not need to embed Ansible or an SSH client.
 
 ## SDK (`sdk/`)
-Module Go publié séparément, **seule dépendance autorisée pour un module** :
-- `sdk/proto/` : définitions protobuf du protocole module et de chaque fonction (`sdk/proto/functions/dns/zone/v1/zone.proto`…).
-- `sdk/go/` : code généré + helpers (`module.Serve(impl)`, client broker typé, types `Secret` avec redaction, harnais de test avec fonctions simulées).
-- Les API de fonctions suivent le versionnement sémantique ; une rupture = nouvelle version (`v2`) servie en parallèle de `v1` pendant la transition.
+A separately published Go module, **the only dependency allowed for a module**:
+- `sdk/proto/`: protobuf definitions of the module protocol and of each function (`sdk/proto/functions/dns/zone/v1/zone.proto`…).
+- `sdk/go/`: generated code + helpers (`module.Serve(impl)`, typed broker client, `Secret` types with redaction, test harness with simulated functions).
+- Function APIs follow semantic versioning; a breaking change = a new version (`v2`) served alongside `v1` during the transition.
 
-## Organisation du dépôt (monorepo, artefacts séparés)
+## Repository layout (monorepo, separate artefacts)
 
 ```
-cmd/genesis/                  binaire du cœur
-internal/                     cœur (aucun import de modules/)
+cmd/genesis/                  core binary
+internal/                     core (no import of modules/)
   spec/ resolver/ planner/ engine/ modulehost/ broker/ state/ secrets/ runner/
-sdk/                          module Go séparé (go.mod propre)
+sdk/                          separate Go module (its own go.mod)
   proto/  go/
-modules/                      chaque module = go.mod propre + binaire propre
+modules/                      each module = its own go.mod + its own binary
   proxmox/
     module.yaml
     main.go
     assets/
   powerdns/  coredns/  chrony/  vault/  step-ca/  teleport/  base-os/
-  fake-compute/               module de test
+  fake-compute/               test module
 docs/
 test/
-  modules/                    modules de test (panicking, test-a…test-kv)
-  integration/                chaque module à travers le vrai hôte de modules,
-                              fonctions requises simulées (tag `docker` si
-                              de vrais conteneurs sont pilotés)
-  e2e/                        bout en bout sur Proxmox (tag `integration`)
+  modules/                    test modules (panicking, test-a…test-kv)
+  integration/                each module through the real module host,
+                              required functions simulated (`docker` tag when
+                              real containers are driven)
+  e2e/                        end to end on Proxmox (`integration` tag)
 ```
 
-Règle vérifiée en CI : `internal/` n'importe jamais `modules/`, et `modules/*` n'importe que `sdk/` (plus ses dépendances tierces).
+Rule enforced in CI: `internal/` never imports `modules/`, and `modules/*` imports only `sdk/` (plus its third-party dependencies).
 
-## Installation et distribution des modules
-- Répertoires de recherche : `$GENESIS_MODULE_PATH`, `~/.local/share/genesis/modules`, `/usr/lib/genesis/modules`.
-- Arborescence : `<nom>/<version>/{module.yaml, module-<os>-<arch>, assets/}`.
-- `genesis modules list | install <nom>@<version> | verify`.
-- `genesis.lock` (à côté de la spec) fige nom, version et empreinte de chaque module utilisé → reproductibilité et compatibilité air-gap future.
-- Les modules officiels sont livrés avec le cœur dans l'itération 1 ; un registre distant et la signature des modules viendront plus tard.
+## Installing and distributing modules
+- Search directories: `$GENESIS_MODULE_PATH`, `~/.local/share/genesis/modules`, `/usr/lib/genesis/modules`.
+- Layout: `<name>/<version>/{module.yaml, module-<os>-<arch>, assets/}`.
+- `genesis modules list | install <name>@<version> | verify`.
+- `genesis.lock` (next to the spec) pins the name, version and digest of each module used → reproducibility and future air-gap compatibility.
+- Official modules ship with the core in iteration 1; a remote registry and module signing will come later.
 
 ## CLI
-| Commande | Rôle |
+| Command | Role |
 |---|---|
-| `genesis init` | Prérequis graine, `state_dir`, clé maîtresse |
-| `genesis modules list/install/verify` | Gestion des modules |
-| `genesis validate -f env.yaml` | Spec + résolution des modules + `Validate` de chaque module |
-| `genesis plan -f env.yaml` | Plan, avec couches et modules ajoutés automatiquement |
-| `genesis apply -f env.yaml [--auto-approve]` | Exécution complète : graine, cible, passations, puis retrait automatique de la graine si tout est vert (ADR-020) |
-| `genesis status` | État par module et par fonction (fournisseur actif) |
-| `genesis secrets list/get` | Secrets générés |
-| `genesis destroy -f env.yaml` | Suppression des ressources cibles |
+| `genesis init` | Seed prerequisites, `state_dir`, master key |
+| `genesis modules list/install/verify` | Module management |
+| `genesis validate -f env.yaml` | Spec + module resolution + each module's `Validate` |
+| `genesis plan -f env.yaml` | Plan, with layers and automatically added modules |
+| `genesis apply -f env.yaml [--auto-approve]` | Full run: seed, target, handovers, then automatic seed retirement if everything is green (ADR-020) |
+| `genesis status` | State per module and per function (active provider) |
+| `genesis secrets list/get` | Generated secrets |
+| `genesis destroy -f env.yaml` | Deletion of target resources |

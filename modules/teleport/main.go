@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 // teleport fournit access.ssh/v1 et fleet.agent/v1 en phase cible
-// (docs/07-modules-mvp.md) : Teleport Community (Auth + Proxy) sur sa
+// (docs/07-mvp-modules.md) : Teleport Community (Auth + Proxy) sur sa
 // propre VM, avec sa propre CA interne pour les certificats SSH (pas de
 // délégation à pki.issuer/v1 pour la signature SSH, docs/09-decisions.md
 // ADR-018). fleet.agent/v1 est une fonction « de parc » (ADR-017) : chaque

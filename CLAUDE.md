@@ -1,47 +1,49 @@
 # Genesis
 
-Outil open source (Go, Apache 2.0) qui construit automatiquement un socle d'environnement autonome (NTP, DNS, PKI, Vault, bastion…) sur un cluster de virtualisation, à partir d'une spec YAML. Architecture **cœur générique + modules plugins** (HashiCorp go-plugin, gRPC).
+Open-source tool (Go, Apache 2.0) that automatically builds a self-sufficient environment foundation (NTP, DNS, PKI, Vault, bastion…) on a virtualisation cluster, from a YAML spec. **Generic core + plugin modules** architecture (HashiCorp go-plugin, gRPC).
 
-## Documentation de conception (source de vérité)
-Ne pas tout charger d'emblée : lire le document utile à la tâche en cours.
-- `docs/01-vision-perimetre.md` — périmètre et non-objectifs de l'itération 1
-- `docs/02-architecture.md` — cœur, modules, fonctions, broker, organisation du dépôt
-- `docs/03-contrat-module.md` — manifest, protocole gRPC, fonctions, règles
-- `docs/04-spec.md` — format de la spec utilisateur
-- `docs/05-cycle-bootstrap.md` — graine → cible → passation → retrait
-- `docs/06-secrets-etat.md` — secrets, redaction, état
-- `docs/07-modules-mvp.md` — modules de l'itération 1
-- `docs/08-jalons.md` — jalons et critères d'acceptation
-- `docs/09-decisions.md` — index des ADR ; une ADR par fichier dans `docs/adr/`
-- `docs/10-ajouter-un-module.md` — procédure d'ajout de module
-- `docs/PROGRESS.md` — **avancement : à lire en début de session** (état des jalons, prochaine étape) ; mis à jour en fin de jalon
-- Suivi du jalon en cours : milestone GitHub, issue parente `jalon` et ses sous-issues (une par PR) — ADR-049
-- `docs/journal.md` — historique détaillé des jalons J0 à J8 (à consulter au besoin) ; ensuite, commentaire de clôture de l'issue parente du jalon
-- Dette technique : issues GitHub `dette-technique` (seule source de vérité)
+## Design documentation (source of truth)
+Do not load everything up front: read the document relevant to the task at hand.
+- `docs/01-vision-scope.md` — scope and non-goals of iteration 1
+- `docs/02-architecture.md` — core, modules, functions, broker, repository layout
+- `docs/03-module-contract.md` — manifest, gRPC protocol, functions, rules
+- `docs/04-spec.md` — user spec format
+- `docs/05-bootstrap-lifecycle.md` — seed → target → handover → retirement
+- `docs/06-secrets-state.md` — secrets, redaction, state
+- `docs/07-mvp-modules.md` — iteration 1 modules
+- `docs/08-milestones.md` — milestones and acceptance criteria
+- `docs/09-decisions.md` — ADR index; one ADR per file in `docs/adr/`
+- `docs/10-adding-a-module.md` — procedure for adding a module
+- `docs/PROGRESS.md` — **progress: read at the start of each session** (milestone status, next step); updated at the end of a milestone
+- Tracking of the current milestone: GitHub milestone, parent issue labelled `milestone` and its sub-issues (one per PR) — ADR-049
+- `docs/journal.md` — detailed history of milestones M0 to M8 (consult when needed); after that, the closing comment of the milestone's parent issue
+- Technical debt: GitHub `tech-debt` issues (single source of truth)
 
-## Méthode de travail
-- Implémenter **un jalon à la fois**, dans l'ordre du doc 08. Ne pas anticiper les jalons suivants.
-- Avant de coder un jalon : proposer un plan court (fichiers, interfaces, tests) et attendre validation.
-- Si un document est ambigu ou contradictoire : poser la question plutôt que deviner. Une décision structurante se débat dans une issue « Décision » (label `decision`), puis s'ajoute en `docs/adr/NNNN-titre.md` (NNNN = numéro de l'issue) dans la PR qui l'applique, avec sa ligne dans `docs/09-decisions.md` (ADR-049).
-- **Une PR atomique par sujet**, fusionnée en squash (ADR-021) : un jalon = plusieurs PR successives. Branche `<type>/<sujet>` depuis `main`, titre de PR en Conventional Commits (scope facultatif : couche du cœur, `sdk`, `proto` ou nom du module), modèle de PR rempli, `Closes #N`. Détail dans `CONTRIBUTING.md`.
-- Chaque PR : `make lint test` vert, ADR et documents de conception à jour dans la même PR. Dette nouvelle → issue `dette-technique`.
-- Un jalon = un milestone GitHub, une issue parente `jalon`, une sous-issue par PR (ADR-049). Fin de jalon : critères d'acceptation vérifiés un par un, compte rendu en commentaire de clôture de l'issue parente, tableau de `docs/PROGRESS.md` à jour, milestone fermé.
-- Ne jamais fusionner une PR sans validation de l'utilisateur.
+## Way of working
+- Everything published in the repository is in English (ADR-054): code, comments, messages, documentation, commits, PRs, issues.
+- Commits, PRs, issues and comments carry no AI-tool attribution: no "Generated with…" footer, no `Co-Authored-By` trailer, no session link.
+- Implement **one milestone at a time**, in the order of doc 08. Do not anticipate later milestones.
+- Before coding a milestone: propose a short plan (files, interfaces, tests) and wait for approval.
+- If a document is ambiguous or contradictory: ask rather than guess. A structural decision is discussed in a "Decision" issue (label `decision`), then added as `docs/adr/NNNN-title.md` (NNNN = the issue number) in the PR that applies it, with its row in `docs/09-decisions.md` (ADR-049).
+- **One atomic PR per topic**, squash-merged (ADR-021): a milestone = several successive PRs. Branch `<type>/<topic>` from `main`, PR title in Conventional Commits (optional scope: core layer, `sdk`, `proto` or module name), PR template filled in, `Closes #N`. Details in `CONTRIBUTING.md`.
+- Every PR: `make lint test` green, ADRs and design documents updated in the same PR. New debt → `tech-debt` issue.
+- A milestone = a GitHub milestone, a parent issue labelled `milestone`, one sub-issue per PR (ADR-049). End of milestone: acceptance criteria checked one by one, report in the closing comment of the parent issue, table in `docs/PROGRESS.md` updated, GitHub milestone closed.
+- Never merge a PR without the user's approval.
 
-## Règles non négociables
-- **Aucun secret en clair** dans logs, sorties, état, erreurs, fixtures ou commits. Type `Secret` avec redaction.
-- **Idempotence** : `Check` avant toute action ; relancer ne produit aucun changement.
-- `internal/` n'importe jamais `modules/` ni une bibliothèque propre à un produit. Aucun `switch` sur un nom de produit, aucun ordre de couche codé en dur.
-- `modules/*` n'importe que `sdk/` + bibliothèques tierces. Interactions entre modules uniquement via le broker et les fonctions déclarées dans `requires`.
-- Ajouter un module ne doit nécessiter aucune modification hors de son répertoire.
-- Plan avant apply ; erreurs actionnables (module, étape, cause, piste).
-- Nouvelle dépendance lourde → ADR.
+## Non-negotiable rules
+- **No plaintext secret** in logs, outputs, state, errors, fixtures or commits. `Secret` type with redaction.
+- **Idempotence**: `Check` before any action; re-running produces no change.
+- `internal/` never imports `modules/` or a product-specific library. No `switch` on a product name, no hard-coded layer order.
+- `modules/*` imports only `sdk/` + third-party libraries. Modules interact only through the broker and the functions declared in `requires`.
+- Adding a module must not require any change outside its directory.
+- Plan before apply; actionable errors (module, step, cause, hint).
+- New heavy dependency → ADR.
 
-## Stack et commandes
-- Go stable, `CGO_ENABLED=0`, cibles linux/amd64 et linux/arm64. `cobra`, `yaml.v3`, `log/slog`, `buf` pour protobuf, `hashicorp/go-plugin`, `filippo.io/age`.
-- `make tools` (outils épinglés dans `.bin/`) · `make build` · `make test` · `make test-race` · `make test-docker` · `make lint` · `make mod-check` · `make proto` / `make proto-check` · `make vuln` · `make licenses` · `make e2e` (build tag `integration`, nécessite un Proxmox : ne jamais lancer sans demande explicite).
-- Tests unitaires sans réseau ni démon de conteneurs (`make test`) ; tests contre de vrais conteneurs sous build tag `docker` (`make test-docker`), images épinglées par version et empreinte ; tests d'un module à travers le cœur dans `test/integration/` ; module `fake-compute` pour le bout en bout ; suite de conformité SDK obligatoire pour chaque module.
+## Stack and commands
+- Stable Go, `CGO_ENABLED=0`, linux/amd64 and linux/arm64 targets. `cobra`, `yaml.v3`, `log/slog`, `buf` for protobuf, `hashicorp/go-plugin`, `filippo.io/age`.
+- `make tools` (pinned tools in `.bin/`) · `make build` · `make test` · `make test-race` · `make test-docker` · `make lint` · `make mod-check` · `make proto` / `make proto-check` · `make vuln` · `make licenses` · `make e2e` (`integration` build tag, needs a Proxmox: never run without an explicit request).
+- Unit tests without network or container daemon (`make test`); tests against real containers under the `docker` build tag (`make test-docker`), images pinned by version and digest; tests of a module through the core in `test/integration/`; `fake-compute` module for end-to-end tests; SDK conformance suite mandatory for every module.
 
-## Pièges connus
-- Ne jamais tester contre un vrai Proxmox ou exécuter `genesis apply`/`destroy` sur une infra réelle sans demande explicite.
-- Chaque module a son propre `go.mod` : lancer les commandes Go depuis le bon répertoire ou via le `Makefile` (workspace `go.work`).
+## Known pitfalls
+- Never test against a real Proxmox or run `genesis apply`/`destroy` on real infrastructure without an explicit request.
+- Each module has its own `go.mod`: run Go commands from the right directory or through the `Makefile` (`go.work` workspace).

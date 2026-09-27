@@ -13,23 +13,23 @@ linters:
     - usestdlibvars
   exclusions:
     rules:
-      # Tests : fixtures en clair, fichiers et sous-processus de test.
+      # Tests: plaintext fixtures, test files and subprocesses.
       - path: _test\.go
         linters: [gosec, noctx]
-      # Noms de références core.secrets (ex. rootTokenRef = "vault/root-token") :
-      # des chemins, pas des valeurs secrètes.
+      # core.secrets reference names (e.g. rootTokenRef = "vault/root-token"):
+      # paths, not secret values.
       - linters: [gosec]
         text: G101
         source: 'Ref(Fmt)?\s+=\s+"'
   settings:
     gosec:
       excludes:
-        # Piloter des outils existants en ligne de commande (docker/podman,
-        # go, step…) est un choix d'architecture (ADR-002) : les arguments
-        # viennent du cœur ou du module, jamais d'une entrée non contrôlée.
+        # Driving existing command-line tools (docker/podman, go, step…) is
+        # an architecture choice (ADR-002): arguments come from the core or
+        # the module, never from uncontrolled input.
         - G204
-        # Chemins de fichiers issus des options de la CLI ou de la spec :
-        # lire le fichier désigné par l'opérateur est le comportement voulu.
+        # File paths from CLI options or the spec: reading the file the
+        # operator points to is the intended behaviour.
         - G304
     depguard:
       rules:
@@ -39,28 +39,28 @@ linters:
             - "**/cmd/**"
           deny:
             - pkg: "github.com/WhiteRoseLK/genesis/modules"
-              desc: "le cœur (internal/, cmd/) ne doit jamais importer modules/ (docs/02-architecture.md)"
+              desc: "the core (internal/, cmd/) must never import modules/ (docs/02-architecture.md)"
         sdk-must-not-import-core:
           files:
             - "**/sdk/**"
           deny:
             - pkg: "github.com/WhiteRoseLK/genesis/internal"
-              desc: "le SDK ne dépend jamais de internal/ (docs/03-contrat-module.md, .claude/rules/sdk.md)"
+              desc: "the SDK never depends on internal/ (docs/03-module-contract.md, .claude/rules/sdk.md)"
             - pkg: "github.com/WhiteRoseLK/genesis/cmd"
-              desc: "le SDK ne dépend jamais de cmd/ (docs/03-contrat-module.md)"
+              desc: "the SDK never depends on cmd/ (docs/03-module-contract.md)"
         modules-must-not-import-core:
           files:
             - "**/modules/**"
             - "**/test/modules/**"
           deny:
             - pkg: "github.com/WhiteRoseLK/genesis/internal"
-              desc: "un module n'importe que sdk/ et des bibliothèques tierces, jamais internal/ (docs/03-contrat-module.md, .claude/rules/modules.md)"
+              desc: "a module imports only sdk/ and third-party libraries, never internal/ (docs/03-module-contract.md, .claude/rules/modules.md)"
             - pkg: "github.com/WhiteRoseLK/genesis/cmd"
-              desc: "un module n'importe que sdk/ et des bibliothèques tierces, jamais cmd/ (docs/03-contrat-module.md)"
+              desc: "a module imports only sdk/ and third-party libraries, never cmd/ (docs/03-module-contract.md)"
 
 run:
   go: "1.27"
-  # Analyse aussi les tests d'intégration (make test-docker).
+  # Also analyse the integration tests (make test-docker).
   build-tags:
     - docker
 

@@ -5,7 +5,7 @@ lint:
   use:
     - STANDARD
   except:
-    # docs/03-contrat-module.md fixe délibérément ce contrat : un service
+    # docs/03-module-contract.md fixe délibérément ce contrat : un service
     # "Module" (pas "ModuleService"), et StepRequest/StepResult partagés par
     # toutes les étapes du cycle de vie plutôt qu'un message par RPC.
     - SERVICE_SUFFIX

@@ -2,8 +2,8 @@
 paths:
   - "sdk/**"
 ---
-# Règles du SDK
-- Toute modification d'une API de fonction existante est une rupture potentielle : ajout de champs uniquement, sinon nouvelle version (`v2`) servie en parallèle.
-- Lancer `make proto` après modification d'un `.proto` et committer le code généré.
-- Le SDK ne dépend jamais de `internal/`.
-- Référence : docs/03-contrat-module.md.
+# SDK rules
+- Any change to an existing function API is a potential breaking change: add fields only, otherwise a new version (`v2`) served alongside.
+- Run `make proto` after changing a `.proto` file and commit the generated code.
+- The SDK never depends on `internal/`.
+- Reference: docs/03-module-contract.md.

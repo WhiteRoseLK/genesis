@@ -9,7 +9,7 @@ import (
 )
 
 // Ref est le seul identifiant de secret circulant hors du store
-// (docs/06-secrets-etat.md), ex. "pki/root-ca-key".
+// (docs/06-secrets-state.md), ex. "pki/root-ca-key".
 type Ref string
 
 var refSegmentPattern = regexp.MustCompile(`^[a-z0-9]([a-z0-9-]*[a-z0-9])?$`)

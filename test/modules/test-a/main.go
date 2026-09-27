@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: Apache-2.0
 
 // test-a est la racine de la chaîne test-a -> test-b -> test-c
-// (docs/08-jalons.md, J4) : il fournit test.a/v1 en phase graine ET cible,
-// exerçant SeedUp/Handover/SeedDown (docs/03-contrat-module.md §5).
+// (docs/08-milestones.md, J4) : il fournit test.a/v1 en phase graine ET cible,
+// exerçant SeedUp/Handover/SeedDown (docs/03-module-contract.md §5).
 package main
 
 import (

@@ -18,7 +18,7 @@ import (
 )
 
 // TestHandoverRetiresCrossModuleSeedProvider prouve la passation croisée
-// entre DEUX modules distincts (docs/05-cycle-bootstrap.md, jalon J6,
+// entre DEUX modules distincts (docs/05-bootstrap-lifecycle.md, jalon J6,
 // critère du doc 08 "après passation, arrêt [du module graine] sans
 // impact") — contrairement à test-a (qui se reprend lui-même), test-e
 // (graine pure) et test-f (cible, lit test.e/v1@seed) sont deux processus
@@ -113,7 +113,7 @@ func TestHandoverRetiresCrossModuleSeedProvider(t *testing.T) {
 	}
 
 	// Second run : conforme partout, rien ne se rejoue (idempotence de la
-	// passation elle-même, docs/08-jalons.md).
+	// passation elle-même, docs/08-milestones.md).
 	var secondLog bytes.Buffer
 	e2 := New(stateDir, newTestSecretsStore(t))
 	e2.Logger = slog.New(slog.NewTextHandler(&secondLog, nil))

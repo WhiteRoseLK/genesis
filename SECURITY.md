@@ -1,24 +1,24 @@
-# Politique de sécurité
+# Security policy
 
-Genesis manipule des secrets, une PKI et des accès SSH à toute une infrastructure : les vulnérabilités sont prises au sérieux.
+Genesis handles secrets, a PKI and SSH access to an entire infrastructure: vulnerabilities are taken seriously.
 
-## Signaler une vulnérabilité
+## Reporting a vulnerability
 
-**N'ouvrez pas d'issue publique.** Utilisez le signalement privé de GitHub : onglet **Security** du dépôt → **Report a vulnerability** ([lien direct](https://github.com/WhiteRoseLK/genesis/security/advisories/new)).
+**Do not open a public issue.** Use GitHub's private reporting: the repository's **Security** tab → **Report a vulnerability** ([direct link](https://github.com/WhiteRoseLK/genesis/security/advisories/new)).
 
-Indiquez si possible :
+If possible, include:
 
-- la version ou le commit concerné ;
-- le composant (couche du cœur ou module) ;
-- un scénario de reproduction minimal, **sans secret réel** ;
-- l'impact estimé.
+- the affected version or commit;
+- the component (core layer or module);
+- a minimal reproduction scenario, **without any real secret**;
+- the estimated impact.
 
-Un accusé de réception est donné sous 7 jours. Le correctif est préparé dans un avis de sécurité privé, puis publié avec une version corrigée et un crédit au découvreur s'il le souhaite.
+Receipt is acknowledged within 7 days. The fix is prepared in a private security advisory, then published with a fixed release, crediting the reporter if they wish.
 
-## Versions prises en charge
+## Supported versions
 
-Tant que le projet est en `0.x`, seule la dernière version publiée (et `main`) reçoit des correctifs de sécurité.
+While the project is at `0.x`, only the latest release (and `main`) receives security fixes.
 
-## Périmètre
+## Scope
 
-Sont notamment concernés : fuite de secret (journaux, état, erreurs, fichiers temporaires), contournement du broker (appel à une fonction non déclarée dans `requires`), élévation de privilèges sur la graine, falsification de module installé (`genesis.lock`), chaîne d'approvisionnement (images, dépendances).
+In scope, among others: secret leaks (logs, state, errors, temporary files), broker bypass (calling a function not declared in `requires`), privilege escalation on the seed, tampering with an installed module (`genesis.lock`), supply chain (images, dependencies).

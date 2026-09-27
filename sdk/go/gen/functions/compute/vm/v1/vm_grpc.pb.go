@@ -4,7 +4,7 @@
 // - protoc             (unknown)
 // source: functions/compute/vm/v1/vm.proto
 
-// Fonction compute.vm/v1 (docs/03-contrat-module.md) : fournisseurs MVP
+// Fonction compute.vm/v1 (docs/03-module-contract.md) : fournisseurs MVP
 // proxmox (J5) et fake-compute (J4, registre mémoire).
 
 package computevmv1

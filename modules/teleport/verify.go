@@ -23,7 +23,7 @@ var (
 
 // Verify prouve, depuis une VM tierce jetable, une connexion SSH réelle à
 // travers l'agent Teleport installé sur une deuxième VM jetable
-// (docs/03-contrat-module.md règle 2 : point de vue consommateur). Le sshd
+// (docs/03-module-contract.md règle 2 : point de vue consommateur). Le sshd
 // natif de la cible n'est pas désactivé à ce jalon (Repoint différé,
 // main.go) : Verify ne teste donc que la connexion via l'agent, pas le
 // refus de l'accès direct.

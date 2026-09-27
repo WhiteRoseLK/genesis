@@ -4,7 +4,7 @@
 // - protoc             (unknown)
 // source: functions/os/base/v1/base.proto
 
-// Fonction os.base/v1 (docs/03-contrat-module.md, docs/07-modules-mvp.md) :
+// Fonction os.base/v1 (docs/03-module-contract.md, docs/07-mvp-modules.md) :
 // fournie par base-os. Harden regroupe le durcissement pur (SSH, mises à
 // jour, nftables) — différé, pas encore implémenté au jalon J5. TrustCA,
 // SetResolver et SetNTP portent la configuration fonctionnelle nécessaire

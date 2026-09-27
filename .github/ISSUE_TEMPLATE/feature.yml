@@ -1,0 +1,35 @@
+name: "💡 Feature"
+description: Propose a feature, a module or an improvement.
+title: "feat: "
+labels: ["enhancement", "needs-triage"]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: Need
+      description: The problem to solve, from the point of view of a Genesis user.
+    validations:
+      required: true
+
+  - type: textarea
+    id: solution
+    attributes:
+      label: Proposal
+      description: Expected behaviour and, for a module, the `provides` / `requires` functions you have in mind.
+    validations:
+      required: true
+
+  - type: checkboxes
+    id: architecture
+    attributes:
+      label: Architectural impact
+      options:
+        - label: Requires a change to the core (`internal/`) or the module contract (`sdk/`) — an ADR is likely.
+        - label: Out of scope for iteration 1 (docs/01-vision-scope.md).
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+    validations:
+      required: false

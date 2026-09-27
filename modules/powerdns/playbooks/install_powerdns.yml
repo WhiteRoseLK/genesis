@@ -1,7 +1,7 @@
 ---
 # Configure (functions/dns/zone/v1 + dns/resolver/v1, module powerdns) :
 # installe et configure PowerDNS Authoritative (SQLite, API) + Recursor
-# (docs/07-modules-mvp.md) — image cloud Debian (docs/01-vision-perimetre.md).
+# (docs/07-mvp-modules.md) — image cloud Debian (docs/01-vision-scope.md).
 - hosts: target
   gather_facts: false
   become: true

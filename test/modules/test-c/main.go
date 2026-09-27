@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 
-// test-c requiert test.b/v1 et fournit test.c/v1 (docs/08-jalons.md, J4) :
+// test-c requiert test.b/v1 et fournit test.c/v1 (docs/08-milestones.md, J4) :
 // ferme la chaîne test-a -> test-b -> test-c.
 package main
 

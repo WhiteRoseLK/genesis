@@ -71,7 +71,7 @@ func (c *Client) Close() {
 }
 
 // Module donne accès au client gRPC brut, pour appeler n'importe quelle
-// étape du cycle de vie (docs/03-contrat-module.md §2).
+// étape du cycle de vie (docs/03-module-contract.md §2).
 func (c *Client) Module() modulev1.ModuleClient {
 	return c.module
 }

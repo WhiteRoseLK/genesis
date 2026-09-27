@@ -123,7 +123,7 @@ func verifyAgainstRoot(t *testing.T, chainPEM, rootPEM string) {
 }
 
 // TestStepCAIssuesAndSignsRealCertificates prouve, contre le vrai
-// conteneur smallstep/step-ca (docs/08-jalons.md, J7), que IssueCert et
+// conteneur smallstep/step-ca (docs/08-milestones.md, J7), que IssueCert et
 // SignCSR produisent des certificats réellement valides jusqu'à la racine
 // générée par la CA, que CAChain expose cette racine, et que SignSSH reste
 // un stub explicite (pas encore de consommateur, différé à J8).
@@ -193,7 +193,7 @@ func TestStepCAIssuesAndSignsRealCertificates(t *testing.T) {
 }
 
 // TestStepCAReusesRootAcrossRestarts prouve l'idempotence de la CA
-// (docs/03-contrat-module.md §4 règle 3) à travers un vrai redémarrage du
+// (docs/03-module-contract.md §4 règle 3) à travers un vrai redémarrage du
 // module (nouveau process, pas juste un cache en mémoire) : la seconde
 // instance doit retrouver la MÊME racine, stockée par la première via
 // core.secrets, pas en générer une nouvelle.
@@ -224,7 +224,7 @@ func TestStepCAReusesRootAcrossRestarts(t *testing.T) {
 // VRAI intermédiaire, capable de signer à son tour une feuille, avec une
 // chaîne complète (feuille tierce -> intermédiaire tiers -> intermédiaire
 // step-ca -> racine) valide jusqu'à la racine de step-ca
-// (docs/07-modules-mvp.md : "pki_int signé par la racine"). Ce chemin a
+// (docs/07-mvp-modules.md : "pki_int signé par la racine"). Ce chemin a
 // révélé un vrai bug (pathlen insuffisant sur la racine par défaut de
 // step-ca) découvert en validant manuellement le workflow Vault dans
 // Docker avant d'écrire modules/vault.

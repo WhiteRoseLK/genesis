@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 // test-f reprend test.e/v1 en phase cible, amorcée par test-e en phase
-// graine (docs/05-cycle-bootstrap.md, jalon J6) : Handover lit réellement
+// graine (docs/05-bootstrap-lifecycle.md, jalon J6) : Handover lit réellement
 // test.e/v1@seed à travers le broker (deux modules distincts, contrairement
 // à test-a qui se reprend lui-même) — le cœur (internal/engine) doit alors
 // déclencher SeedDown sur test-e, pas sur test-f.

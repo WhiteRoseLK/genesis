@@ -1,12 +1,13 @@
 name: Release Please
 
-# Tient à jour une PR de release par paquet (cœur `vX.Y.Z`, SDK `sdk/vX.Y.Z`)
-# à partir des commits de main. GoReleaser (binaires du cœur et des modules)
-# viendra plus tard (ADR-021).
+# Keeps one release PR per package (core `vX.Y.Z`, SDK `sdk/vX.Y.Z`) up to
+# date from the commits on main. GoReleaser (core and module binaries) will
+# come later (ADR-021).
 #
-# Une PR ouverte avec GITHUB_TOKEN ne déclenche pas la CI : définir le secret
-# RELEASE_PLEASE_TOKEN (jeton à granularité fine, droits contents + pull
-# requests sur ce dépôt) pour que la PR de release passe les checks requis.
+# A PR opened with GITHUB_TOKEN does not trigger CI: set the
+# RELEASE_PLEASE_TOKEN secret (fine-grained token, contents + pull requests
+# permissions on this repository) so that the release PR runs the required
+# checks.
 on:
   push:
     branches: [main]

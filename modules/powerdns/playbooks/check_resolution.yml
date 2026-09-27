@@ -1,7 +1,7 @@
 ---
 # Verify (functions/dns/zone/v1 + dns/resolver/v1, module powerdns) : exécuté
 # sur une VM tierce jetable, résolution directe + inverse + nom externe
-# (docs/07-modules-mvp.md : "Verify : résolution directe/inverse depuis une
+# (docs/07-mvp-modules.md : "Verify : résolution directe/inverse depuis une
 # VM tierce + nom externe").
 - hosts: target
   gather_facts: false

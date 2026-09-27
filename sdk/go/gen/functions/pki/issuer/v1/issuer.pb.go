@@ -4,7 +4,7 @@
 // 	protoc        (unknown)
 // source: functions/pki/issuer/v1/issuer.proto
 
-// Fonction pki.issuer/v1 (docs/03-contrat-module.md) : fournisseurs MVP
+// Fonction pki.issuer/v1 (docs/03-module-contract.md) : fournisseurs MVP
 // step-ca (J7, seed) et vault (J7, target).
 
 package pkiissuerv1
@@ -135,7 +135,7 @@ type SignCSRRequest struct {
 	Extra      map[string]string      `protobuf:"bytes,3,rep,name=extra,proto3" json:"extra,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
 	// is_ca : signe le CSR comme certificat intermédiaire (CA) plutôt que
 	// feuille — nécessaire pour qu'un autre pki.issuer/v1 (ex. vault) obtienne
-	// son propre intermédiaire signé par celui-ci (docs/07-modules-mvp.md :
+	// son propre intermédiaire signé par celui-ci (docs/07-mvp-modules.md :
 	// "pki_int signé par la racine").
 	IsCa bool `protobuf:"varint,4,opt,name=is_ca,json=isCa,proto3" json:"is_ca,omitempty"`
 	// path_len_constraint : profondeur d'intermédiaires supplémentaires que

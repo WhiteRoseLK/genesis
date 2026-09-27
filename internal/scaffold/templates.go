@@ -73,7 +73,7 @@ import (
 var manifestYAML []byte
 
 // {{.Name}} implémente modulev1.ModuleServer. Chaque étape est un stub tant
-// qu'elle n'a pas été écrite (docs/10-ajouter-un-module.md, étape 3).
+// qu'elle n'a pas été écrite (docs/10-adding-a-module.md, étape 3).
 type {{.Name}}Module struct {
 	modulev1.UnimplementedModuleServer
 	manifest *modulev1.Manifest
@@ -148,7 +148,7 @@ import (
 	"github.com/WhiteRoseLK/genesis/sdk/go/moduletest"
 )
 
-// TestConformance : suite de conformité du SDK (docs/10-ajouter-un-module.md,
+// TestConformance : suite de conformité du SDK (docs/10-adding-a-module.md,
 // étape 5). À lancer via 'go test ./... -run Conformance'.
 func TestConformance(t *testing.T) {
 	mf, err := sdk.LoadManifest("module.yaml")

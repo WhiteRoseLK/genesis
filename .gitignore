@@ -1,16 +1,15 @@
-# Binaires
+# Binaries
 /genesis
 /bin/
-# Binaires de modules compilés localement (`go build ./...` dans modules/*
-# ou test/modules/*, où le binaire de sortie prend le nom du module Go).
+# Module binaries built locally (`go build ./...` in modules/* or
+# test/modules/*, where the output binary takes the Go module's name).
 genesis-module-*
 genesis-test-module-*
 module-linux-*
 module-darwin-*
-# `go build` sans -o dans un module écrit un binaire sans extension portant
-# le nom du module : tout fichier sans extension à la racine d'un module est
-# ignoré (les sources ont toutes une extension ; les sous-répertoires restent
-# suivis).
+# `go build` without -o in a module writes an extensionless binary named
+# after the module: any extensionless file at a module's root is ignored
+# (sources all have an extension; subdirectories stay tracked).
 /modules/*/*
 /test/modules/*/*
 !/modules/*/*.*
@@ -18,11 +17,11 @@ module-darwin-*
 !/modules/*/*/
 !/test/modules/*/*/
 
-# Artefacts de build Go
+# Go build artefacts
 *.test
 *.out
 
-# IDE / éditeurs
+# IDEs / editors
 .vscode/
 .idea/
 *.swp

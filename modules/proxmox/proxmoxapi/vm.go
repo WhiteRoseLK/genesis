@@ -43,7 +43,7 @@ func (c *Client) ListVMs(ctx context.Context, node string) ([]VM, error) {
 }
 
 // FindVMByName cherche une VM existante par nom — clé d'idempotence
-// d'EnsureVM avec le tag genesis-env (docs/07-modules-mvp.md).
+// d'EnsureVM avec le tag genesis-env (docs/07-mvp-modules.md).
 func (c *Client) FindVMByName(ctx context.Context, node, name string) (*VM, error) {
 	vms, err := c.ListVMs(ctx, node)
 	if err != nil {
@@ -170,7 +170,7 @@ func (c *Client) Status(ctx context.Context, node string, vmid int) (*VMStatus, 
 	return &s, nil
 }
 
-// NodeTime est l'heure du nœud (docs/05-cycle-bootstrap.md : contrôle d'horloge).
+// NodeTime est l'heure du nœud (docs/05-bootstrap-lifecycle.md : contrôle d'horloge).
 type NodeTime struct {
 	Time int64 `json:"time"` // secondes Unix
 }

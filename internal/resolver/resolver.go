@@ -42,7 +42,7 @@ type Resolved struct {
 	CapabilityModule map[string]string
 	// FunctionProviders[fonction][phase] = module fournisseur pour cette
 	// fonction dans cette phase ("seed" ou "target") — une même fonction
-	// peut avoir des fournisseurs différents par phase (docs/05-cycle-bootstrap.md :
+	// peut avoir des fournisseurs différents par phase (docs/05-bootstrap-lifecycle.md :
 	// CoreDNS en graine, PowerDNS en cible, toutes deux dns.zone/v1).
 	FunctionProviders map[string]map[string]string
 }
@@ -50,7 +50,7 @@ type Resolved struct {
 // ProviderFor retourne le module fournisseur de function pour phase. Si
 // phase est vide (fonction requise sans suffixe @seed/@target), le
 // fournisseur cible est préféré, la graine sert de repli
-// (docs/03-contrat-module.md §1 : "sans suffixe, le fournisseur actif").
+// (docs/03-module-contract.md §1 : "sans suffixe, le fournisseur actif").
 func (r *Resolved) ProviderFor(function, phase string) (string, bool) {
 	byPhase, ok := r.FunctionProviders[function]
 	if !ok {
@@ -123,7 +123,7 @@ func Resolve(env *spec.Environment, installed []modulehost.Installed) (*Resolved
 		return nil, err
 	}
 
-	// 3. Compatibilité de version du cœur (docs/03-contrat-module.md §1).
+	// 3. Compatibilité de version du cœur (docs/03-module-contract.md §1).
 	for _, m := range r.Modules {
 		if err := checkCoreCompatibility(m.Name, m.Manifest.Core); err != nil {
 			return nil, err
@@ -264,7 +264,7 @@ func orderedRequires(requires map[string][]sdk.RequireEntry) []namedRequireList 
 // findProvider cherche un module installé (non encore résolu ou pas) qui
 // fournit function pour phase. phase vide (require non suffixé) préfère un
 // fournisseur cible, la graine sert de repli — les deux peuvent coexister
-// sans être ambigus l'un envers l'autre (docs/05-cycle-bootstrap.md).
+// sans être ambigus l'un envers l'autre (docs/05-bootstrap-lifecycle.md).
 func findProvider(function, phase string, byName map[string]modulehost.Installed) (*modulehost.Installed, error) {
 	if phase != "" {
 		return pickCandidate(function, providersForPhase(function, phase, byName))
@@ -307,7 +307,7 @@ func pickCandidate(function string, candidates []modulehost.Installed) (*moduleh
 }
 
 // SplitFunctionPhase sépare le suffixe @seed/@target d'un nom de fonction
-// requise (docs/03-contrat-module.md §1) ; réutilisée par internal/planner.
+// requise (docs/03-module-contract.md §1) ; réutilisée par internal/planner.
 func SplitFunctionPhase(function string) (name, phase string) {
 	if i := strings.IndexByte(function, '@'); i >= 0 {
 		return function[:i], function[i+1:]

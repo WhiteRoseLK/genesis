@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 // vault fournit pki.issuer/v1 et secrets.kv/v1 en phase cible
-// (docs/07-modules-mvp.md) : Raft mono-nœud, TLS initial via
+// (docs/07-mvp-modules.md) : Raft mono-nœud, TLS initial via
 // pki.issuer/v1@seed (step-ca), moteur PKI intermédiaire (pki_int) signé
 // par step-ca, KV v2, AppRole "genesis" — même principe que modules/powerdns
 // (api.go parle directement à l'API REST du produit, ansible se limite à

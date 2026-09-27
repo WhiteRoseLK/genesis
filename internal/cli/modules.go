@@ -60,7 +60,7 @@ func newModulesListCmd() *cobra.Command {
 func newModulesInstallCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "install <répertoire-source>",
-		Short: "Compile et installe un module depuis son répertoire source (docs/10-ajouter-un-module.md)",
+		Short: "Compile et installe un module depuis son répertoire source (docs/10-adding-a-module.md)",
 		Args:  cobra.ExactArgs(1),
 	}
 	cmd.Flags().String("lock-file", "genesis.lock", "chemin du fichier de verrouillage, à côté de la spec (doc 02)")
@@ -172,7 +172,7 @@ func newModulesVerifyCmd() *cobra.Command {
 func newModulesScaffoldCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "scaffold <nom>",
-		Short: "Génère modules/<nom>/ (à exécuter depuis la racine du dépôt, docs/10-ajouter-un-module.md)",
+		Short: "Génère modules/<nom>/ (à exécuter depuis la racine du dépôt, docs/10-adding-a-module.md)",
 		Args:  cobra.ExactArgs(1),
 	}
 	cmd.Flags().StringSlice("provides", nil, "fonctions fournies (ex. dns.zone/v1,dns.resolver/v1)")

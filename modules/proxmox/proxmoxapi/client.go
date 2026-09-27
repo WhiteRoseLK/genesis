@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 // Package proxmoxapi est un client minimal de l'API REST Proxmox VE — juste
-// ce dont le module a besoin (docs/07-modules-mvp.md), pas une bibliothèque
+// ce dont le module a besoin (docs/07-mvp-modules.md), pas une bibliothèque
 // générique. Écrit à la main plutôt qu'avec un SDK tiers : la surface
 // nécessaire est étroite, et un SDK tiers ajouterait une dépendance qu'on ne
 // peut de toute façon pas valider contre un vrai cluster dans cet
@@ -131,7 +131,7 @@ func (c *Client) WaitForTask(ctx context.Context, node, upid string) error {
 	}
 }
 
-// Version vérifie l'accès à l'API (docs/05-cycle-bootstrap.md, Phase 0 : Validate).
+// Version vérifie l'accès à l'API (docs/05-bootstrap-lifecycle.md, Phase 0 : Validate).
 func (c *Client) Version(ctx context.Context) (string, error) {
 	var v struct {
 		Version string `json:"version"`

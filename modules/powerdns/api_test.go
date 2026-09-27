@@ -94,7 +94,7 @@ func removeRRset(rrsets []pdnsRRset, name, typ string) []pdnsRRset {
 // TestPowerDNSZoneServerRoundTrip prouve le round-trip réel Upsert -> List
 // -> Delete -> List à travers de vraies requêtes HTTP (httptest), y compris
 // la création automatique de zone au premier UpsertRecord et le filtrage
-// des enregistrements SOA/NS auto-créés (docs/07-modules-mvp.md).
+// des enregistrements SOA/NS auto-créés (docs/07-mvp-modules.md).
 func TestPowerDNSZoneServerRoundTrip(t *testing.T) {
 	ts, srv := newTestPDNSServer()
 	defer srv.Close()

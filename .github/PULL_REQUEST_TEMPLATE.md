@@ -1,17 +1,17 @@
 <!--
-Une PR = un sujet (ADR-021). Fusion en squash : le titre devient le commit
-sur main et suit Conventional Commits, ex. `feat(engine): …`.
+One PR = one topic (ADR-021). Squash merge: the title becomes the commit on
+main and follows Conventional Commits, e.g. `feat(engine): …`.
 -->
 
 ## Description
 
-<!-- Ce que change la PR et pourquoi. -->
+<!-- What the PR changes and why. -->
 
 Closes #
 
 ## Checklist
 
-- [ ] Tests ajoutés ou mis à jour (`make test`, `make test-docker` si des conteneurs sont concernés) ; suite de conformité SDK verte pour tout module touché.
-- [ ] Règles non négociables de `CLAUDE.md` respectées : aucun secret en clair, idempotence (`Check` avant toute action), aucun import interdit, aucune modification hors du répertoire d'un module ajouté.
-- [ ] ADR (`docs/adr/`, issue « Décision » liée) et documents de conception à jour si une décision, le contrat, la spec ou le cycle changent.
-- [ ] Dette nouvelle → issue `dette-technique`.
+- [ ] Tests added or updated (`make test`, plus `make test-docker` when containers are involved); SDK conformance suite green for every module touched.
+- [ ] Non-negotiable rules of `CLAUDE.md` respected: no plaintext secret, idempotence (`Check` before any action), no forbidden import, no change outside the directory of an added module.
+- [ ] ADR (`docs/adr/`, linked "Decision" issue) and design documents updated if a decision, the contract, the spec or the lifecycle changes.
+- [ ] New debt → `tech-debt` issue.

@@ -8,8 +8,8 @@ updates:
       prefix: "ci"
       include: "scope"
 
-  # Motifs glob : un nouveau module (modules/<nom>/go.mod) est couvert sans
-  # modifier ce fichier (règle d'extensibilité, docs/02-architecture.md).
+  # Glob patterns: a new module (modules/<name>/go.mod) is covered without
+  # editing this file (extensibility rule, docs/02-architecture.md).
   - package-ecosystem: "gomod"
     directories:
       - "/"
@@ -18,8 +18,8 @@ updates:
       - "/test/modules/*"
     schedule:
       interval: "weekly"
-    # Une PR par dépendance, qui la met à jour dans tous les go.mod à la fois
-    # (au lieu d'une PR par répertoire).
+    # One PR per dependency, updating it in every go.mod at once (instead of
+    # one PR per directory).
     groups:
       go-deps:
         group-by: dependency-name
@@ -27,10 +27,10 @@ updates:
     commit-message:
       prefix: "chore"
       include: "scope"
-    # Versions refusées : chaque entrée cite sa raison et se retire quand elle
-    # ne s'applique plus.
+    # Rejected versions: each entry states its reason and is removed once it
+    # no longer applies.
     ignore:
-      # grpc 1.84.x réintroduit GO-2026-6443 (CVE-2026-84445, panic serveur,
-      # atteignable via le broker) ; corrigé en 1.83.2 (utilisée) et en 1.85.
+      # grpc 1.84.x reintroduces GO-2026-6443 (CVE-2026-84445, server panic,
+      # reachable through the broker); fixed in 1.83.2 (in use) and in 1.85.
       - dependency-name: "google.golang.org/grpc"
         versions: ["1.84.x"]

@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 // powerdns fournit dns.zone/v1 et dns.resolver/v1 en phase cible
-// (docs/07-modules-mvp.md) : PowerDNS Authoritative (SQLite, API) + Recursor
+// (docs/07-mvp-modules.md) : PowerDNS Authoritative (SQLite, API) + Recursor
 // sur sa propre VM (compute.vm/v1), reprend la zone de coredns au moment de
 // la passation (Handover lit dns.zone/v1@seed, recrée tout, compare).
 //
@@ -107,7 +107,7 @@ func (m *powerdnsModule) Check(_ context.Context, req *modulev1.StepRequest) (*m
 // connexion — même précaution que modules/chrony. dns.zone/v1@seed est
 // résolu vers le fournisseur graine actif (coredns) via la clé qualifiée du
 // registre (internal/engine), dns.resolver/v1 et les autres via leur clé
-// active (docs/05-cycle-bootstrap.md).
+// active (docs/05-bootstrap-lifecycle.md).
 func (m *powerdnsModule) dial() error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
@@ -341,7 +341,7 @@ func (m *powerdnsModule) Configure(ctx context.Context, req *modulev1.StepReques
 
 // Handover relit dns.zone/v1@seed (coredns) et recrée chaque enregistrement
 // via sa propre implémentation de dns.zone/v1, puis compare
-// (docs/07-modules-mvp.md : "relit la zone via dns.zone@seed.ListRecords,
+// (docs/07-mvp-modules.md : "relit la zone via dns.zone@seed.ListRecords,
 // recrée tout, compare").
 func (m *powerdnsModule) Handover(ctx context.Context, req *modulev1.StepRequest) (*modulev1.StepResult, error) {
 	if err := m.dial(); err != nil {
@@ -404,7 +404,7 @@ func recordsEqual(a, b []*dnszonev1.Record) bool {
 
 // Verify prouve, depuis une VM tierce jetable, une résolution directe et
 // inverse réelle, plus un nom externe via le recursor
-// (docs/07-modules-mvp.md, docs/03-contrat-module.md règle 2).
+// (docs/07-mvp-modules.md, docs/03-module-contract.md règle 2).
 func (m *powerdnsModule) Verify(ctx context.Context, req *modulev1.StepRequest) (*modulev1.StepResult, error) {
 	if err := m.dial(); err != nil {
 		return nil, err

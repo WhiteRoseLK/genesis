@@ -93,7 +93,7 @@ func (s *vaultPkiServer) CAChain(ctx context.Context, req *pkiissuerv1.Empty) (*
 
 // vaultKVServer implémente secrets.kv/v1 — utilisé par le cœur (migration
 // file->vault, internal/engine) via le token AppRole, jamais le root token
-// (docs/07-modules-mvp.md).
+// (docs/07-mvp-modules.md).
 type vaultKVServer struct {
 	secretskvv1.UnimplementedSecretsKVServer
 	module *vaultModule

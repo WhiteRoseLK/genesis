@@ -1,7 +1,7 @@
 apiVersion: genesis/module/v1
 name: teleport
 version: 0.1.0
-description: "Bastion cible « de parc » (docs/07-modules-mvp.md) : access.ssh/v1 et fleet.agent/v1 (ADR-017), Auth+Proxy Teleport sur sa propre VM, agent SSH installé sur chaque VM du parc via fleet.agent/v1.Install"
+description: "Bastion cible « de parc » (docs/07-mvp-modules.md) : access.ssh/v1 et fleet.agent/v1 (ADR-017), Auth+Proxy Teleport sur sa propre VM, agent SSH installé sur chaque VM du parc via fleet.agent/v1.Install"
 layer: services
 core: ">=0.1.0 <0.3.0"
 protocol: 1

@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 // Package version porte la version du cœur, comparée à la contrainte `core`
-// du manifest de chaque module (docs/03-contrat-module.md).
+// du manifest de chaque module (docs/03-module-contract.md).
 package version
 
 // Version est mise à jour par Release Please dans la PR de release (marqueur

@@ -10,7 +10,7 @@ import (
 
 // knownSecretPatterns détecte des motifs de secrets connus qui pourraient
 // fuiter dans un message de log sans passer par le type Secret
-// (docs/06-secrets-etat.md "Redaction") : tokens Vault et blocs PEM.
+// (docs/06-secrets-state.md "Redaction") : tokens Vault et blocs PEM.
 var knownSecretPatterns = []*regexp.Regexp{
 	regexp.MustCompile(`\bhvs\.[A-Za-z0-9_-]+\b`),                                   // token Vault (service)
 	regexp.MustCompile(`\bhvb\.[A-Za-z0-9_-]+\b`),                                   // token Vault (batch)

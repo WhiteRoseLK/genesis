@@ -7,10 +7,10 @@
 // s'il faut rejouer son groupe d'étapes en entier (seed.up, provision,
 // configure, verify, [handover]) plutôt qu'un Check devant
 // chaque RPC individuellement — chaque étape étant elle-même idempotente
-// (docs/03-contrat-module.md §4, règle 3), rejouer le groupe après une
+// (docs/03-module-contract.md §4, règle 3), rejouer le groupe après une
 // reprise est sûr même si certaines étapes du groupe avaient déjà réussi.
 //
-// Passation multi-module (docs/05-cycle-bootstrap.md) : un module cible dont
+// Passation multi-module (docs/05-bootstrap-lifecycle.md) : un module cible dont
 // une fonction fournie a un fournisseur graine actif
 // (resolver.Resolved.ProviderFor(fn, "seed")) exécute Handover puis devient
 // le fournisseur actif de la fonction pour tous les modules construits
@@ -67,7 +67,7 @@ type Engine struct {
 	StateDir string
 	Logger   *slog.Logger
 	// Secrets : accès direct (pas seulement via core.secrets/v1) pour la
-	// migration file->vault (docs/06-secrets-etat.md) — seul le cœur peut
+	// migration file->vault (docs/06-secrets-state.md) — seul le cœur peut
 	// lister TOUTES les entrées, un module n'accède qu'aux siennes.
 	Secrets secrets.Store
 }
@@ -81,7 +81,7 @@ func New(stateDir string, secretsStore secrets.Store) *Engine {
 }
 
 // Run exécute plan dans l'ordre, avec le verrou d'état
-// (deux apply concurrents → le second refuse, docs/06-secrets-etat.md).
+// (deux apply concurrents → le second refuse, docs/06-secrets-state.md).
 func (e *Engine) Run(ctx context.Context, resolved *resolver.Resolved, plan *planner.Plan) error {
 	release, err := state.Lock(e.StateDir)
 	if err != nil {
@@ -139,7 +139,7 @@ func (e *Engine) Run(ctx context.Context, resolved *resolver.Resolved, plan *pla
 			// consommer explicitement la fonction @seed d'un AUTRE module
 			// pendant sa passation (ex. powerdns lit dns.zone/v1@seed chez
 			// coredns), même quand un troisième module fournit la même
-			// fonction en phase cible (docs/05-cycle-bootstrap.md).
+			// fonction en phase cible (docs/05-bootstrap-lifecycle.md).
 			for _, phase := range p.Phases {
 				e.Registry.SetModuleProvider(p.Function+"@"+phase, conn, register)
 			}
@@ -224,7 +224,7 @@ func (e *Engine) runModule(
 
 	if !providesInPhase(m, "target") {
 		// Module graine pur (ex. coredns) : s'arrête à seed_ready
-		// (docs/03-contrat-module.md §5) — SeedDown n'arrive qu'en fin de
+		// (docs/03-module-contract.md §5) — SeedDown n'arrive qu'en fin de
 		// Run (retireSeed).
 		return e.action(ctx, runID, m, client, st, "verify", client.Module().Verify)
 	}
@@ -257,7 +257,7 @@ func (e *Engine) runModule(
 	return nil
 }
 
-// retireSeed arrête la graine en fin de Run (docs/05-cycle-bootstrap.md,
+// retireSeed arrête la graine en fin de Run (docs/05-bootstrap-lifecycle.md,
 // phase 4 ; ADR-020), sans intervention de l'opérateur, mais seulement si :
 //   - chaque fonction fournie en phase graine a un fournisseur cible (sinon
 //     la graine reste le seul fournisseur et est conservée) ;
@@ -338,7 +338,7 @@ func functionsWithoutTarget(resolved *resolver.Resolved, seedModules []string) [
 // handoverSeedModules retourne, dédupliqué et trié, les modules graine
 // distincts dont AU MOINS une fonction fournie par m en phase cible avait
 // un fournisseur actif en phase graine — c'est la définition même d'une
-// passation (docs/05-cycle-bootstrap.md). Un module qui fournit une même
+// passation (docs/05-bootstrap-lifecycle.md). Un module qui fournit une même
 // fonction dans les deux phases (auto-passation, ex. test/modules/test-a)
 // s'y retrouve lui-même : Handover puis SeedDown s'exécutent alors tous
 // deux sur lui.
@@ -378,7 +378,7 @@ func (e *Engine) repoint(resolved *resolver.Resolved, m *resolver.Module, provid
 	}
 }
 
-// migrateSecretsIfNeeded implémente docs/06-secrets-etat.md : "Migration
+// migrateSecretsIfNeeded implémente docs/06-secrets-state.md : "Migration
 // file -> vault, déclenchée par la passation de la capacité secrets" — ce
 // n'est PAS un handover de fonction classique (secrets.kv/v1 n'a pas de
 // fournisseur graine à reprendre, c'est core.secrets/v1, natif, qui change

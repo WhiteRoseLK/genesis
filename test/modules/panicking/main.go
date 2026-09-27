@@ -2,7 +2,7 @@
 
 // Module de test pour internal/modulehost : Check panique volontairement,
 // pour vérifier que le cœur produit une erreur propre sans s'arrêter
-// (critère d'acceptation du jalon J3, docs/08-jalons.md).
+// (critère d'acceptation du jalon J3, docs/08-milestones.md).
 package main
 
 import (

@@ -1,6 +1,6 @@
 syntax = "proto3";
 
-// Fonction pki.issuer/v1 (docs/03-contrat-module.md) : fournisseurs MVP
+// Fonction pki.issuer/v1 (docs/03-module-contract.md) : fournisseurs MVP
 // step-ca (J7, seed) et vault (J7, target).
 package functions.pki.issuer.v1;
 
@@ -28,7 +28,7 @@ message SignCSRRequest {
   map<string, string> extra = 3;
   // is_ca : signe le CSR comme certificat intermédiaire (CA) plutôt que
   // feuille — nécessaire pour qu'un autre pki.issuer/v1 (ex. vault) obtienne
-  // son propre intermédiaire signé par celui-ci (docs/07-modules-mvp.md :
+  // son propre intermédiaire signé par celui-ci (docs/07-mvp-modules.md :
   // "pki_int signé par la racine").
   bool is_ca = 4;
   // path_len_constraint : profondeur d'intermédiaires supplémentaires que

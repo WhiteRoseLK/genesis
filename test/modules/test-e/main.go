@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 // test-e fournit test.e/v1 en phase graine PURE (aucune phase cible) :
-// exerce la passation croisée entre DEUX modules distincts (docs/05-cycle-bootstrap.md,
+// exerce la passation croisée entre DEUX modules distincts (docs/05-bootstrap-lifecycle.md,
 // jalon J6) — contrairement à test-a (qui fournit la même fonction dans les
 // deux phases, auto-passation), test-e ne devient jamais son propre
 // fournisseur cible : c'est test-f qui reprend test.e/v1, et c'est

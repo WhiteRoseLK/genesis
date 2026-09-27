@@ -20,7 +20,7 @@ var caPinRe = regexp.MustCompile(`sha256:[0-9a-f]{64}`)
 
 // Configure installe Teleport (Auth + Proxy) sur sa propre VM, avec un
 // certificat TLS émis par pki.issuer/v1 (résolu vers vault, déjà actif à ce
-// stade du DAG, docs/07-modules-mvp.md), puis calcule le pin de la CA
+// stade du DAG, docs/07-mvp-modules.md), puis calcule le pin de la CA
 // interne Teleport (tctl status) réutilisé par fleet.agent/v1.Install pour
 // chaque enrôlement (docs/09-decisions.md ADR-017/018).
 func (m *teleportModule) Configure(ctx context.Context, req *modulev1.StepRequest) (*modulev1.StepResult, error) {

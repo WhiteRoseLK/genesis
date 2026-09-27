@@ -14,7 +14,7 @@ import (
 )
 
 // MasterKeyProvider fournit la clé maîtresse qui chiffre le backend `file`
-// (docs/06-secrets-etat.md, ADR-007). Seule l'implémentation `file` existe
+// (docs/06-secrets-state.md, ADR-007). Seule l'implémentation `file` existe
 // à l'itération 1 ; l'interface existe dès maintenant pour brancher
 // TPM/Shamir/HSM plus tard sans changer les appelants.
 type MasterKeyProvider interface {

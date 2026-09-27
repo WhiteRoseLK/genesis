@@ -11,7 +11,7 @@ import (
 	modulev1 "github.com/WhiteRoseLK/genesis/sdk/go/gen/module/v1"
 )
 
-// ManifestFile est la forme YAML de module.yaml (docs/03-contrat-module.md §1).
+// ManifestFile est la forme YAML de module.yaml (docs/03-module-contract.md §1).
 type ManifestFile struct {
 	APIVersion   string                    `yaml:"apiVersion"`
 	Name         string                    `yaml:"name"`
@@ -42,7 +42,7 @@ type FunctionRef struct {
 
 // RequireEntry est une fonction requise par le module. Le YAML accepte soit
 // une simple chaîne ("compute.vm/v1"), soit un objet {function, optional}
-// (docs/10-ajouter-un-module.md, dépendances optionnelles).
+// (docs/10-adding-a-module.md, dépendances optionnelles).
 type RequireEntry struct {
 	Function string `yaml:"function"`
 	Optional bool   `yaml:"optional"`

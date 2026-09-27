@@ -22,7 +22,7 @@ import (
 )
 
 // sshTarget est un conteneur SSH jetable faisant office de VM cible, pour
-// tester réellement core.ansible/v1 sans hyperviseur (docs/08-jalons.md, J5).
+// tester réellement core.ansible/v1 sans hyperviseur (docs/08-milestones.md, J5).
 //
 // Remarque d'environnement : ce test vérifie le résultat via `docker exec`
 // plutôt qu'en dialant l'IP du conteneur cible directement (le réseau pont
@@ -133,7 +133,7 @@ func runPlaybookWithRetry(t *testing.T, server *ansibleServer, req *ansiblev1.Ru
 }
 
 // TestRunPlaybookActuallyConfiguresTarget prouve le mécanisme complet de
-// core.ansible/v1 (docs/08-jalons.md, J5) : le conteneur ansible se connecte
+// core.ansible/v1 (docs/08-milestones.md, J5) : le conteneur ansible se connecte
 // réellement en SSH à la cible et y exécute réellement la tâche — vérifié via
 // `docker exec` sur la cible, pas en croyant la réponse d'ansible sur parole.
 func TestRunPlaybookActuallyConfiguresTarget(t *testing.T) {
@@ -142,7 +142,7 @@ func TestRunPlaybookActuallyConfiguresTarget(t *testing.T) {
 
 	// ansible.builtin.raw plutôt que copy/template : l'image SSH jetable de
 	// ce test n'a pas Python (les vraies VM cibles, image cloud Debian, en
-	// ont un — docs/01-vision-perimetre.md), et raw n'en a pas besoin.
+	// ont un — docs/01-vision-scope.md), et raw n'en a pas besoin.
 	const playbook = `---
 - hosts: target
   gather_facts: false

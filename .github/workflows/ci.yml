@@ -8,12 +8,12 @@ on:
 permissions:
   contents: read
 
-# Un nouveau push sur une PR annule l'exécution précédente ; jamais sur main.
+# A new push to a PR cancels the previous run; never on main.
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
-# Actions épinglées par SHA (version en commentaire, mise à jour par Dependabot).
+# Actions pinned by SHA (version in a comment, updated by Dependabot).
 jobs:
   test:
     name: build & test (détecteur de concurrence)
@@ -39,10 +39,10 @@ jobs:
         with:
           go-version-file: go.mod
           cache-dependency-path: "**/go.sum"
-      - name: images épinglées (avec reprises)
+      - name: pinned images (with retries)
         run: make pull-images
-      # Archives téléchargées par les tests (binaires Teleport de l'image de
-      # test construite localement, somme vérifiée par le test lui-même).
+      # Archives downloaded by the tests (Teleport binaries for the locally
+      # built test image; the test itself verifies the checksum).
       - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: ~/.cache/genesis-test
@@ -73,7 +73,7 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          fetch-depth: 0 # buf breaking compare avec la branche de base
+          fetch-depth: 0 # buf breaking compares against the base branch
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
           go-version-file: go.mod
@@ -83,14 +83,14 @@ jobs:
           path: .bin
           key: tools-${{ runner.os }}-${{ hashFiles('Makefile', 'go.mod') }}
       - run: make tools
-      - name: go.mod autonomes (hors go.work)
+      - name: self-contained go.mod files (outside go.work)
         run: make mod-check
-      - name: code protobuf à jour
+      - name: protobuf code up to date
         run: make proto-check
-      - name: contrat protobuf sans rupture (buf breaking)
+      - name: no breaking protobuf change (buf breaking)
         if: github.event_name == 'pull_request'
         run: .bin/buf breaking sdk/proto --against ".git#ref=${{ github.event.pull_request.base.sha }},subdir=sdk/proto"
-      - name: vulnérabilités (govulncheck)
+      - name: vulnerabilities (govulncheck)
         run: make vuln
-      - name: licences des dépendances
+      - name: dependency licenses
         run: make licenses

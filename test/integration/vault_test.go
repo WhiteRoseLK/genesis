@@ -433,7 +433,7 @@ func TestVaultVerifyPassesFromThirdPartyVM(t *testing.T) {
 }
 
 // TestVaultHandoverReissuesCertAndRevokesRootToken prouve Handover
-// (docs/07-modules-mvp.md : "réémission de son propre certificat...
+// (docs/07-mvp-modules.md : "réémission de son propre certificat...
 // révocation du token root") : vault redevient joignable après le
 // redéploiement TLS via son PROPRE pki_int, IssueCert continue de
 // fonctionner (token AppRole, jamais affecté par la révocation du root

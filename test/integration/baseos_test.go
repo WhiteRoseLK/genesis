@@ -70,7 +70,7 @@ func (f *fakeAnsibleServer) lastCall() *ansiblev1.RunPlaybookRequest {
 
 // TestBaseOSCallsAnsibleWithExpectedPlaybooks vérifie que TrustCA/SetResolver/
 // SetNTP dialent la session de broker capturée par Check et envoient le bon
-// playbook avec les bonnes variables (docs/08-jalons.md, J5).
+// playbook avec les bonnes variables (docs/08-milestones.md, J5).
 func TestBaseOSCallsAnsibleWithExpectedPlaybooks(t *testing.T) {
 	binaryPath, manifest := buildModule(t, "base-os")
 

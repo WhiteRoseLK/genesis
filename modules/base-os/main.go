@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 
-// base-os fournit os.base/v1 (docs/07-modules-mvp.md) : la configuration
+// base-os fournit os.base/v1 (docs/07-mvp-modules.md) : la configuration
 // fonctionnelle nécessaire au bon fonctionnement d'une VM cible (CA,
 // résolveur, NTP). Harden (durcissement SSH, mises à jour, nftables) est un
 // volet de sécurité pure différé à une itération future — voir la

@@ -1,7 +1,7 @@
 ---
 # Configure (functions/time/ntp/v1, module chrony) : installe et configure
-# chronyd en serveur NTP (docs/07-modules-mvp.md) — image cloud Debian
-# (docs/01-vision-perimetre.md), même hypothèse que modules/base-os.
+# chronyd en serveur NTP (docs/07-mvp-modules.md) — image cloud Debian
+# (docs/01-vision-scope.md), même hypothèse que modules/base-os.
 - hosts: target
   gather_facts: false
   become: true

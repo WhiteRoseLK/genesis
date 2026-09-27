@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 // fake-compute fournit compute.vm/v1 via de vrais conteneurs SSH-joignables
-// sur la graine (docs/07-modules-mvp.md), pour tester le cœur et les
+// sur la graine (docs/07-mvp-modules.md), pour tester le cœur et les
 // modules de service sans hyperviseur. Chaque « VM » est un conteneur
 // lscr.io/linuxserver/openssh-server réel, démarré via core.container/v1 —
 // pas de systemd à l'intérieur (contrairement à la lettre du doc 07) : le
@@ -28,7 +28,7 @@ import (
 var manifestYAML []byte
 
 // sshTargetImage et le port interne sont fixés : le point de fake-compute
-// est d'être une cible SSH prévisible, pas configurable (docs/08-jalons.md, J4/J6).
+// est d'être une cible SSH prévisible, pas configurable (docs/08-milestones.md, J4/J6).
 const (
 	sshTargetImage = "lscr.io/linuxserver/openssh-server:10.3_p1-r1-ls237@sha256:946fa26105e0ec212fdf821b9ddc59aab65f2c2d07c02b25ff0f5001fc332ff0"
 	sshTargetPort  = 22
@@ -124,7 +124,7 @@ func (s *computeVMServer) EnsureImage(context.Context, *computevmv1.EnsureImageR
 	return &computevmv1.EnsureImageResponse{}, nil
 }
 
-// EnsureVM est idempotent par nom (clé d'idempotence, docs/07-modules-mvp.md).
+// EnsureVM est idempotent par nom (clé d'idempotence, docs/07-mvp-modules.md).
 func (s *computeVMServer) EnsureVM(ctx context.Context, req *computevmv1.EnsureVMRequest) (*computevmv1.VM, error) {
 	s.mu.Lock()
 	if vm, ok := s.vms[req.GetName()]; ok {

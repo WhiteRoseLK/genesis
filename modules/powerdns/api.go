@@ -15,7 +15,7 @@ import (
 )
 
 // pdnsClient parle directement à l'API REST de PowerDNS Authoritative
-// (docs/07-modules-mvp.md : "Authoritative (SQLite, API)"), à la manière de
+// (docs/07-mvp-modules.md : "Authoritative (SQLite, API)"), à la manière de
 // modules/proxmox/proxmoxapi pour Proxmox — un module appelle l'API du
 // produit qu'il pilote directement, pas via ansible, quand le produit en
 // expose une.
