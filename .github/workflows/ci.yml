@@ -16,7 +16,7 @@ concurrency:
 # Actions pinned by SHA (version in a comment, updated by Dependabot).
 jobs:
   test:
-    name: build & test (détecteur de concurrence)
+    name: build & test (race detector)
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
@@ -30,7 +30,7 @@ jobs:
       - run: make test-race
 
   docker:
-    name: tests d'intégration (conteneurs)
+    name: integration tests (containers)
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
@@ -50,7 +50,7 @@ jobs:
       - run: make test-docker
 
   lint:
-    name: lint (règles d'import comprises)
+    name: lint (including import rules)
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
@@ -67,7 +67,7 @@ jobs:
       - run: make lint
 
   checks:
-    name: modules, protobuf, vulnérabilités, licences
+    name: modules, protobuf, vulnerabilities, licenses
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
