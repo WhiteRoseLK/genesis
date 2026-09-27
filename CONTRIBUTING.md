@@ -14,6 +14,7 @@ Les règles d'architecture et les règles non négociables sont dans [`CLAUDE.md
 | `make test` | Tests unitaires de chaque `go.mod` : sans réseau ni démon de conteneurs |
 | `make test-race` | Mêmes tests avec le détecteur de concurrence (CGO requis pour les tests seulement) |
 | `make test-docker` | Tests d'intégration contre de vrais conteneurs (build tag `docker`) |
+| `make pull-images` | Tire d'avance, avec reprises, les images épinglées dans le code (limites de débit des registres) |
 | `make lint` | `golangci-lint`, règles d'import `depguard` comprises |
 | `make mod-check` | Chaque `go.mod` est à jour et compile hors de `go.work` |
 | `make proto` | Régénère le code protobuf (`buf generate`) : le code généré est commité |
