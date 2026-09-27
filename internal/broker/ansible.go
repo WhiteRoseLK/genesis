@@ -17,13 +17,13 @@ import (
 	ansiblev1 "github.com/WhiteRoseLK/genesis/sdk/go/gen/functions/core/ansible/v1"
 )
 
-// ansibleImage exécute les playbooks sans rien installer sur la graine
-// (ADR-002). Épinglée par version et empreinte (reproductibilité, chaîne
-// d'approvisionnement). TODO : rendre configurable (miroir privé pour le
-// profil air-gap de l'ADR-008).
+// ansibleImage runs the playbooks without installing anything on the seed
+// (ADR-002). Pinned by version and digest (reproducibility, supply chain).
+// TODO: make it configurable (private mirror for the air-gapped profile of
+// ADR-008).
 const ansibleImage = "willhallonline/ansible:2.16-alpine-3.19@sha256:6f9d1ec5bdb30f0a06d7293e8cd9eb3a41ad4521c05b2a94ccf1604e0946b7b6"
 
-// NativeAnsible construit le fournisseur core.ansible/v1, natif au cœur.
+// NativeAnsible builds the core.ansible/v1 provider, native to the core.
 func NativeAnsible(rt *runner.ContainerRuntime) nativeFactory {
 	return func(_ string) func(*grpc.Server) {
 		return func(s *grpc.Server) {
@@ -53,7 +53,7 @@ func (a *ansibleServer) RunPlaybook(ctx context.Context, req *ansiblev1.RunPlayb
 	if vars := req.GetVars(); vars != nil {
 		varsJSON, err := json.Marshal(vars.AsMap())
 		if err != nil {
-			return nil, fmt.Errorf("encodage des extra-vars : %w", err)
+			return nil, fmt.Errorf("encoding the extra-vars: %w", err)
 		}
 		files["vars.json"] = varsJSON
 		playbookCmd += " --extra-vars @/work/vars.json"
@@ -61,27 +61,26 @@ func (a *ansibleServer) RunPlaybook(ctx context.Context, req *ansiblev1.RunPlayb
 	}
 	sensitive = append(sensitive, target.GetSshPrivateKey())
 
-	// Les fichiers (clé privée, extra-vars contenant des secrets) ne
-	// touchent jamais le disque de la graine : ils transitent par l'entrée
-	// standard, sous forme d'archive tar, vers un tmpfs du conteneur. Aucun
-	// autre utilisateur de la graine ne peut les lire, quel que soit l'UID
-	// effectif du conteneur.
+	// The files (private key, extra-vars holding secrets) never touch the
+	// seed's disk: they go through standard input, as a tar archive, into a
+	// tmpfs of the container. No other user of the seed can read them,
+	// whatever the container's effective UID.
 	archive, err := tarFiles(files)
 	if err != nil {
-		return nil, fmt.Errorf("préparation des fichiers du playbook : %w", err)
+		return nil, fmt.Errorf("preparing the playbook files: %w", err)
 	}
 
 	result, err := a.runtime.Run(ctx, runner.RunOptions{
 		Image:   ansibleImage,
 		Command: []string{"sh", "-c", "tar -xf - -C /work && exec " + playbookCmd},
-		// 1777 : l'image n'exécute pas ansible en root ; le tmpfs est privé
-		// au conteneur et les fichiers y sont extraits en 0600.
+		// 1777: the image does not run ansible as root; the tmpfs is private
+		// to the container and the files are extracted there as 0600.
 		Tmpfs: []string{"/work:rw,mode=1777"},
 		Stdin: archive,
 		Env:   map[string]string{"ANSIBLE_HOST_KEY_CHECKING": "False"},
 	})
 	if err != nil {
-		return nil, fmt.Errorf("exécution du conteneur ansible : %w", err)
+		return nil, fmt.Errorf("running the ansible container: %w", err)
 	}
 
 	return &ansiblev1.RunPlaybookResponse{
@@ -90,7 +89,7 @@ func (a *ansibleServer) RunPlaybook(ctx context.Context, req *ansiblev1.RunPlayb
 	}, nil
 }
 
-// tarFiles construit une archive tar en mémoire, chaque fichier en 0600.
+// tarFiles builds an in-memory tar archive, each file as 0600.
 func tarFiles(files map[string][]byte) ([]byte, error) {
 	names := make([]string, 0, len(files))
 	for name := range files {
@@ -115,11 +114,11 @@ func tarFiles(files map[string][]byte) ([]byte, error) {
 	return buf.Bytes(), nil
 }
 
-// minRedactLen évite de masquer des valeurs courtes et banales (ports,
-// booléens, noms d'utilisateur) qui rendraient la sortie illisible.
+// minRedactLen avoids masking short, mundane values (ports, booleans, user
+// names) that would make the output unreadable.
 const minRedactLen = 8
 
-// collectStrings renvoie toutes les chaînes contenues dans v, récursivement.
+// collectStrings returns every string contained in v, recursively.
 func collectStrings(v any) []string {
 	var out []string
 	switch t := v.(type) {
@@ -137,11 +136,11 @@ func collectStrings(v any) []string {
 	return out
 }
 
-// redactValues masque dans out chaque valeur de values (et chacune de ses
-// lignes, Ansible pouvant réafficher un bloc PEM ligne par ligne). Les
-// extra-vars transportent des secrets (certificats, role_id/secret_id) :
-// la sortie du playbook remonte jusqu'aux erreurs et journaux du moteur et
-// ne doit jamais les contenir (règle « aucun secret en clair »).
+// redactValues masks in out each value of values (and each of its lines, since
+// Ansible may print a PEM block back line by line). The extra-vars carry
+// secrets (certificates, role_id/secret_id): the playbook output travels up to
+// the engine's errors and logs and must never contain them (the "no plaintext
+// secret" rule).
 func redactValues(out string, values []string) string {
 	var needles []string
 	for _, v := range values {
@@ -151,8 +150,8 @@ func redactValues(out string, values []string) string {
 			}
 		}
 	}
-	// Les plus longues d'abord : une valeur contenue dans une autre ne doit
-	// pas empêcher de masquer la plus longue.
+	// Longest first: a value contained in another must not prevent the longer
+	// one from being masked.
 	sort.Slice(needles, func(i, j int) bool { return len(needles[i]) > len(needles[j]) })
 	for _, n := range needles {
 		out = strings.ReplaceAll(out, n, "***")

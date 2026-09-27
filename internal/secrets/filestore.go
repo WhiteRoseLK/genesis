@@ -21,16 +21,16 @@ import (
 	"github.com/WhiteRoseLK/genesis/internal/atomicfile"
 )
 
-// FileStore est le backend `file` de l'itération 1 (docs/06-secrets-state.md) :
-// un fichier chiffré age par secret, des métadonnées en clair mais sans
-// valeur, sous state_dir/secrets/.
+// FileStore is the `file` backend of iteration 1 (docs/06-secrets-state.md):
+// one age-encrypted file per secret, plaintext metadata without the value,
+// under state_dir/secrets/.
 type FileStore struct {
 	Identity *age.X25519Identity
 	stateDir string
 }
 
-// NewFileStore construit un FileStore ancré sur stateDir, chiffrant avec la
-// clé maîtresse identity.
+// NewFileStore builds a FileStore rooted at stateDir, encrypting with the
+// identity master key.
 func NewFileStore(stateDir string, identity *age.X25519Identity) *FileStore {
 	return &FileStore{Identity: identity, stateDir: stateDir}
 }
@@ -58,14 +58,14 @@ func (s *FileStore) Ensure(ctx context.Context, ref Ref, gen Generator, meta Met
 		return err
 	}
 	if _, err := os.Stat(s.secretPath(ref)); err == nil {
-		return nil // déjà présent : idempotent, on ne régénère jamais.
+		return nil // already present: idempotent, never regenerated.
 	} else if !os.IsNotExist(err) {
-		return fmt.Errorf("vérification de %s : %w", s.secretPath(ref), err)
+		return fmt.Errorf("checking %s: %w", s.secretPath(ref), err)
 	}
 
 	value, err := gen()
 	if err != nil {
-		return fmt.Errorf("génération du secret %s : %w", ref, err)
+		return fmt.Errorf("generating secret %s: %w", ref, err)
 	}
 	return s.Put(ctx, ref, value, meta)
 }
@@ -75,15 +75,15 @@ func (s *FileStore) Put(_ context.Context, ref Ref, value Secret, meta Meta) err
 		return err
 	}
 	if err := os.MkdirAll(filepath.Dir(s.secretPath(ref)), 0o700); err != nil {
-		return fmt.Errorf("création du répertoire pour %s : %w", ref, err)
+		return fmt.Errorf("creating the directory for %s: %w", ref, err)
 	}
 
 	ciphertext, err := s.encrypt(value.ExposeSecret())
 	if err != nil {
-		return fmt.Errorf("chiffrement de %s : %w", ref, err)
+		return fmt.Errorf("chiffrement de %s: %w", ref, err)
 	}
 	if err := atomicfile.Write(s.secretPath(ref), ciphertext, 0o600); err != nil {
-		return fmt.Errorf("écriture de %s : %w", ref, err)
+		return fmt.Errorf("writing %s: %w", ref, err)
 	}
 
 	if meta.CreatedAt.IsZero() {
@@ -91,10 +91,10 @@ func (s *FileStore) Put(_ context.Context, ref Ref, value Secret, meta Meta) err
 	}
 	metaJSON, err := json.MarshalIndent(meta, "", "  ")
 	if err != nil {
-		return fmt.Errorf("encodage des métadonnées de %s : %w", ref, err)
+		return fmt.Errorf("encoding the metadata of %s: %w", ref, err)
 	}
 	if err := atomicfile.Write(s.metaPath(ref), metaJSON, 0o600); err != nil {
-		return fmt.Errorf("écriture des métadonnées de %s : %w", ref, err)
+		return fmt.Errorf("writing the metadata of %s: %w", ref, err)
 	}
 	return nil
 }
@@ -105,14 +105,14 @@ func (s *FileStore) Get(_ context.Context, ref Ref) (Secret, error) {
 	}
 	ciphertext, err := os.ReadFile(s.secretPath(ref))
 	if os.IsNotExist(err) {
-		return Secret{}, fmt.Errorf("secret %s : introuvable", ref)
+		return Secret{}, fmt.Errorf("secret %s: not found", ref)
 	}
 	if err != nil {
-		return Secret{}, fmt.Errorf("lecture de %s : %w", ref, err)
+		return Secret{}, fmt.Errorf("lecture de %s: %w", ref, err)
 	}
 	plaintext, err := s.decrypt(ciphertext)
 	if err != nil {
-		return Secret{}, fmt.Errorf("déchiffrement de %s : %w", ref, err)
+		return Secret{}, fmt.Errorf("decrypting %s: %w", ref, err)
 	}
 	return NewSecret(plaintext), nil
 }
@@ -123,27 +123,27 @@ func (s *FileStore) GetMeta(_ context.Context, ref Ref) (Meta, error) {
 	}
 	raw, err := os.ReadFile(s.metaPath(ref))
 	if os.IsNotExist(err) {
-		return Meta{}, fmt.Errorf("secret %s : introuvable", ref)
+		return Meta{}, fmt.Errorf("secret %s: not found", ref)
 	}
 	if err != nil {
-		return Meta{}, fmt.Errorf("lecture des métadonnées de %s : %w", ref, err)
+		return Meta{}, fmt.Errorf("reading the metadata of %s: %w", ref, err)
 	}
 	var meta Meta
 	if err := json.Unmarshal(raw, &meta); err != nil {
-		return Meta{}, fmt.Errorf("métadonnées invalides pour %s : %w", ref, err)
+		return Meta{}, fmt.Errorf("invalid metadata for %s: %w", ref, err)
 	}
 	return meta, nil
 }
 
 func (s *FileStore) List(_ context.Context, prefix string) ([]Entry, error) {
-	// os.Root : le parcours ne peut pas sortir du répertoire des secrets,
-	// ni par un lien symbolique ni par un préfixe contenant « .. ».
+	// os.Root: the walk cannot leave the secrets directory, neither through a
+	// symbolic link nor through a prefix containing "..".
 	root, err := os.OpenRoot(s.secretsDir())
 	if errors.Is(err, fs.ErrNotExist) {
-		return nil, nil // rien à lister
+		return nil, nil // nothing to list
 	}
 	if err != nil {
-		return nil, fmt.Errorf("liste des secrets : %w", err)
+		return nil, fmt.Errorf("listing secrets: %w", err)
 	}
 	defer func() { _ = root.Close() }()
 	fsys := root.FS()
@@ -157,7 +157,7 @@ func (s *FileStore) List(_ context.Context, prefix string) ([]Entry, error) {
 	err = fs.WalkDir(fsys, start, func(p string, d fs.DirEntry, err error) error {
 		if err != nil {
 			if errors.Is(err, fs.ErrNotExist) && p == start {
-				return nil // rien à lister
+				return nil // nothing to list
 			}
 			return err
 		}
@@ -166,17 +166,17 @@ func (s *FileStore) List(_ context.Context, prefix string) ([]Entry, error) {
 		}
 		raw, err := fs.ReadFile(fsys, p)
 		if err != nil {
-			return fmt.Errorf("lecture de %s : %w", p, err)
+			return fmt.Errorf("lecture de %s: %w", p, err)
 		}
 		var meta Meta
 		if err := json.Unmarshal(raw, &meta); err != nil {
-			return fmt.Errorf("métadonnées invalides dans %s : %w", p, err)
+			return fmt.Errorf("invalid metadata in %s: %w", p, err)
 		}
 		entries = append(entries, Entry{Ref: Ref(strings.TrimSuffix(p, ".meta.json")), Meta: meta})
 		return nil
 	})
 	if err != nil {
-		return nil, fmt.Errorf("liste des secrets sous %q : %w", prefix, err)
+		return nil, fmt.Errorf("listing secrets under %q: %w", prefix, err)
 	}
 	return entries, nil
 }

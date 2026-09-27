@@ -10,19 +10,19 @@ func TestSaveLoadRoundTrip(t *testing.T) {
 	want.SecretsBackend = "vault"
 
 	if err := Save(dir, want); err != nil {
-		t.Fatalf("Save : %v", err)
+		t.Fatalf("Save: %v", err)
 	}
 	got, err := Load(dir)
 	if err != nil {
-		t.Fatalf("Load : %v", err)
+		t.Fatalf("Load: %v", err)
 	}
 	if got.SchemaVersion != want.SchemaVersion || got.SecretsBackend != want.SecretsBackend {
-		t.Errorf("Load() = %+v, attendu %+v", got, want)
+		t.Errorf("Load() = %+v, want %+v", got, want)
 	}
 }
 
 func TestLoadWithoutInit(t *testing.T) {
 	if _, err := Load(t.TempDir()); err == nil {
-		t.Fatal("Load sans état existant : succès inattendu")
+		t.Fatal("Load without an existing state: unexpected success")
 	}
 }

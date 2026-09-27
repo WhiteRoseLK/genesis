@@ -9,25 +9,24 @@ import (
 	"syscall"
 )
 
-// Lock acquiert un verrou exclusif non bloquant sur state_dir/state.lock.
-// Un deuxième appel concurrent (même processus avec un descripteur
-// différent, ou processus distinct) échoue immédiatement au lieu d'attendre
-// — c'est ce qui fait refuser un second `apply` concurrent (critère
-// d'acceptation du jalon J2, doc 08).
+// Lock acquires a non-blocking exclusive lock on state_dir/state.lock. A
+// second concurrent call (same process with a different descriptor, or a
+// separate process) fails immediately instead of waiting — this is what makes
+// a second concurrent `apply` refuse to run (M2 acceptance criterion, doc 08).
 func Lock(stateDir string) (release func() error, err error) {
 	if err := os.MkdirAll(stateDir, 0o700); err != nil {
-		return nil, fmt.Errorf("création de %s : %w", stateDir, err)
+		return nil, fmt.Errorf("creating %s: %w", stateDir, err)
 	}
 
 	path := filepath.Join(stateDir, "state.lock")
 	f, err := os.OpenFile(path, os.O_CREATE|os.O_RDWR, 0o600)
 	if err != nil {
-		return nil, fmt.Errorf("ouverture de %s : %w", path, err)
+		return nil, fmt.Errorf("opening %s: %w", path, err)
 	}
 
 	if err := syscall.Flock(int(f.Fd()), syscall.LOCK_EX|syscall.LOCK_NB); err != nil {
 		_ = f.Close()
-		return nil, fmt.Errorf("state_dir %s déjà verrouillé (une autre exécution est-elle en cours ?) : %w", stateDir, err)
+		return nil, fmt.Errorf("state_dir %s is already locked (is another run in progress?): %w", stateDir, err)
 	}
 
 	return func() error {

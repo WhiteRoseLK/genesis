@@ -12,8 +12,8 @@ import (
 	fleetagentv1 "github.com/WhiteRoseLK/genesis/sdk/go/gen/functions/fleet/agent/v1"
 )
 
-// fakeFleetAgentServer capture les appels Install reçus — joue le rôle d'un
-// module « de parc » réel (teleport, J8), dispensé normalement via
+// fakeFleetAgentServer records the Install calls it receives — it plays the
+// role of a real "fleet" module (teleport, M8), normally dispensed through
 // go-plugin.
 type fakeFleetAgentServer struct {
 	fleetagentv1.UnimplementedFleetAgentServer
@@ -35,10 +35,10 @@ func (f *fakeFleetAgentServer) calls() int {
 	return len(f.got)
 }
 
-// TestBuildSessionFanOutFleetFunction prouve docs/09-decisions.md ADR-017 :
-// un seul appel Install(target) de l'appelant est diffusé vers TOUS les
-// fournisseurs « de parc » installés, pas un seul fournisseur actif comme
-// le reste des fonctions.
+// TestBuildSessionFanOutFleetFunction proves docs/09-decisions.md ADR-017: a
+// single Install(target) call from the caller fans out to ALL installed
+// "fleet" providers, not to a single active provider as for the other
+// functions.
 func TestBuildSessionFanOutFleetFunction(t *testing.T) {
 	agentA := &fakeFleetAgentServer{name: "teleport-like-a"}
 	agentB := &fakeFleetAgentServer{name: "teleport-like-b"}
@@ -55,23 +55,23 @@ func TestBuildSessionFanOutFleetFunction(t *testing.T) {
 
 	client := fleetagentv1.NewFleetAgentClient(sessionConn)
 	if _, err := client.Install(context.Background(), &fleetagentv1.InstallRequest{
-		Target: &fleetagentv1.Target{Host: "10.10.0.5", Port: 22, User: "genesis", SshPrivateKey: "clé-test"},
+		Target: &fleetagentv1.Target{Host: "10.10.0.5", Port: 22, User: "genesis", SshPrivateKey: "test-key"},
 	}); err != nil {
-		t.Fatalf("Install : %v", err)
+		t.Fatalf("Install: %v", err)
 	}
 
 	if agentA.calls() != 1 || agentB.calls() != 1 {
-		t.Fatalf("appels reçus = a:%d b:%d, attendu 1 partout (diffusion vers tous les fournisseurs)", agentA.calls(), agentB.calls())
+		t.Fatalf("calls received = a:%d b:%d, want 1 each (fan-out to every provider)", agentA.calls(), agentB.calls())
 	}
 	if got := agentA.got[0].GetTarget().GetHost(); got != "10.10.0.5" {
-		t.Errorf("target reçu par a = %q, attendu 10.10.0.5", got)
+		t.Errorf("target received by a = %q, want 10.10.0.5", got)
 	}
 }
 
-// TestBuildSessionFleetFunctionWithNoProviders vérifie le cas no-op :
-// aucun module « de parc » installé, l'appel échoue proprement (comme
-// n'importe quelle fonction déclarée sans fournisseur — le module appelant
-// doit traiter fleet.agent/v1 comme un requires optionnel, docs07/ADR-017).
+// TestBuildSessionFleetFunctionWithNoProviders checks the no-op case: no
+// "fleet" module is installed, the call fails cleanly (like any declared
+// function without a provider — the calling module must treat fleet.agent/v1
+// as an optional requires, doc 07/ADR-017).
 func TestBuildSessionFleetFunctionWithNoProviders(t *testing.T) {
 	r := NewRegistry()
 	sessionServer := r.BuildSession("chrony", []string{"fleet.agent/v1"})
@@ -82,7 +82,7 @@ func TestBuildSessionFleetFunctionWithNoProviders(t *testing.T) {
 		Target: &fleetagentv1.Target{Host: "10.10.0.5"},
 	})
 	if err == nil {
-		t.Fatal("Install sans aucun fournisseur : succès inattendu")
+		t.Fatal("Install with no provider: unexpected success")
 	}
 }
 

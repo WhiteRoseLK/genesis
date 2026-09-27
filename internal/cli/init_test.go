@@ -27,16 +27,16 @@ func TestInitCreatesMasterKeyAndState(t *testing.T) {
 
 	out, err := runCLI(t, "init", "--state-dir", stateDir)
 	if err != nil {
-		t.Fatalf("genesis init : %v", err)
+		t.Fatalf("genesis init: %v", err)
 	}
-	if !strings.Contains(out, "Clé maîtresse générée") {
-		t.Errorf("sortie du premier init = %q, attendu la mention de génération de la clé", out)
+	if !strings.Contains(out, "Master key generated") {
+		t.Errorf("output of the first init = %q, want the key generation message", out)
 	}
 	if _, err := os.Stat(filepath.Join(stateDir, "master.key")); err != nil {
-		t.Errorf("master.key absent : %v", err)
+		t.Errorf("master.key absent: %v", err)
 	}
 	if _, err := os.Stat(filepath.Join(stateDir, "state.json")); err != nil {
-		t.Errorf("state.json absent : %v", err)
+		t.Errorf("state.json absent: %v", err)
 	}
 }
 
@@ -45,29 +45,29 @@ func TestInitIsIdempotent(t *testing.T) {
 	stateDir := filepath.Join(dir, "state")
 
 	if _, err := runCLI(t, "init", "--state-dir", stateDir); err != nil {
-		t.Fatalf("premier init : %v", err)
+		t.Fatalf("first init: %v", err)
 	}
 	keyBefore, err := os.ReadFile(filepath.Join(stateDir, "master.key"))
 	if err != nil {
-		t.Fatalf("lecture de master.key : %v", err)
+		t.Fatalf("lecture de master.key: %v", err)
 	}
 
 	out, err := runCLI(t, "init", "--state-dir", stateDir)
 	if err != nil {
-		t.Fatalf("second init : %v", err)
+		t.Fatalf("second init: %v", err)
 	}
-	if strings.Contains(out, "Clé maîtresse générée") {
-		t.Errorf("le second init a réaffiché la clé maîtresse : %q", out)
+	if strings.Contains(out, "Master key generated") {
+		t.Errorf("the second init displayed the master key again: %q", out)
 	}
-	if !strings.Contains(out, "Déjà initialisé") {
-		t.Errorf("sortie du second init = %q, attendu la mention \"Déjà initialisé\"", out)
+	if !strings.Contains(out, "Already initialised") {
+		t.Errorf("output of the second init = %q, want \"Already initialised\"", out)
 	}
 
 	keyAfter, err := os.ReadFile(filepath.Join(stateDir, "master.key"))
 	if err != nil {
-		t.Fatalf("lecture de master.key après second init : %v", err)
+		t.Fatalf("reading master.key after the second init: %v", err)
 	}
 	if string(keyBefore) != string(keyAfter) {
-		t.Error("la clé maîtresse a changé après un second init")
+		t.Error("the master key changed after a second init")
 	}
 }

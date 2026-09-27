@@ -44,41 +44,41 @@ func TestSecretsEnsureAndGetSameCaller(t *testing.T) {
 		Generator: secretsv1.Generator_GENERATOR_TOKEN,
 	})
 	if err != nil {
-		t.Fatalf("Ensure : %v", err)
+		t.Fatalf("Ensure: %v", err)
 	}
 
 	resp, err := client.Get(ctx, &secretsv1.GetRequest{Ref: "module-a/token"})
 	if err != nil {
-		t.Fatalf("Get par le propriétaire : %v", err)
+		t.Fatalf("Get by the owner: %v", err)
 	}
 	if resp.GetValue() == "" {
-		t.Error("Get a retourné une valeur vide")
+		t.Error("Get returned an empty value")
 	}
 }
 
-// TestSecretsGetDeniedForOtherModule est le pendant applicatif de la règle
-// "un module ne peut lire que ses propres secrets et ceux explicitement
-// partagés" (docs/02-architecture.md).
+// TestSecretsGetDeniedForOtherModule is the application-level counterpart of
+// the rule "a module can read only its own secrets and those explicitly
+// shared" (docs/02-architecture.md).
 func TestSecretsGetDeniedForOtherModule(t *testing.T) {
 	r := newTestSecretsRegistry(t)
 	ctx := context.Background()
 
 	owner := secretsClientFor(t, r, "module-a")
 	if _, err := owner.Ensure(ctx, &secretsv1.EnsureRequest{Ref: "module-a/secret", Generator: secretsv1.Generator_GENERATOR_TOKEN}); err != nil {
-		t.Fatalf("Ensure : %v", err)
+		t.Fatalf("Ensure: %v", err)
 	}
 
 	other := secretsClientFor(t, r, "module-b")
 	_, err := other.Get(ctx, &secretsv1.GetRequest{Ref: "module-a/secret"})
 	if err == nil {
-		t.Fatal("Get par un autre module : succès inattendu, devait être refusé")
+		t.Fatal("Get by another module: unexpected success, should have been refused")
 	}
 	if status.Code(err) != codes.PermissionDenied {
-		t.Errorf("code = %v, attendu %v", status.Code(err), codes.PermissionDenied)
+		t.Errorf("code = %v, want %v", status.Code(err), codes.PermissionDenied)
 	}
 }
 
-// TestSecretsGetAllowedForExplicitConsumer vérifie le partage explicite.
+// TestSecretsGetAllowedForExplicitConsumer checks explicit sharing.
 func TestSecretsGetAllowedForExplicitConsumer(t *testing.T) {
 	r := newTestSecretsRegistry(t)
 	ctx := context.Background()
@@ -90,12 +90,12 @@ func TestSecretsGetAllowedForExplicitConsumer(t *testing.T) {
 		Meta:      &secretsv1.Meta{Consumers: []string{"module-b"}},
 	})
 	if err != nil {
-		t.Fatalf("Ensure : %v", err)
+		t.Fatalf("Ensure: %v", err)
 	}
 
 	consumer := secretsClientFor(t, r, "module-b")
 	if _, err := consumer.Get(ctx, &secretsv1.GetRequest{Ref: "module-a/shared"}); err != nil {
-		t.Errorf("Get par un consumer déclaré : erreur inattendue : %v", err)
+		t.Errorf("Get by a declared consumer: unexpected error: %v", err)
 	}
 }
 
@@ -109,9 +109,9 @@ func TestSecretsEnsureDeniedForWrongOwner(t *testing.T) {
 		Meta:      &secretsv1.Meta{Owner: "module-b"},
 	})
 	if err == nil {
-		t.Fatal("Ensure avec owner falsifié : succès inattendu")
+		t.Fatal("Ensure with a forged owner: unexpected success")
 	}
 	if status.Code(err) != codes.PermissionDenied {
-		t.Errorf("code = %v, attendu %v", status.Code(err), codes.PermissionDenied)
+		t.Errorf("code = %v, want %v", status.Code(err), codes.PermissionDenied)
 	}
 }

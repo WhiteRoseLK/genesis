@@ -12,15 +12,15 @@ import (
 	"github.com/WhiteRoseLK/genesis/internal/spec"
 )
 
-// TestAddingTestDInsertsAtCorrectPlanPosition est le dernier critère
-// d'acceptation du jalon J4 (doc 08) : "ajout d'un module test-d dépendant
-// de test-a sans modifier aucun fichier hors test/modules/test-d/ → inséré
-// au bon endroit dans le plan."
+// TestAddingTestDInsertsAtCorrectPlanPosition is the last acceptance
+// criterion of milestone M4 (doc 08): "adding a test-d module that depends
+// on test-a, without changing any file outside test/modules/test-d/ →
+// inserted at the right place in the plan."
 //
-// test-d existe déjà comme fixture sous test/modules/test-d/ (comme
-// test-a/b/c) ; ce test prouve que le résolveur, le planificateur et le
-// moteur n'ont eu besoin d'aucune modification pour le prendre en charge —
-// aucun fichier de ce paquet ne connaît "test-d" par son nom.
+// test-d already exists as a fixture under test/modules/test-d/ (like
+// test-a/b/c); this test proves that the resolver, the planner and the
+// engine needed no change to support it — no file in this package knows
+// "test-d" by name.
 func TestAddingTestDInsertsAtCorrectPlanPosition(t *testing.T) {
 	searchRoot := t.TempDir()
 	installedA := buildAndInstall(t, "test-a", searchRoot)
@@ -33,26 +33,26 @@ func TestAddingTestDInsertsAtCorrectPlanPosition(t *testing.T) {
 
 	resolved, err := resolver.Resolve(env, []modulehost.Installed{installedA, installedB, installedC, installedD})
 	if err != nil {
-		t.Fatalf("Resolve : %v", err)
+		t.Fatalf("Resolve: %v", err)
 	}
 	plan, err := planner.Build(resolved)
 	if err != nil {
-		t.Fatalf("Build : %v", err)
+		t.Fatalf("Build: %v", err)
 	}
 
 	if len(plan.Order) != 4 {
-		t.Fatalf("Order = %v, attendu 4 modules", plan.Order)
+		t.Fatalf("Order = %v, want 4 modules", plan.Order)
 	}
 	if indexOf(plan.Order, "test-a") >= indexOf(plan.Order, "test-d") {
-		t.Errorf("test-a devrait précéder test-d : %v", plan.Order)
+		t.Errorf("test-a should come before test-d: %v", plan.Order)
 	}
-	// test-d ne dépend ni de test-b ni de test-c, et rien ne dépend de lui :
-	// sa position relative à eux n'est pas contrainte, seule sa position
-	// après test-a compte.
+	// test-d depends neither on test-b nor on test-c, and nothing depends on
+	// it: its position relative to them is not constrained, only its
+	// position after test-a matters.
 
 	stateDir := t.TempDir()
 	e := New(stateDir, newTestSecretsStore(t))
 	if err := e.Run(context.Background(), resolved, plan); err != nil {
-		t.Fatalf("Run avec test-d : %v", err)
+		t.Fatalf("Run with test-d: %v", err)
 	}
 }

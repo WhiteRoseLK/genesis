@@ -60,7 +60,7 @@ func (m *fakeComputeModule) Check(_ context.Context, req *modulev1.StepRequest) 
 	// de session pour joindre core.container/v1 (même mécanisme que
 	// modules/base-os avec core.ansible/v1).
 	m.brokerToken = req.GetBrokerToken()
-	return &modulev1.CheckResult{Status: modulev1.CheckResult_STATUS_CONFORME}, nil
+	return &modulev1.CheckResult{Status: modulev1.CheckResult_STATUS_COMPLIANT}, nil
 }
 
 func (m *fakeComputeModule) Provision(_ context.Context, req *modulev1.StepRequest) (*modulev1.StepResult, error) {

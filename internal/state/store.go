@@ -12,42 +12,42 @@ import (
 	"github.com/WhiteRoseLK/genesis/internal/atomicfile"
 )
 
-// ErrNotInitialized signale l'absence de state_dir/state.json : `genesis
-// init` n'a pas encore été exécuté pour ce state_dir.
-var ErrNotInitialized = errors.New("état absent : lancez d'abord `genesis init`")
+// ErrNotInitialized reports that state_dir/state.json is missing: `genesis
+// init` has not been run yet for this state_dir.
+var ErrNotInitialized = errors.New("no state: run `genesis init` first")
 
 func statePath(stateDir string) string {
 	return filepath.Join(stateDir, "state.json")
 }
 
-// Load lit l'état persisté dans state_dir/state.json.
+// Load reads the state persisted in state_dir/state.json.
 func Load(stateDir string) (*State, error) {
 	path := statePath(stateDir)
 	raw, err := os.ReadFile(path)
 	if os.IsNotExist(err) {
-		return nil, fmt.Errorf("%s : %w", stateDir, ErrNotInitialized)
+		return nil, fmt.Errorf("%s: %w", stateDir, ErrNotInitialized)
 	}
 	if err != nil {
-		return nil, fmt.Errorf("lecture de %s : %w", path, err)
+		return nil, fmt.Errorf("lecture de %s: %w", path, err)
 	}
 	var s State
 	if err := json.Unmarshal(raw, &s); err != nil {
-		return nil, fmt.Errorf("état invalide dans %s : %w", path, err)
+		return nil, fmt.Errorf("invalid state in %s: %w", path, err)
 	}
 	return &s, nil
 }
 
-// Save persiste s dans state_dir/state.json, en écriture atomique.
+// Save persists s in state_dir/state.json, with an atomic write.
 func Save(stateDir string, s *State) error {
 	if err := os.MkdirAll(stateDir, 0o700); err != nil {
-		return fmt.Errorf("création de %s : %w", stateDir, err)
+		return fmt.Errorf("creating %s: %w", stateDir, err)
 	}
 	raw, err := json.MarshalIndent(s, "", "  ")
 	if err != nil {
-		return fmt.Errorf("encodage de l'état : %w", err)
+		return fmt.Errorf("encoding the state: %w", err)
 	}
 	if err := atomicfile.Write(statePath(stateDir), raw, 0o600); err != nil {
-		return fmt.Errorf("écriture de %s : %w", statePath(stateDir), err)
+		return fmt.Errorf("writing %s: %w", statePath(stateDir), err)
 	}
 	return nil
 }

@@ -10,8 +10,8 @@ import (
 	osbasev1 "github.com/WhiteRoseLK/genesis/sdk/go/gen/functions/os/base/v1"
 )
 
-// ForwardOSBase enregistre un BaseServer qui relaie chaque appel vers conn,
-// la connexion dispensée du module qui fournit os.base/v1 (base-os).
+// ForwardOSBase registers a BaseServer that relays each call to conn, the
+// dispensed connection of the module currently providing os.base/v1 (base-os).
 func ForwardOSBase(s *grpc.Server, conn *grpc.ClientConn) {
 	osbasev1.RegisterBaseServer(s, &forwardingOSBase{client: osbasev1.NewBaseClient(conn)})
 }

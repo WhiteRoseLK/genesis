@@ -4,8 +4,8 @@
 // 	protoc        (unknown)
 // source: functions/core/secrets/v1/secrets.proto
 
-// Fonction core.secrets/v1 (docs/03-module-contract.md, docs/06-secrets-state.md) :
-// fournie nativement par le cœur, jamais par un module.
+// Function core.secrets/v1 (docs/03-module-contract.md, docs/06-secrets-state.md):
+// provided natively by the core, never by a module.
 
 package secretsv1
 
@@ -24,9 +24,9 @@ const (
 	_ = protoimpl.EnforceVersion(protoimpl.MaxVersion - 20)
 )
 
-// Générateurs fournis par le cœur (docs/06-secrets-state.md). Le certificat
-// (via pki.issuer) n'est pas dans cette liste : il passe par la fonction
-// pki.issuer/v1 elle-même, pas par un générateur ici (arrive au jalon J7).
+// Generators provided by the core (docs/06-secrets-state.md). The
+// certificate (through pki.issuer) is not in this list: it goes through the
+// pki.issuer/v1 function itself, not through a generator here (milestone M7).
 type Generator int32
 
 const (

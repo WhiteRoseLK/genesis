@@ -4,8 +4,8 @@ package spec
 
 import "fmt"
 
-// ValidationError signale un problème de structure dans la spec, avec le
-// chemin YAML concerné (critère d'acceptation du jalon J0/J1, doc 08).
+// ValidationError reports a structural problem in the spec, with the YAML path
+// concerned (M0/M1 acceptance criterion, doc 08).
 type ValidationError struct {
 	Path    string
 	Message string

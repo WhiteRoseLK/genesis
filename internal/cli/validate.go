@@ -13,9 +13,9 @@ import (
 func newValidateCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "validate",
-		Short: "Valide une spec : structure, résolution des modules, Validate de chaque module",
+		Short: "Validate a spec: structure, module resolution, each module's Validate",
 	}
-	cmd.Flags().StringP("file", "f", "", "chemin de la spec YAML")
+	cmd.Flags().StringP("file", "f", "", "path of the YAML spec")
 	_ = cmd.MarkFlagRequired("file")
 	cmd.RunE = func(cmd *cobra.Command, args []string) error {
 		file, err := cmd.Flags().GetString("file")
@@ -26,10 +26,10 @@ func newValidateCmd() *cobra.Command {
 			return err
 		}
 		out := cmd.OutOrStdout()
-		if _, err := fmt.Fprintf(out, "%s : structure valide.\n", file); err != nil {
+		if _, err := fmt.Fprintf(out, "%s: structure valide.\n", file); err != nil {
 			return err
 		}
-		_, err = fmt.Fprintln(out, "résolution des modules et validation par module : pas encore implémentées (prévues aux J3/J4, voir docs/08-milestones.md).")
+		_, err = fmt.Fprintln(out, "module resolution and per-module validation: not implemented yet (see docs/08-milestones.md).")
 		return err
 	}
 	return cmd

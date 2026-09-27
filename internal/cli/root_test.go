@@ -8,9 +8,9 @@ import (
 	"testing"
 )
 
-// TestHelpListsDocumentedCommands vérifie que `genesis --help` fait apparaître
-// toutes les commandes du tableau CLI de docs/02-architecture.md (critère
-// d'acceptation du jalon J0).
+// TestHelpListsDocumentedCommands checks that `genesis --help` shows every
+// command of the CLI table in docs/02-architecture.md (M0 acceptance
+// criterion).
 func TestHelpListsDocumentedCommands(t *testing.T) {
 	want := []string{"init", "modules", "validate", "plan", "apply", "status", "secrets", "destroy"}
 
@@ -21,21 +21,21 @@ func TestHelpListsDocumentedCommands(t *testing.T) {
 	root.SetArgs([]string{"--help"})
 
 	if err := root.Execute(); err != nil {
-		t.Fatalf("genesis --help : erreur inattendue : %v", err)
+		t.Fatalf("genesis --help: unexpected error: %v", err)
 	}
 
 	help := out.String()
 	for _, name := range want {
 		if !strings.Contains(help, name) {
-			t.Errorf("genesis --help ne mentionne pas la commande %q\n--- sortie ---\n%s", name, help)
+			t.Errorf("genesis --help does not mention the %q command\n--- output ---\n%s", name, help)
 		}
 	}
 }
 
-// TestStubCommandsFail vérifie que les commandes encore au stade de stub
-// (jalons ultérieurs) renvoient une erreur explicite plutôt qu'un succès
-// silencieux. `init`, `validate`, `secrets`, `modules`, `plan` et `apply`
-// sont réellement implémentées (J1/J2/J3/J4) et testées ailleurs.
+// TestStubCommandsFail checks that the commands still at the stub stage (later
+// milestones) return an explicit error rather than a silent success. `init`,
+// `validate`, `secrets`, `modules`, `plan` and `apply` are really implemented
+// (M1/M2/M3/M4) and tested elsewhere.
 func TestStubCommandsFail(t *testing.T) {
 	cases := [][]string{
 		{"status"},
@@ -51,7 +51,7 @@ func TestStubCommandsFail(t *testing.T) {
 			root.SetArgs(args)
 
 			if err := root.Execute(); err == nil {
-				t.Fatalf("genesis %s : succès inattendu, la commande n'est pourtant pas implémentée", strings.Join(args, " "))
+				t.Fatalf("genesis %s: unexpected success, although the command is not implemented", strings.Join(args, " "))
 			}
 		})
 	}

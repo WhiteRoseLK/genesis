@@ -13,7 +13,7 @@ import (
 func newSecretsCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "secrets",
-		Short: "Gère les secrets générés (list, get)",
+		Short: "Manage generated secrets (list, get)",
 	}
 	cmd.AddCommand(
 		newSecretsListCmd(),
@@ -22,8 +22,8 @@ func newSecretsCmd() *cobra.Command {
 	return cmd
 }
 
-// openSecretsStore charge la clé maîtresse existante (échoue si `genesis
-// init` n'a pas été exécuté) et construit le store `file`.
+// openSecretsStore loads the existing master key (fails if `genesis init` has
+// not been run) and builds the `file` store.
 func openSecretsStore(cmd *cobra.Command) (*secrets.FileStore, error) {
 	stateDir, err := cmd.Flags().GetString("state-dir")
 	if err != nil {
@@ -40,7 +40,7 @@ func openSecretsStore(cmd *cobra.Command) (*secrets.FileStore, error) {
 func newSecretsListCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "list",
-		Short: "Liste les secrets générés (métadonnées seulement, jamais de valeur)",
+		Short: "List generated secrets (metadata only, never a value)",
 	}
 	cmd.RunE = func(cmd *cobra.Command, args []string) error {
 		store, err := openSecretsStore(cmd)
@@ -53,7 +53,7 @@ func newSecretsListCmd() *cobra.Command {
 		}
 		out := cmd.OutOrStdout()
 		if len(entries) == 0 {
-			_, err := fmt.Fprintln(out, "aucun secret.")
+			_, err := fmt.Fprintln(out, "no secret.")
 			return err
 		}
 		for _, e := range entries {
@@ -69,8 +69,8 @@ func newSecretsListCmd() *cobra.Command {
 
 func newSecretsGetCmd() *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "get <référence>",
-		Short: "Révèle la valeur en clair d'un secret généré",
+		Use:   "get <reference>",
+		Short: "Reveal the plaintext value of a generated secret",
 		Args:  cobra.ExactArgs(1),
 	}
 	cmd.RunE = func(cmd *cobra.Command, args []string) error {

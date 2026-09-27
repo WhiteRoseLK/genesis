@@ -4,9 +4,9 @@
 // - protoc             (unknown)
 // source: functions/test/echo/v1/echo.proto
 
-// Fonction de test générique, réutilisée sous des noms différents
-// (test.a/v1, test.b/v1...) par test/modules/test-* pour exercer le
-// résolveur/planificateur/broker sans logique métier (docs/08-milestones.md, J4).
+// Generic test function, reused under different names (test.a/v1,
+// test.b/v1...) by test/modules/test-* to exercise the
+// resolver/planner/broker without business logic (docs/08-milestones.md, M4).
 
 package echov1
 

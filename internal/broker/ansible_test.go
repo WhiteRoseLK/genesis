@@ -21,15 +21,15 @@ import (
 	ansiblev1 "github.com/WhiteRoseLK/genesis/sdk/go/gen/functions/core/ansible/v1"
 )
 
-// sshTarget est un conteneur SSH jetable faisant office de VM cible, pour
-// tester réellement core.ansible/v1 sans hyperviseur (docs/08-milestones.md, J5).
+// sshTarget is a disposable SSH container acting as the target VM, to really
+// test core.ansible/v1 without a hypervisor (docs/08-milestones.md, M5).
 //
-// Remarque d'environnement : ce test vérifie le résultat via `docker exec`
-// plutôt qu'en dialant l'IP du conteneur cible directement (le réseau pont
-// docker0 n'est pas joignable depuis le process de test dans cet
-// environnement, seulement depuis un autre conteneur ou via le daemon
-// docker) — ce que fait réellement RunPlaybook (conteneur ansible ->
-// conteneur cible) n'est pas affecté, seule la vérification externe l'est.
+// Environment note: this test checks the result through `docker exec` rather
+// than dialling the target container's IP directly (the docker0 bridge network
+// is not reachable from the test process in this environment, only from
+// another container or through the docker daemon) — what RunPlaybook really
+// does (ansible container -> target container) is not affected, only the
+// external check is.
 type sshTarget struct {
 	containerID   string
 	ip            string
@@ -66,7 +66,7 @@ func startSSHTarget(t *testing.T, rt *runner.ContainerRuntime) *sshTarget {
 		Detach: true,
 	})
 	if err != nil {
-		t.Fatalf("démarrage du conteneur cible SSH : %v", err)
+		t.Fatalf("starting the SSH target container: %v", err)
 	}
 	t.Cleanup(func() { _ = rt.Stop(context.Background(), result.ContainerID) })
 
@@ -90,13 +90,13 @@ func waitForIP(t *testing.T, rt *runner.ContainerRuntime, containerID string) st
 		}
 		time.Sleep(300 * time.Millisecond)
 	}
-	t.Fatalf("le conteneur %s n'a jamais eu d'adresse IP", containerID)
+	t.Fatalf("container %s never got an IP address", containerID)
 	return ""
 }
 
-// dockerExec vérifie ce qui s'est réellement passé sur la cible en
-// inspectant son système de fichiers via le daemon docker (docker exec),
-// indépendamment de tout ce qu'ansible a rapporté.
+// dockerExec checks what really happened on the target by inspecting its file
+// system through the docker daemon (docker exec), independently of anything
+// ansible reported.
 func dockerExec(t *testing.T, containerID string, args ...string) string {
 	t.Helper()
 	cmdArgs := append([]string{"exec", containerID}, args...)
@@ -105,14 +105,14 @@ func dockerExec(t *testing.T, containerID string, args ...string) string {
 	cmd.Stdout = &stdout
 	cmd.Stderr = &stderr
 	if err := cmd.Run(); err != nil {
-		t.Fatalf("docker exec %v : %v\n%s", args, err, stderr.String())
+		t.Fatalf("docker exec %v: %v\n%s", args, err, stderr.String())
 	}
 	return stdout.String()
 }
 
-// runPlaybookWithRetry retente RunPlaybook : sshd dans le conteneur cible met
-// quelques secondes à générer ses clés d'hôte et devenir joignable, et rien
-// dans ce test ne peut l'attendre directement (voir la note sur sshTarget).
+// runPlaybookWithRetry retries RunPlaybook: sshd in the target container takes
+// a few seconds to generate its host keys and become reachable, and nothing in
+// this test can wait for it directly (see the note on sshTarget).
 func runPlaybookWithRetry(t *testing.T, server *ansibleServer, req *ansiblev1.RunPlaybookRequest) *ansiblev1.RunPlaybookResponse {
 	t.Helper()
 	var lastResp *ansiblev1.RunPlaybookResponse
@@ -126,28 +126,28 @@ func runPlaybookWithRetry(t *testing.T, server *ansibleServer, req *ansiblev1.Ru
 		time.Sleep(5 * time.Second)
 	}
 	if lastErr != nil {
-		t.Fatalf("RunPlaybook a échoué après plusieurs tentatives : %v", lastErr)
+		t.Fatalf("RunPlaybook failed after several attempts: %v", lastErr)
 	}
-	t.Fatalf("RunPlaybook n'a jamais réussi :\n%s", lastResp.GetOutput())
+	t.Fatalf("RunPlaybook never succeeded:\n%s", lastResp.GetOutput())
 	return nil
 }
 
-// TestRunPlaybookActuallyConfiguresTarget prouve le mécanisme complet de
-// core.ansible/v1 (docs/08-milestones.md, J5) : le conteneur ansible se connecte
-// réellement en SSH à la cible et y exécute réellement la tâche — vérifié via
-// `docker exec` sur la cible, pas en croyant la réponse d'ansible sur parole.
+// TestRunPlaybookActuallyConfiguresTarget proves the complete core.ansible/v1
+// mechanism (docs/08-milestones.md, M5): the ansible container really connects
+// to the target over SSH and really runs the task there — checked with `docker
+// exec` on the target, not by taking ansible's word for it.
 func TestRunPlaybookActuallyConfiguresTarget(t *testing.T) {
 	rt := testutil.RequireRuntime(t)
 	target := startSSHTarget(t, rt)
 
-	// ansible.builtin.raw plutôt que copy/template : l'image SSH jetable de
-	// ce test n'a pas Python (les vraies VM cibles, image cloud Debian, en
-	// ont un — docs/01-vision-scope.md), et raw n'en a pas besoin.
+	// ansible.builtin.raw rather than copy/template: this test's disposable
+	// SSH image has no Python (the real target VMs, a Debian cloud image, have
+	// one — docs/01-vision-scope.md), and raw does not need it.
 	const playbook = `---
 - hosts: target
   gather_facts: false
   tasks:
-    - name: écrire un marqueur
+    - name: write a marker
       ansible.builtin.raw: echo -n "ok" > /tmp/marker.txt
 `
 	server := &ansibleServer{runtime: rt}
@@ -161,11 +161,11 @@ func TestRunPlaybookActuallyConfiguresTarget(t *testing.T) {
 		PlaybookYaml: []byte(playbook),
 	})
 	if !resp.GetOk() {
-		t.Fatalf("RunPlaybook a échoué :\n%s", resp.GetOutput())
+		t.Fatalf("RunPlaybook failed:\n%s", resp.GetOutput())
 	}
 
 	got := dockerExec(t, target.containerID, "cat", "/tmp/marker.txt")
 	if got != "ok" {
-		t.Errorf("contenu de /tmp/marker.txt = %q, attendu %q — le playbook n'a pas réellement agi sur la cible", got, "ok")
+		t.Errorf("content of /tmp/marker.txt = %q, want %q — the playbook did not really act on the target", got, "ok")
 	}
 }

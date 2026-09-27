@@ -15,7 +15,7 @@ import (
 	modulev1 "github.com/WhiteRoseLK/genesis/sdk/go/gen/module/v1"
 )
 
-// Client est une connexion vivante à un module lancé en process séparé.
+// Client is a live connection to a module launched as a separate process.
 type Client struct {
 	plugin    *goplugin.Client
 	rpcClient goplugin.ClientProtocol
@@ -23,11 +23,11 @@ type Client struct {
 	broker    *goplugin.GRPCBroker
 }
 
-// Launch démarre le binaire du module et établit la connexion gRPC
-// (docs/02-architecture.md : hôte de modules, go-plugin). manifest peut être
-// nil si les fonctions fournies par le module n'ont pas encore besoin d'être
-// dispensées (ex. simple Describe() de découverte) ; il doit être fourni dès
-// qu'une fonction fournie sera routée par le broker.
+// Launch starts the module binary and sets up the gRPC connection
+// (docs/02-architecture.md: module host, go-plugin). manifest may be nil if
+// the functions provided by the module do not need to be dispensed yet (e.g. a
+// simple discovery Describe()); it must be provided as soon as a provided
+// function is to be routed by the broker.
 func Launch(binaryPath string, manifest *sdk.ManifestFile) (*Client, error) {
 	plugins := sdk.ClientPlugins()
 	if manifest != nil {
@@ -37,68 +37,68 @@ func Launch(binaryPath string, manifest *sdk.ManifestFile) (*Client, error) {
 	pc := goplugin.NewClient(&goplugin.ClientConfig{
 		HandshakeConfig: sdk.Handshake,
 		Plugins:         plugins,
-		// Pas de contexte : go-plugin gère la durée de vie du processus
-		// (Client.Close le termine), qui dépasse l'appel à Launch.
-		Cmd:              exec.Command(binaryPath), //nolint:noctx // voir ci-dessus
+		// No context: go-plugin manages the process lifetime (Client.Close
+		// ends it), which outlives the call to Launch.
+		Cmd:              exec.Command(binaryPath), //nolint:noctx // see above
 		AllowedProtocols: []goplugin.Protocol{goplugin.ProtocolGRPC},
-		// Par défaut go-plugin journalise en DEBUG/TRACE sur stderr ; Warn
-		// évite de noyer la sortie du cœur avec le détail du transport gRPC.
+		// By default go-plugin logs at DEBUG/TRACE on stderr; Warn avoids
+		// drowning the core's output in gRPC transport details.
 		Logger: hclog.New(&hclog.LoggerOptions{Name: "modulehost", Level: hclog.Warn}),
 	})
 
 	rpcClient, err := pc.Client()
 	if err != nil {
 		pc.Kill()
-		return nil, fmt.Errorf("démarrage du module %s : %w", binaryPath, err)
+		return nil, fmt.Errorf("starting module %s: %w", binaryPath, err)
 	}
 	raw, err := rpcClient.Dispense(sdk.PluginKey)
 	if err != nil {
 		pc.Kill()
-		return nil, fmt.Errorf("connexion au module %s : %w", binaryPath, err)
+		return nil, fmt.Errorf("connecting to module %s: %w", binaryPath, err)
 	}
 	conn, ok := raw.(*sdk.ModuleConnection)
 	if !ok {
 		pc.Kill()
-		return nil, fmt.Errorf("module %s : type de client inattendu (%T)", binaryPath, raw)
+		return nil, fmt.Errorf("module %s: unexpected client type (%T)", binaryPath, raw)
 	}
 	return &Client{plugin: pc, rpcClient: rpcClient, module: conn.Client, broker: conn.Broker}, nil
 }
 
-// Close arrête le process du module. Un module qui a déjà planté n'entraîne
-// pas d'erreur ici : Kill est idempotent côté go-plugin.
+// Close stops the module process. A module that has already crashed causes no
+// error here: Kill is idempotent on the go-plugin side.
 func (c *Client) Close() {
 	c.plugin.Kill()
 }
 
-// Module donne accès au client gRPC brut, pour appeler n'importe quelle
-// étape du cycle de vie (docs/03-module-contract.md §2).
+// Module gives access to the raw gRPC client, to call any lifecycle step
+// (docs/03-module-contract.md §2).
 func (c *Client) Module() modulev1.ModuleClient {
 	return c.module
 }
 
-// Broker donne accès au canal bidirectionnel go-plugin de cette connexion,
-// pour ouvrir une session de broker avant d'invoquer une étape
-// (internal/broker, docs/02-architecture.md).
+// Broker gives access to this connection's bidirectional go-plugin channel, to
+// open a broker session before invoking a step (internal/broker,
+// docs/02-architecture.md).
 func (c *Client) Broker() *goplugin.GRPCBroker {
 	return c.broker
 }
 
-// DispenseFunction ouvre la connexion brute vers une fonction fournie par ce
-// module (déclarée dans son manifest.Provides), à typer par l'appelant
-// (internal/broker, qui seul connaît le type concret de la fonction).
+// DispenseFunction opens the raw connection to a function provided by this
+// module (declared in its manifest.Provides), to be typed by the caller
+// (internal/broker, which alone knows the function's concrete type).
 func (c *Client) DispenseFunction(name string) (*grpc.ClientConn, error) {
 	raw, err := c.rpcClient.Dispense(sdk.FunctionPluginKey(name))
 	if err != nil {
-		return nil, fmt.Errorf("connexion à la fonction %q : %w", name, err)
+		return nil, fmt.Errorf("connecting to function %q: %w", name, err)
 	}
 	conn, ok := raw.(*grpc.ClientConn)
 	if !ok {
-		return nil, fmt.Errorf("fonction %q : type de connexion inattendu (%T)", name, raw)
+		return nil, fmt.Errorf("function %q: unexpected connection type (%T)", name, raw)
 	}
 	return conn, nil
 }
 
-// Describe interroge le manifest publié par le module en cours d'exécution.
+// Describe queries the manifest published by the running module.
 func (c *Client) Describe(ctx context.Context) (*modulev1.Manifest, error) {
 	m, err := c.module.Describe(ctx, &modulev1.Empty{})
 	if err != nil {
@@ -107,9 +107,9 @@ func (c *Client) Describe(ctx context.Context) (*modulev1.Manifest, error) {
 	return m, nil
 }
 
-// WrapModuleError transforme une erreur de transport gRPC (un module qui a
-// planté ou n'a pas répondu pendant une étape) en erreur actionnable, sans
-// jamais faire s'arrêter le cœur (critère d'acceptation du jalon J3, doc 08).
+// WrapModuleError turns a gRPC transport error (a module that crashed or did
+// not answer during a step) into an actionable error, without ever stopping
+// the core (M3 acceptance criterion, doc 08).
 func WrapModuleError(step string, err error) error {
-	return fmt.Errorf("module : étape %q en échec (le module a peut-être planté, le cœur continue) : %w", step, err)
+	return fmt.Errorf("module: step %q failed (the module may have crashed, the core keeps running): %w", step, err)
 }

@@ -70,7 +70,7 @@ func launchFakeComputeWithContainerSession(t *testing.T) (*modulehost.Client, co
 	if err != nil {
 		t.Fatalf("Check : %v", err)
 	}
-	if checkResp.GetStatus() != modulev1.CheckResult_STATUS_CONFORME {
+	if checkResp.GetStatus() != modulev1.CheckResult_STATUS_COMPLIANT {
 		t.Fatalf("Check().Status = %v, attendu CONFORME", checkResp.GetStatus())
 	}
 

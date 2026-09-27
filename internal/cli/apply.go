@@ -19,11 +19,11 @@ import (
 func newApplyCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "apply",
-		Short: "Exécute le plan : graine, cible, passation puis retrait de la graine",
+		Short: "Run the plan: seed, target, handover, then seed retirement",
 	}
-	cmd.Flags().StringP("file", "f", "", "chemin de la spec YAML")
+	cmd.Flags().StringP("file", "f", "", "path of the YAML spec")
 	_ = cmd.MarkFlagRequired("file")
-	cmd.Flags().Bool("auto-approve", false, "n'attend pas de confirmation avant d'appliquer le plan")
+	cmd.Flags().Bool("auto-approve", false, "do not ask for confirmation before applying the plan")
 	cmd.RunE = func(cmd *cobra.Command, args []string) error {
 		file, err := cmd.Flags().GetString("file")
 		if err != nil {
@@ -49,7 +49,7 @@ func newApplyCmd() *cobra.Command {
 				return err
 			}
 			if !approved {
-				_, err := fmt.Fprintln(out, "annulé.")
+				_, err := fmt.Fprintln(out, "cancelled.")
 				return err
 			}
 		}
@@ -68,7 +68,7 @@ func newApplyCmd() *cobra.Command {
 			return err
 		}
 
-		if _, err := fmt.Fprintln(out, "apply terminé."); err != nil {
+		if _, err := fmt.Fprintln(out, "apply complete."); err != nil {
 			return err
 		}
 		return printSeedStatus(out, stateDir)
@@ -76,8 +76,8 @@ func newApplyCmd() *cobra.Command {
 	return cmd
 }
 
-// printSeedStatus indique si la graine a été retirée et, le cas échéant, ce
-// qu'il faut conserver hors ligne avant de supprimer la machine graine
+// printSeedStatus reports whether the seed has been retired and, if so, what
+// to keep offline before deleting the seed machine
 // (docs/05-bootstrap-lifecycle.md, phase 4).
 func printSeedStatus(out io.Writer, stateDir string) error {
 	st, err := state.Load(stateDir)
@@ -85,25 +85,25 @@ func printSeedStatus(out io.Writer, stateDir string) error {
 		return err
 	}
 	if !st.SeedRetired {
-		_, err := fmt.Fprintln(out, "graine conservée : toutes ses fonctions ne sont pas encore reprises par la cible (voir le journal).")
+		_, err := fmt.Fprintln(out, "seed kept: not all of its functions have been taken over by the target yet (see the log).")
 		return err
 	}
-	_, err = fmt.Fprintf(out, `graine retirée. À conserver hors ligne avant de supprimer la machine graine :
-  - %s (clé maîtresse, déchiffre les secrets de récupération)
-  - %s (copie chiffrée des secrets de récupération : racine CA, clés de descellement)
-  - %s (état)
+	_, err = fmt.Fprintf(out, `seed retired. Keep offline before deleting the seed machine:
+  - %s (master key, decrypts the recovery secrets)
+  - %s (encrypted copy of the recovery secrets: CA root, unseal keys)
+  - %s (state)
 `, filepath.Join(stateDir, "master.key"), filepath.Join(stateDir, "secrets"), filepath.Join(stateDir, "state.json"))
 	return err
 }
 
 func confirm(cmd *cobra.Command) (bool, error) {
-	if _, err := fmt.Fprint(cmd.OutOrStdout(), "Appliquer ce plan ? [y/N] "); err != nil {
+	if _, err := fmt.Fprint(cmd.OutOrStdout(), "Apply this plan? [y/N] "); err != nil {
 		return false, err
 	}
 	line, err := bufio.NewReader(cmd.InOrStdin()).ReadString('\n')
 	if err != nil && !errors.Is(err, io.EOF) {
-		return false, fmt.Errorf("lecture de la confirmation : %w", err)
+		return false, fmt.Errorf("lecture de la confirmation: %w", err)
 	}
 	answer := strings.ToLower(strings.TrimSpace(line))
-	return answer == "y" || answer == "yes" || answer == "o" || answer == "oui", nil
+	return answer == "y" || answer == "yes", nil
 }

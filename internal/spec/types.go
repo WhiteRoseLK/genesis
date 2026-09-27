@@ -1,13 +1,13 @@
 // SPDX-License-Identifier: Apache-2.0
 
-// Package spec charge et valide la spec utilisateur (docs/04-spec.md).
+// Package spec loads and validates the user spec (docs/04-spec.md).
 //
-// La validation propre à chaque module (config_schema) est déléguée au
-// module et arrivera au jalon J3/J4 ; ce paquet ne fait que la validation
-// structurelle générale décrite au jalon J1.
+// Module-specific validation (config_schema) is delegated to the module and
+// arrives at milestone M3/M4; this package only does the overall structural
+// validation described in milestone M1.
 package spec
 
-// Environment est la racine de la spec utilisateur.
+// Environment is the root of the user spec.
 type Environment struct {
 	APIVersion   string                `yaml:"apiVersion"`
 	Kind         string                `yaml:"kind"`
@@ -45,9 +45,9 @@ type Size struct {
 	DiskGB   int `yaml:"disk_gb"`
 }
 
-// Capability est la demande utilisateur pour une capacité (doc 04). Config
-// reste opaque au cœur : sa validation propre au module est déléguée au
-// module (jalon J3/J4).
+// Capability is the user request for a capability (doc 04). Config stays
+// opaque to the core: its module-specific validation is delegated to the
+// module (milestone M3/M4).
 type Capability struct {
 	Module string         `yaml:"module,omitempty"`
 	Config map[string]any `yaml:"config,omitempty"`

@@ -4,23 +4,22 @@ package state
 
 import "testing"
 
-// TestSecondConcurrentLockRefused est le critère d'acceptation explicite du
-// jalon J2 (doc 08) : "deux apply concurrents → le second refuse". Les
-// verrous flock() sont attachés à la description de fichier ouverte, pas au
-// processus : deux appels à Lock avec deux descripteurs distincts simulent
-// fidèlement deux exécutions concurrentes de `genesis apply` même dans un
-// seul process de test.
+// TestSecondConcurrentLockRefused is the explicit M2 acceptance criterion (doc
+// 08): "two concurrent applies → the second one refuses". flock() locks are
+// attached to the open file description, not to the process: two calls to Lock
+// with two distinct descriptors faithfully simulate two concurrent runs of
+// `genesis apply`, even within a single test process.
 func TestSecondConcurrentLockRefused(t *testing.T) {
 	dir := t.TempDir()
 
 	release, err := Lock(dir)
 	if err != nil {
-		t.Fatalf("premier Lock : %v", err)
+		t.Fatalf("first Lock: %v", err)
 	}
 	defer func() { _ = release() }()
 
 	if _, err := Lock(dir); err == nil {
-		t.Fatal("second Lock concurrent : succès inattendu, il aurait dû être refusé")
+		t.Fatal("concurrent second Lock: unexpected success, it should have been refused")
 	}
 }
 
@@ -29,15 +28,15 @@ func TestLockReleasedAllowsNextLock(t *testing.T) {
 
 	release, err := Lock(dir)
 	if err != nil {
-		t.Fatalf("premier Lock : %v", err)
+		t.Fatalf("first Lock: %v", err)
 	}
 	if err := release(); err != nil {
-		t.Fatalf("release : %v", err)
+		t.Fatalf("release: %v", err)
 	}
 
 	release2, err := Lock(dir)
 	if err != nil {
-		t.Fatalf("Lock après release : %v", err)
+		t.Fatalf("Lock after release: %v", err)
 	}
 	_ = release2()
 }

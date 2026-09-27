@@ -23,8 +23,8 @@ import (
 	"github.com/WhiteRoseLK/genesis/internal/state"
 )
 
-// buildAndInstall compile le module source sous test/modules/<name> et
-// l'installe dans searchRoot/<name>/<version>/ (layout attendu par
+// buildAndInstall builds the source module under test/modules/<name> and
+// installs it into searchRoot/<name>/<version>/ (the layout expected by
 // internal/modulehost.Discover, docs/02-architecture.md).
 func buildAndInstall(t *testing.T, name, searchRoot string) modulehost.Installed {
 	t.Helper()
@@ -44,7 +44,7 @@ func buildAndInstall(t *testing.T, name, searchRoot string) modulehost.Installed
 	build := exec.Command("go", "build", "-o", binaryPath, ".")
 	build.Dir = sourceDir
 	if out, err := build.CombinedOutput(); err != nil {
-		t.Fatalf("compilation de %s : %v\n%s", name, err, out)
+		t.Fatalf("building %s: %v\n%s", name, err, out)
 	}
 
 	moduleYAML, err := os.ReadFile(filepath.Join(sourceDir, "module.yaml"))
@@ -64,7 +64,7 @@ func buildAndInstall(t *testing.T, name, searchRoot string) modulehost.Installed
 			return m
 		}
 	}
-	t.Fatalf("module %q non découvert après installation", name)
+	t.Fatalf("module %q not discovered after installation", name)
 	return modulehost.Installed{}
 }
 
@@ -87,11 +87,11 @@ func newTestSecretsStore(t *testing.T) secrets.Store {
 	return secrets.NewFileStore(t.TempDir(), identity)
 }
 
-// TestRunExecutesChainInOrderAndSecondRunIsNoop couvre deux critères
-// d'acceptation du jalon J4 (doc 08) avec le même mécanisme : "kill puis
-// relance -> reprise" (une nouvelle instance de moteur qui relit le même
-// état ne refait pas le travail déjà fait — c'est exactement ce qui se
-// passerait après un kill+relance du cœur) et "second apply -> 0 changement".
+// TestRunExecutesChainInOrderAndSecondRunIsNoop covers two acceptance
+// criteria of milestone M4 (doc 08) with the same mechanism: "kill then
+// re-run -> resumption" (a new engine instance that reads the same state
+// back does not redo the work already done — exactly what would happen
+// after a kill+restart of the core) and "second apply -> 0 changes".
 func TestRunExecutesChainInOrderAndSecondRunIsNoop(t *testing.T) {
 	searchRoot := t.TempDir()
 	installedA := buildAndInstall(t, "test-a", searchRoot)
@@ -100,14 +100,14 @@ func TestRunExecutesChainInOrderAndSecondRunIsNoop(t *testing.T) {
 
 	resolved, err := resolver.Resolve(testEnv(), []modulehost.Installed{installedA, installedB, installedC})
 	if err != nil {
-		t.Fatalf("Resolve : %v", err)
+		t.Fatalf("Resolve: %v", err)
 	}
 	plan, err := planner.Build(resolved)
 	if err != nil {
-		t.Fatalf("Build : %v", err)
+		t.Fatalf("Build: %v", err)
 	}
 	if got := plan.Order; indexOf(got, "test-a") >= indexOf(got, "test-b") || indexOf(got, "test-b") >= indexOf(got, "test-c") {
-		t.Fatalf("ordre du plan = %v, attendu test-a puis test-b puis test-c", got)
+		t.Fatalf("plan order = %v, want test-a then test-b then test-c", got)
 	}
 
 	stateDir := t.TempDir()
@@ -116,54 +116,54 @@ func TestRunExecutesChainInOrderAndSecondRunIsNoop(t *testing.T) {
 	e1 := New(stateDir, newTestSecretsStore(t))
 	e1.Logger = slog.New(slog.NewTextHandler(&firstLog, nil))
 	if err := e1.Run(context.Background(), resolved, plan); err != nil {
-		t.Fatalf("premier Run : %v", err)
+		t.Fatalf("first Run: %v", err)
 	}
-	if !strings.Contains(firstLog.String(), "étape=verify") {
-		t.Errorf("le premier run devrait avoir exécuté verify au moins une fois :\n%s", firstLog.String())
+	if !strings.Contains(firstLog.String(), "step=verify") {
+		t.Errorf("the first run should have executed verify at least once:\n%s", firstLog.String())
 	}
 
 	st, err := state.Load(stateDir)
 	if err != nil {
-		t.Fatalf("Load état après le premier run : %v", err)
+		t.Fatalf("Load state after the first run: %v", err)
 	}
 	for _, name := range []string{"test-a", "test-b", "test-c"} {
 		ms, ok := st.Modules[name]
 		if !ok || len(ms.StateJSON) == 0 {
-			t.Errorf("aucun état persisté pour %q après le premier run", name)
+			t.Errorf("no persisted state for %q after the first run", name)
 			continue
 		}
 		var flags map[string]any
 		if err := json.Unmarshal(ms.StateJSON, &flags); err != nil {
-			t.Fatalf("état invalide pour %q : %v", name, err)
+			t.Fatalf("invalid state for %q: %v", name, err)
 		}
 		if v, _ := flags["verified"].(bool); !v {
-			t.Errorf("%q : verified=%v, attendu true après le premier run", name, flags["verified"])
+			t.Errorf("%q: verified=%v, want true after the first run", name, flags["verified"])
 		}
 	}
 
-	// Seconde exécution : une toute nouvelle instance de moteur, comme après
-	// un kill+relance du cœur. Elle doit tout retrouver déjà conforme.
+	// Second run: a brand new engine instance, as after a kill+restart of
+	// the core. It must find everything already compliant.
 	var secondLog bytes.Buffer
-	e2 := New(stateDir, newTestSecretsStore(t)) // backend secrets différent : sans importance, non utilisé ici
+	e2 := New(stateDir, newTestSecretsStore(t)) // different secret backend: irrelevant, unused here
 	e2.Logger = slog.New(slog.NewTextHandler(&secondLog, nil))
 	if err := e2.Run(context.Background(), resolved, plan); err != nil {
-		t.Fatalf("second Run : %v", err)
+		t.Fatalf("second Run: %v", err)
 	}
 
 	logStr := secondLog.String()
-	for _, forbidden := range []string{"étape=provision", "étape=configure", "étape=verify", "étape=seed.up", "étape=handover", "étape=seed.retire"} {
-		if strings.Contains(logStr, forbidden+" résultat=ok") {
-			t.Errorf("le second run a exécuté %q, attendu 0 changement :\n%s", forbidden, logStr)
+	for _, forbidden := range []string{"step=provision", "step=configure", "step=verify", "step=seed.up", "step=handover", "step=seed.retire"} {
+		if strings.Contains(logStr, forbidden+" outcome=ok") {
+			t.Errorf("the second run executed %q, want 0 changes:\n%s", forbidden, logStr)
 		}
 	}
-	if !strings.Contains(logStr, "étape=check résultat=\"conforme, aucune action\"") {
-		t.Errorf("le second run devrait constater conforme pour chaque module :\n%s", logStr)
+	if !strings.Contains(logStr, "step=check outcome=\"compliant, no action\"") {
+		t.Errorf("the second run should find every module compliant:\n%s", logStr)
 	}
 }
 
-// TestRunResumesFromPersistedState vérifie que Run n'exécute que ce qui
-// manque quand l'état persisté montre qu'un module est déjà terminé — le
-// mécanisme concret derrière "kill puis relance -> reprise".
+// TestRunResumesFromPersistedState checks that Run only executes what is
+// missing when the persisted state shows that a module is already done —
+// the concrete mechanism behind "kill then re-run -> resumption".
 func TestRunResumesFromPersistedState(t *testing.T) {
 	searchRoot := t.TempDir()
 	installedA := buildAndInstall(t, "test-a", searchRoot)
@@ -172,16 +172,16 @@ func TestRunResumesFromPersistedState(t *testing.T) {
 
 	resolved, err := resolver.Resolve(testEnv(), []modulehost.Installed{installedA, installedB, installedC})
 	if err != nil {
-		t.Fatalf("Resolve : %v", err)
+		t.Fatalf("Resolve: %v", err)
 	}
 	plan, err := planner.Build(resolved)
 	if err != nil {
-		t.Fatalf("Build : %v", err)
+		t.Fatalf("Build: %v", err)
 	}
 
 	stateDir := t.TempDir()
-	// Pré-remplit l'état comme si test-a avait déjà terminé (kill après
-	// test-a, avant test-b) lors d'une exécution précédente.
+	// Pre-fills the state as if test-a had already finished (kill after
+	// test-a, before test-b) during a previous run.
 	pre := state.New()
 	doneA, err := json.Marshal(map[string]any{
 		"seeded": true, "provisioned": true, "configured": true,
@@ -199,18 +199,18 @@ func TestRunResumesFromPersistedState(t *testing.T) {
 	e := New(stateDir, newTestSecretsStore(t))
 	e.Logger = slog.New(slog.NewTextHandler(&logBuf, nil))
 	if err := e.Run(context.Background(), resolved, plan); err != nil {
-		t.Fatalf("Run : %v", err)
+		t.Fatalf("Run: %v", err)
 	}
 
 	logStr := logBuf.String()
-	if strings.Contains(logStr, "module=test-a étape=provision résultat=ok") {
-		t.Errorf("test-a était déjà terminé, ne devait pas être reprovisionné :\n%s", logStr)
+	if strings.Contains(logStr, "module=test-a step=provision outcome=ok") {
+		t.Errorf("test-a was already done and must not be provisioned again:\n%s", logStr)
 	}
-	if !strings.Contains(logStr, "module=test-b étape=verify résultat=ok") {
-		t.Errorf("test-b devait être exécuté (pas encore fait) :\n%s", logStr)
+	if !strings.Contains(logStr, "module=test-b step=verify outcome=ok") {
+		t.Errorf("test-b should have run (not done yet):\n%s", logStr)
 	}
-	if !strings.Contains(logStr, "module=test-c étape=verify résultat=ok") {
-		t.Errorf("test-c devait être exécuté (pas encore fait) :\n%s", logStr)
+	if !strings.Contains(logStr, "module=test-c step=verify outcome=ok") {
+		t.Errorf("test-c should have run (not done yet):\n%s", logStr)
 	}
 }
 

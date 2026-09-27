@@ -1,8 +1,8 @@
 syntax = "proto3";
 
-// Fonction core.ansible/v1 (docs/03-module-contract.md, ADR-002) : fournie
-// nativement par le cœur, exécute un playbook dans un conteneur pour
-// n'imposer aucune installation d'Ansible sur la graine.
+// Function core.ansible/v1 (docs/03-module-contract.md, ADR-002): provided
+// natively by the core, runs a playbook in a container so that Ansible
+// never has to be installed on the seed.
 package functions.core.ansible.v1;
 
 import "google/protobuf/struct.proto";
@@ -17,23 +17,23 @@ message Target {
   string host = 1;
   int32 port = 2;
   string user = 3;
-  string ssh_private_key = 4; // clé privée OpenSSH, obtenue via core.secrets/v1
-  // ssh_certificate_pem : certificat OpenSSH signé (ex. par la CA Teleport,
-  // "tctl auth sign --format=openssh") accompagnant ssh_private_key —
-  // authentification par certificat plutôt que clé nue, sans rien changer
-  // au transport (SSH standard, docs/09-decisions.md ADR-018 : le service
-  // ssh_service de Teleport parle SSH standard sur son propre port, pas
-  // un protocole propriétaire).
+  string ssh_private_key = 4; // OpenSSH private key, obtained through core.secrets/v1
+  // ssh_certificate_pem: signed OpenSSH certificate (e.g. by the Teleport
+  // CA, "tctl auth sign --format=openssh") that goes with ssh_private_key —
+  // certificate authentication rather than a bare key, with no change to
+  // the transport (standard SSH, docs/09-decisions.md ADR-018: Teleport's
+  // ssh_service speaks standard SSH on its own port, not a proprietary
+  // protocol).
   string ssh_certificate_pem = 5;
 }
 
 message RunPlaybookRequest {
   Target target = 1;
-  bytes playbook_yaml = 2; // contenu du playbook, fourni par le module appelant
+  bytes playbook_yaml = 2; // playbook content, provided by the calling module
   google.protobuf.Struct vars = 3; // extra-vars
 }
 
 message RunPlaybookResponse {
   bool ok = 1;
-  string output = 2; // sortie combinée stdout+stderr, pour diagnostic
+  string output = 2; // combined stdout+stderr output, for diagnostics
 }

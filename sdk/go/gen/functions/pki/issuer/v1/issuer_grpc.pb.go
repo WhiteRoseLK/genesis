@@ -4,8 +4,8 @@
 // - protoc             (unknown)
 // source: functions/pki/issuer/v1/issuer.proto
 
-// Fonction pki.issuer/v1 (docs/03-module-contract.md) : fournisseurs MVP
-// step-ca (J7, seed) et vault (J7, target).
+// Function pki.issuer/v1 (docs/03-module-contract.md): MVP providers
+// step-ca (M7, seed) and vault (M7, target).
 
 package pkiissuerv1
 

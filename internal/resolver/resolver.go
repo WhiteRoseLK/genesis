@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
-// Package resolver associe les capacités demandées par la spec à des
-// modules installés (docs/02-architecture.md).
+// Package resolver maps the capabilities requested by the spec to installed
+// modules (docs/02-architecture.md).
 package resolver
 
 import (
@@ -15,42 +15,41 @@ import (
 	sdk "github.com/WhiteRoseLK/genesis/sdk/go"
 )
 
-// CoreVersion est la version courante du cœur, comparée à la contrainte
-// `core` de chaque manifest (source unique : internal/version).
+// CoreVersion is the current version of the core, compared with the `core`
+// constraint of each manifest (single source: internal/version).
 const CoreVersion = coreversion.Version
 
-// Module est un module retenu par la résolution.
+// Module is a module selected by the resolution.
 type Module struct {
 	Name      string
 	Manifest  *sdk.ManifestFile
 	Installed modulehost.Installed
-	// AutoAdded est vrai si le module a été ajouté parce qu'il fournit une
-	// fonction requise, sans être demandé explicitement dans la spec
-	// (docs/04-spec.md : "le plan affiche les modules ajoutés").
+	// AutoAdded is true if the module was added because it provides a required
+	// function, without being requested explicitly in the spec
+	// (docs/04-spec.md: "the plan shows the added modules").
 	AutoAdded bool
-	// Config est la config résolue des capacités que ce module sert,
-	// fusionnée (doc04 : "deux capacités pointant sur le même module
-	// partagent son instance"). Transmise telle quelle dans
-	// StepRequest.config par internal/engine.
+	// Config is the resolved config of the capabilities this module serves,
+	// merged (doc 04: "two capabilities pointing to the same module share its
+	// instance"). Passed as is in StepRequest.config by internal/engine.
 	Config map[string]any
 }
 
-// Resolved est le résultat de la résolution : l'ensemble des modules
-// nécessaires, et la correspondance capacité → module.
+// Resolved is the result of the resolution: the set of modules needed, and the
+// capability → module mapping.
 type Resolved struct {
 	Modules          map[string]*Module
 	CapabilityModule map[string]string
-	// FunctionProviders[fonction][phase] = module fournisseur pour cette
-	// fonction dans cette phase ("seed" ou "target") — une même fonction
-	// peut avoir des fournisseurs différents par phase (docs/05-bootstrap-lifecycle.md :
-	// CoreDNS en graine, PowerDNS en cible, toutes deux dns.zone/v1).
+	// FunctionProviders[function][phase] = the providing module for this
+	// function in this phase ("seed" or "target") — the same function may have
+	// different providers per phase (docs/05-bootstrap-lifecycle.md: CoreDNS
+	// in the seed, PowerDNS as the target, both dns.zone/v1).
 	FunctionProviders map[string]map[string]string
 }
 
-// ProviderFor retourne le module fournisseur de function pour phase. Si
-// phase est vide (fonction requise sans suffixe @seed/@target), le
-// fournisseur cible est préféré, la graine sert de repli
-// (docs/03-module-contract.md §1 : "sans suffixe, le fournisseur actif").
+// ProviderFor returns the module providing function for phase. If phase is
+// empty (required function without an @seed/@target suffix), the target
+// provider is preferred and the seed is the fallback
+// (docs/03-module-contract.md §1: "without a suffix, the active provider").
 func (r *Resolved) ProviderFor(function, phase string) (string, bool) {
 	byPhase, ok := r.FunctionProviders[function]
 	if !ok {
@@ -67,9 +66,9 @@ func (r *Resolved) ProviderFor(function, phase string) (string, bool) {
 	return name, ok
 }
 
-// Resolve associe chaque capacité de env à un module installé, ajoute
-// automatiquement les modules requis manquants, et vérifie la compatibilité
-// de version du cœur (docs/02-architecture.md).
+// Resolve maps each capability of env to an installed module, automatically
+// adds the missing required modules, and checks the core version compatibility
+// (docs/02-architecture.md).
 func Resolve(env *spec.Environment, installed []modulehost.Installed) (*Resolved, error) {
 	byName := make(map[string]modulehost.Installed, len(installed))
 	for _, m := range installed {
@@ -82,7 +81,7 @@ func Resolve(env *spec.Environment, installed []modulehost.Installed) (*Resolved
 		FunctionProviders: map[string]map[string]string{},
 	}
 
-	// 1. Capacité -> module (explicite ou défaut), doc04.
+	// 1. Capability -> module (explicit or default), doc 04.
 	capNames := make([]string, 0, len(env.Capabilities))
 	for name := range env.Capabilities {
 		capNames = append(capNames, name)
@@ -101,7 +100,7 @@ func Resolve(env *spec.Environment, installed []modulehost.Installed) (*Resolved
 		}
 		installedModule, ok := byName[moduleName]
 		if !ok {
-			return nil, fmt.Errorf("capacité %q : module %q non installé (genesis modules install)", capName, moduleName)
+			return nil, fmt.Errorf("capability %q: module %q is not installed (genesis modules install)", capName, moduleName)
 		}
 		if err := addModule(r, installedModule, false); err != nil {
 			return nil, err
@@ -117,13 +116,13 @@ func Resolve(env *spec.Environment, installed []modulehost.Installed) (*Resolved
 		}
 	}
 
-	// 2. Fermeture des fonctions requises : ajoute automatiquement les
-	// modules manquants jusqu'à point fixe (docs/02-architecture.md).
+	// 2. Closure over required functions: automatically adds the missing
+	//    modules up to a fixed point (docs/02-architecture.md).
 	if err := closeRequirements(r, byName); err != nil {
 		return nil, err
 	}
 
-	// 3. Compatibilité de version du cœur (docs/03-module-contract.md §1).
+	// 3. Core version compatibility (docs/03-module-contract.md §1).
 	for _, m := range r.Modules {
 		if err := checkCoreCompatibility(m.Name, m.Manifest.Core); err != nil {
 			return nil, err
@@ -142,7 +141,7 @@ func defaultModuleFor(capability string, installed []modulehost.Installed) (stri
 	}
 	switch len(candidates) {
 	case 0:
-		return "", fmt.Errorf("capacité %q : aucun module installé ne la fournit", capability)
+		return "", fmt.Errorf("capability %q: no installed module provides it", capability)
 	case 1:
 		return candidates[0].Manifest.Name, nil
 	default:
@@ -156,7 +155,7 @@ func defaultModuleFor(capability string, installed []modulehost.Installed) (stri
 			return defaults[0].Manifest.Name, nil
 		}
 		names := moduleNames(candidates)
-		return "", fmt.Errorf("capacité %q : plusieurs modules installés (%s), choix explicite requis (capabilities.%s.module)", capability, strings.Join(names, ", "), capability)
+		return "", fmt.Errorf("capability %q: several modules installed (%s), explicit choice required (capabilities.%s.module)", capability, strings.Join(names, ", "), capability)
 	}
 }
 
@@ -164,7 +163,7 @@ func addModule(r *Resolved, installed modulehost.Installed, autoAdded bool) erro
 	name := installed.Manifest.Name
 	if existing, ok := r.Modules[name]; ok {
 		if !autoAdded {
-			existing.AutoAdded = false // une demande explicite l'emporte sur un ajout automatique
+			existing.AutoAdded = false // an explicit request takes precedence over an automatic addition
 		}
 		return registerProvides(r, existing)
 	}
@@ -186,7 +185,7 @@ func registerProvides(r *Resolved, m *Module) error {
 		}
 		for _, phase := range phases {
 			if existing, ok := byPhase[phase]; ok && existing != m.Name {
-				return fmt.Errorf("fonction %q (phase %s) : fournie à la fois par %q et %q, choix explicite requis", p.Function, phase, existing, m.Name)
+				return fmt.Errorf("function %q (phase %s): provided by both %q and %q, explicit choice required", p.Function, phase, existing, m.Name)
 			}
 			byPhase[phase] = m.Name
 		}
@@ -194,8 +193,8 @@ func registerProvides(r *Resolved, m *Module) error {
 	return nil
 }
 
-// closeRequirements ajoute, tant que nécessaire, les modules qui fournissent
-// une fonction requise par un module déjà retenu mais non encore couverte.
+// closeRequirements adds, as long as needed, the modules that provide a
+// function required by an already selected module but not yet covered.
 func closeRequirements(r *Resolved, byName map[string]modulehost.Installed) error {
 	for {
 		added := false
@@ -220,13 +219,13 @@ func closeRequirements(r *Resolved, byName map[string]modulehost.Installed) erro
 						if entry.Optional {
 							continue
 						}
-						return fmt.Errorf("module %q requiert %q : %w", m.Name, entry.Function, err)
+						return fmt.Errorf("module %q requires %q: %w", m.Name, entry.Function, err)
 					}
 					if provider == nil {
 						if entry.Optional {
 							continue
 						}
-						return fmt.Errorf("module %q requiert %q : aucun fournisseur installé", m.Name, entry.Function)
+						return fmt.Errorf("module %q requires %q: no provider installed", m.Name, entry.Function)
 					}
 					if err := addModule(r, *provider, true); err != nil {
 						return err
@@ -247,7 +246,7 @@ type namedRequireList struct {
 	entries []sdk.RequireEntry
 }
 
-// orderedRequires trie les phases pour un parcours déterministe.
+// orderedRequires sorts the phases for a deterministic walk.
 func orderedRequires(requires map[string][]sdk.RequireEntry) []namedRequireList {
 	phases := make([]string, 0, len(requires))
 	for phase := range requires {
@@ -261,10 +260,10 @@ func orderedRequires(requires map[string][]sdk.RequireEntry) []namedRequireList 
 	return out
 }
 
-// findProvider cherche un module installé (non encore résolu ou pas) qui
-// fournit function pour phase. phase vide (require non suffixé) préfère un
-// fournisseur cible, la graine sert de repli — les deux peuvent coexister
-// sans être ambigus l'un envers l'autre (docs/05-bootstrap-lifecycle.md).
+// findProvider looks for an installed module (already resolved or not) that
+// provides function for phase. An empty phase (unsuffixed require) prefers a
+// target provider, with the seed as a fallback — both can coexist without
+// being ambiguous with each other (docs/05-bootstrap-lifecycle.md).
 func findProvider(function, phase string, byName map[string]modulehost.Installed) (*modulehost.Installed, error) {
 	if phase != "" {
 		return pickCandidate(function, providersForPhase(function, phase, byName))
@@ -302,12 +301,12 @@ func pickCandidate(function string, candidates []modulehost.Installed) (*moduleh
 	case 1:
 		return &candidates[0], nil
 	default:
-		return nil, fmt.Errorf("plusieurs modules installés fournissent %q (%s), choix explicite requis", function, strings.Join(moduleNames(candidates), ", "))
+		return nil, fmt.Errorf("several installed modules provide %q (%s), explicit choice required", function, strings.Join(moduleNames(candidates), ", "))
 	}
 }
 
-// SplitFunctionPhase sépare le suffixe @seed/@target d'un nom de fonction
-// requise (docs/03-module-contract.md §1) ; réutilisée par internal/planner.
+// SplitFunctionPhase splits the @seed/@target suffix off a required function
+// name (docs/03-module-contract.md §1); reused by internal/planner.
 func SplitFunctionPhase(function string) (name, phase string) {
 	if i := strings.IndexByte(function, '@'); i >= 0 {
 		return function[:i], function[i+1:]

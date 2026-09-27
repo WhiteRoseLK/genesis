@@ -4,9 +4,9 @@
 // 	protoc        (unknown)
 // source: module/v1/module.proto
 
-// Protocole de cycle de vie module <-> cœur (docs/03-module-contract.md).
-// Nommage : package "module.v1" (sans préfixe "genesis.") pour que le
-// répertoire sdk/proto/module/v1/ corresponde au paquet (convention buf).
+// Module <-> core lifecycle protocol (docs/03-module-contract.md).
+// Naming: package "module.v1" (no "genesis." prefix) so that the
+// sdk/proto/module/v1/ directory matches the package (buf convention).
 
 package modulev1
 
@@ -26,25 +26,41 @@ const (
 	_ = protoimpl.EnforceVersion(protoimpl.MaxVersion - 20)
 )
 
+// The English names come first: they are the canonical names (Go String(),
+// JSON). The original French names stay as aliases of the same numbers so
+// that existing modules keep compiling; they will be removed in a breaking
+// release (ADR-054).
 type CheckResult_Status int32
 
 const (
 	CheckResult_STATUS_UNSPECIFIED CheckResult_Status = 0
-	CheckResult_STATUS_CONFORME    CheckResult_Status = 1
-	CheckResult_STATUS_A_FAIRE     CheckResult_Status = 2
-	CheckResult_STATUS_DERIVE      CheckResult_Status = 3
+	CheckResult_STATUS_COMPLIANT   CheckResult_Status = 1
+	CheckResult_STATUS_TODO        CheckResult_Status = 2
+	CheckResult_STATUS_DRIFT       CheckResult_Status = 3
+	// Deprecated: Marked as deprecated in module/v1/module.proto.
+	CheckResult_STATUS_CONFORME CheckResult_Status = 1
+	// Deprecated: Marked as deprecated in module/v1/module.proto.
+	CheckResult_STATUS_A_FAIRE CheckResult_Status = 2
+	// Deprecated: Marked as deprecated in module/v1/module.proto.
+	CheckResult_STATUS_DERIVE CheckResult_Status = 3
 )
 
 // Enum value maps for CheckResult_Status.
 var (
 	CheckResult_Status_name = map[int32]string{
 		0: "STATUS_UNSPECIFIED",
-		1: "STATUS_CONFORME",
-		2: "STATUS_A_FAIRE",
-		3: "STATUS_DERIVE",
+		1: "STATUS_COMPLIANT",
+		2: "STATUS_TODO",
+		3: "STATUS_DRIFT",
+		// Duplicate value: 1: "STATUS_CONFORME",
+		// Duplicate value: 2: "STATUS_A_FAIRE",
+		// Duplicate value: 3: "STATUS_DERIVE",
 	}
 	CheckResult_Status_value = map[string]int32{
 		"STATUS_UNSPECIFIED": 0,
+		"STATUS_COMPLIANT":   1,
+		"STATUS_TODO":        2,
+		"STATUS_DRIFT":       3,
 		"STATUS_CONFORME":    1,
 		"STATUS_A_FAIRE":     2,
 		"STATUS_DERIVE":      3,
@@ -163,10 +179,11 @@ func (*Empty) Descriptor() ([]byte, []int) {
 	return file_module_v1_module_proto_rawDescGZIP(), []int{0}
 }
 
-// FunctionRef identifie une fonction fournie, avec les phases où elle l'est.
+// FunctionRef identifies a provided function, with the phases in which it is
+// provided.
 type FunctionRef struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
-	Function      string                 `protobuf:"bytes,1,opt,name=function,proto3" json:"function,omitempty"` // ex. "pki.issuer/v1"
+	Function      string                 `protobuf:"bytes,1,opt,name=function,proto3" json:"function,omitempty"` // e.g. "pki.issuer/v1"
 	Phases        []string               `protobuf:"bytes,2,rep,name=phases,proto3" json:"phases,omitempty"`     // "seed" | "target"
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
@@ -216,11 +233,11 @@ func (x *FunctionRef) GetPhases() []string {
 	return nil
 }
 
-// RequireEntry est une fonction requise par le module pour une phase donnée.
+// RequireEntry is a function the module requires for a given phase.
 type RequireEntry struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
-	Function      string                 `protobuf:"bytes,1,opt,name=function,proto3" json:"function,omitempty"`  // ex. "compute.vm/v1", peut porter le suffixe "@seed"/"@target"
-	Optional      bool                   `protobuf:"varint,2,opt,name=optional,proto3" json:"optional,omitempty"` // docs/10-adding-a-module.md : dépendances optionnelles
+	Function      string                 `protobuf:"bytes,1,opt,name=function,proto3" json:"function,omitempty"`  // e.g. "compute.vm/v1", may carry the "@seed"/"@target" suffix
+	Optional      bool                   `protobuf:"varint,2,opt,name=optional,proto3" json:"optional,omitempty"` // docs/10-adding-a-module.md: optional dependencies
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -441,7 +458,7 @@ func (x *ResourceDecl) GetSize() string {
 	return ""
 }
 
-// Manifest reflète module.yaml (docs/03-module-contract.md §1).
+// Manifest mirrors module.yaml (docs/03-module-contract.md §1).
 type Manifest struct {
 	state         protoimpl.MessageState  `protogen:"open.v1"`
 	ApiVersion    string                  `protobuf:"bytes,1,opt,name=api_version,json=apiVersion,proto3" json:"api_version,omitempty"`
@@ -449,12 +466,12 @@ type Manifest struct {
 	Version       string                  `protobuf:"bytes,3,opt,name=version,proto3" json:"version,omitempty"`
 	Description   string                  `protobuf:"bytes,4,opt,name=description,proto3" json:"description,omitempty"`
 	Layer         string                  `protobuf:"bytes,5,opt,name=layer,proto3" json:"layer,omitempty"`
-	Core          string                  `protobuf:"bytes,6,opt,name=core,proto3" json:"core,omitempty"`          // contrainte semver sur le cœur
-	Protocol      int32                   `protobuf:"varint,7,opt,name=protocol,proto3" json:"protocol,omitempty"` // version du protocole gRPC module <-> cœur
+	Core          string                  `protobuf:"bytes,6,opt,name=core,proto3" json:"core,omitempty"`          // semver constraint on the core
+	Protocol      int32                   `protobuf:"varint,7,opt,name=protocol,proto3" json:"protocol,omitempty"` // version of the module <-> core gRPC protocol
 	Capabilities  []string                `protobuf:"bytes,8,rep,name=capabilities,proto3" json:"capabilities,omitempty"`
 	Provides      []*FunctionRef          `protobuf:"bytes,9,rep,name=provides,proto3" json:"provides,omitempty"`
-	Requires      map[string]*RequireList `protobuf:"bytes,10,rep,name=requires,proto3" json:"requires,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"` // clé : "seed" | "target"
-	ConfigSchema  string                  `protobuf:"bytes,11,opt,name=config_schema,json=configSchema,proto3" json:"config_schema,omitempty"`                                               // chemin du JSON Schema, relatif au module
+	Requires      map[string]*RequireList `protobuf:"bytes,10,rep,name=requires,proto3" json:"requires,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"` // key: "seed" | "target"
+	ConfigSchema  string                  `protobuf:"bytes,11,opt,name=config_schema,json=configSchema,proto3" json:"config_schema,omitempty"`                                               // path of the JSON Schema, relative to the module
 	Secrets       []*SecretDecl           `protobuf:"bytes,12,rep,name=secrets,proto3" json:"secrets,omitempty"`
 	Resources     []*ResourceDecl         `protobuf:"bytes,13,rep,name=resources,proto3" json:"resources,omitempty"`
 	Defaults      map[string]bool         `protobuf:"bytes,14,rep,name=defaults,proto3" json:"defaults,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"varint,2,opt,name=value"`
@@ -592,7 +609,7 @@ func (x *Manifest) GetDefaults() map[string]bool {
 
 type ValidateRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
-	Config        *structpb.Struct       `protobuf:"bytes,1,opt,name=config,proto3" json:"config,omitempty"` // section de spec résolue pour ce module
+	Config        *structpb.Struct       `protobuf:"bytes,1,opt,name=config,proto3" json:"config,omitempty"` // spec section resolved for this module
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -636,7 +653,7 @@ func (x *ValidateRequest) GetConfig() *structpb.Struct {
 
 type Diagnostic struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
-	Path          string                 `protobuf:"bytes,1,opt,name=path,proto3" json:"path,omitempty"` // chemin YAML concerné, si applicable
+	Path          string                 `protobuf:"bytes,1,opt,name=path,proto3" json:"path,omitempty"` // YAML path concerned, if applicable
 	Message       string                 `protobuf:"bytes,2,opt,name=message,proto3" json:"message,omitempty"`
 	Severity      string                 `protobuf:"bytes,3,opt,name=severity,proto3" json:"severity,omitempty"` // error | warning
 	unknownFields protoimpl.UnknownFields
@@ -738,14 +755,14 @@ func (x *Diagnostics) GetDiagnostics() []*Diagnostic {
 	return nil
 }
 
-// StepRequest porte tout ce dont un module a besoin pour exécuter une étape
-// (docs/03-module-contract.md §2) : le cœur ne laisse rien d'autre y accéder.
+// StepRequest carries everything a module needs to run a step
+// (docs/03-module-contract.md §2): the core gives it access to nothing else.
 type StepRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	RunId         string                 `protobuf:"bytes,1,opt,name=run_id,json=runId,proto3" json:"run_id,omitempty"`
-	Config        *structpb.Struct       `protobuf:"bytes,2,opt,name=config,proto3" json:"config,omitempty"`                              // configuration résolue du module
-	State         *structpb.Struct       `protobuf:"bytes,3,opt,name=state,proto3" json:"state,omitempty"`                                // extrait d'état propre au module, opaque pour le cœur
-	BrokerToken   string                 `protobuf:"bytes,4,opt,name=broker_token,json=brokerToken,proto3" json:"broker_token,omitempty"` // jeton d'accès broker, limité aux fonctions déclarées (J4)
+	Config        *structpb.Struct       `protobuf:"bytes,2,opt,name=config,proto3" json:"config,omitempty"`                              // the module's resolved configuration
+	State         *structpb.Struct       `protobuf:"bytes,3,opt,name=state,proto3" json:"state,omitempty"`                                // the module's own slice of the state, opaque to the core
+	BrokerToken   string                 `protobuf:"bytes,4,opt,name=broker_token,json=brokerToken,proto3" json:"broker_token,omitempty"` // broker access token, limited to the declared functions (M4)
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -811,7 +828,7 @@ func (x *StepRequest) GetBrokerToken() string {
 type RepointRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Step          *StepRequest           `protobuf:"bytes,1,opt,name=step,proto3" json:"step,omitempty"`
-	Function      string                 `protobuf:"bytes,2,opt,name=function,proto3" json:"function,omitempty"` // fonction dont le fournisseur vient de changer
+	Function      string                 `protobuf:"bytes,2,opt,name=function,proto3" json:"function,omitempty"` // function whose provider has just changed
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -972,8 +989,8 @@ func (x *CheckResult) GetDetail() string {
 	return ""
 }
 
-// StepResult : le module ne persiste rien lui-même, state est à
-// persister par le cœur, opaque (docs/03-module-contract.md §2).
+// StepResult: the module persists nothing itself; state is to be persisted
+// by the core, opaque (docs/03-module-contract.md §2).
 type StepResult struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Status        StepResult_Status      `protobuf:"varint,1,opt,name=status,proto3,enum=module.v1.StepResult_Status" json:"status,omitempty"`
@@ -1113,15 +1130,18 @@ const file_module_v1_module_proto_rawDesc = "" +
 	"\n" +
 	"ExtraEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
-	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"\xba\x01\n" +
+	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"\x84\x02\n" +
 	"\vCheckResult\x125\n" +
 	"\x06status\x18\x01 \x01(\x0e2\x1d.module.v1.CheckResult.StatusR\x06status\x12\x16\n" +
-	"\x06detail\x18\x02 \x01(\tR\x06detail\"\\\n" +
+	"\x06detail\x18\x02 \x01(\tR\x06detail\"\xa5\x01\n" +
 	"\x06Status\x12\x16\n" +
-	"\x12STATUS_UNSPECIFIED\x10\x00\x12\x13\n" +
-	"\x0fSTATUS_CONFORME\x10\x01\x12\x12\n" +
-	"\x0eSTATUS_A_FAIRE\x10\x02\x12\x11\n" +
-	"\rSTATUS_DERIVE\x10\x03\"\xa1\x02\n" +
+	"\x12STATUS_UNSPECIFIED\x10\x00\x12\x14\n" +
+	"\x10STATUS_COMPLIANT\x10\x01\x12\x0f\n" +
+	"\vSTATUS_TODO\x10\x02\x12\x10\n" +
+	"\fSTATUS_DRIFT\x10\x03\x12\x17\n" +
+	"\x0fSTATUS_CONFORME\x10\x01\x1a\x02\b\x01\x12\x16\n" +
+	"\x0eSTATUS_A_FAIRE\x10\x02\x1a\x02\b\x01\x12\x15\n" +
+	"\rSTATUS_DERIVE\x10\x03\x1a\x02\b\x01\x1a\x02\x10\x01\"\xa1\x02\n" +
 	"\n" +
 	"StepResult\x124\n" +
 	"\x06status\x18\x01 \x01(\x0e2\x1c.module.v1.StepResult.StatusR\x06status\x12-\n" +

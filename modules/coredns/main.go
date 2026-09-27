@@ -69,9 +69,9 @@ func (m *coreDNSModule) Check(_ context.Context, req *modulev1.StepRequest) (*mo
 	m.brokerToken = req.GetBrokerToken()
 	flags := sdk.StateMap(req.GetState())
 	if boolFlag(flags, "seeded") || boolFlag(flags, "retired") {
-		return &modulev1.CheckResult{Status: modulev1.CheckResult_STATUS_CONFORME}, nil
+		return &modulev1.CheckResult{Status: modulev1.CheckResult_STATUS_COMPLIANT}, nil
 	}
-	return &modulev1.CheckResult{Status: modulev1.CheckResult_STATUS_A_FAIRE}, nil
+	return &modulev1.CheckResult{Status: modulev1.CheckResult_STATUS_TODO}, nil
 }
 
 func (m *coreDNSModule) SeedUp(_ context.Context, req *modulev1.StepRequest) (*modulev1.StepResult, error) {

@@ -1,30 +1,29 @@
 // SPDX-License-Identifier: Apache-2.0
 
-// Package engine exécute le plan : Check avant toute action, état persisté
-// après chaque étape réussie, reprise (docs/02-architecture.md : Moteur).
+// Package engine runs the plan: Check before any action, state persisted
+// after each successful step, resumption (docs/02-architecture.md: Engine).
 //
-// Simplification assumée pour le jalon J4 : un seul Check par module décide
-// s'il faut rejouer son groupe d'étapes en entier (seed.up, provision,
-// configure, verify, [handover]) plutôt qu'un Check devant
-// chaque RPC individuellement — chaque étape étant elle-même idempotente
-// (docs/03-module-contract.md §4, règle 3), rejouer le groupe après une
-// reprise est sûr même si certaines étapes du groupe avaient déjà réussi.
+// Accepted simplification for milestone M4: a single Check per module
+// decides whether to replay its whole group of steps (seed.up, provision,
+// configure, verify, [handover]) rather than a Check before each individual
+// RPC — since each step is itself idempotent (docs/03-module-contract.md §4,
+// rule 3), replaying the group after a resumption is safe even if some
+// steps of the group had already succeeded.
 //
-// Passation multi-module (docs/05-bootstrap-lifecycle.md) : un module cible dont
-// une fonction fournie a un fournisseur graine actif
-// (resolver.Resolved.ProviderFor(fn, "seed")) exécute Handover puis devient
-// le fournisseur actif de la fonction pour tous les modules construits
-// ensuite (clé de registre sans suffixe @phase, voir repoint). La graine,
-// elle, reste active : ses propres services continuent de se servir d'elle.
-// Elle n'est arrêtée qu'en fin de Run (retireSeed, ADR-020), une fois
-// chaque fonction graine reprise par la cible et tous les Verify cible
-// verts. Le Repoint(RepointRequest) explicite du proto n'est pas
-// encore déclenché par le cœur vers les modules consommateurs : dans ce
-// MVP, aucun module ne consomme encore dns.zone/v1, dns.resolver/v1 ou
-// time.ntp/v1 sans le suffixe de phase après son propre Check (le seul
-// consommateur sensible à la passation, powerdns, lit explicitement
-// dns.zone/v1@seed) — Repoint devra être câblé dès qu'un tel consommateur
-// existera (dette, docs/PROGRESS.md).
+// Multi-module handover (docs/05-bootstrap-lifecycle.md): a target module
+// one of whose provided functions has an active seed provider
+// (resolver.Resolved.ProviderFor(fn, "seed")) runs Handover, then becomes
+// the function's active provider for every module built afterwards
+// (registry key without the @phase suffix, see repoint). The seed itself
+// stays active: its own services keep using it. It is only stopped at the
+// end of Run (retireSeed, ADR-020), once every seed function has been taken
+// over by the target and every target Verify is green. The proto's
+// explicit Repoint(RepointRequest) is not yet triggered by the core towards
+// consumer modules: in this MVP, no module consumes dns.zone/v1,
+// dns.resolver/v1 or time.ntp/v1 without the phase suffix after its own
+// Check (the only consumer sensitive to the handover, powerdns, explicitly
+// reads dns.zone/v1@seed) — Repoint will have to be wired as soon as such a
+// consumer exists (debt, docs/PROGRESS.md).
 package engine
 
 import (
@@ -53,35 +52,35 @@ import (
 	modulev1 "github.com/WhiteRoseLK/genesis/sdk/go/gen/module/v1"
 )
 
-// providerConn est la connexion dispensée d'un module pour une fonction
-// qu'il fournit, avec son forwarder — mise en cache pour repoint (pas de
-// redispense, voir Run).
+// providerConn is the connection dispensed by a module for a function it
+// provides, with its forwarder — cached for repoint (no re-dispensing, see
+// Run).
 type providerConn struct {
 	conn     *grpc.ClientConn
 	register func(*grpc.Server, *grpc.ClientConn)
 }
 
-// Engine exécute un plan résolu.
+// Engine runs a resolved plan.
 type Engine struct {
 	Registry *broker.Registry
 	StateDir string
 	Logger   *slog.Logger
-	// Secrets : accès direct (pas seulement via core.secrets/v1) pour la
-	// migration file->vault (docs/06-secrets-state.md) — seul le cœur peut
-	// lister TOUTES les entrées, un module n'accède qu'aux siennes.
+	// Secrets: direct access (not only through core.secrets/v1) for the
+	// file->vault migration (docs/06-secrets-state.md) — only the core can
+	// list ALL entries, a module only accesses its own.
 	Secrets secrets.Store
 }
 
-// New construit un moteur : registre du broker avec core.secrets/v1 déjà
-// enregistrée (fonction native, jamais un module).
+// New builds an engine: a broker registry with core.secrets/v1 already
+// registered (a native function, never a module).
 func New(stateDir string, secretsStore secrets.Store) *Engine {
 	registry := broker.NewRegistry()
 	registry.SetNative("core.secrets/v1", broker.NativeSecrets(secretsStore))
 	return &Engine{Registry: registry, StateDir: stateDir, Logger: slog.Default(), Secrets: secretsStore}
 }
 
-// Run exécute plan dans l'ordre, avec le verrou d'état
-// (deux apply concurrents → le second refuse, docs/06-secrets-state.md).
+// Run executes plan in order, holding the state lock (two concurrent
+// applies → the second one refuses, docs/06-secrets-state.md).
 func (e *Engine) Run(ctx context.Context, resolved *resolver.Resolved, plan *planner.Plan) error {
 	release, err := state.Lock(e.StateDir)
 	if err != nil {
@@ -106,40 +105,40 @@ func (e *Engine) Run(ctx context.Context, resolved *resolver.Resolved, plan *pla
 		}
 	}()
 
-	// providers[fonction][module] : connexion dispensée, mise en cache pour
-	// le repoint post-passation (pas de redispense, voir repoint plus bas).
+	// providers[function][module]: dispensed connection, cached for the
+	// post-handover repoint (no re-dispensing, see repoint below).
 	providers := map[string]map[string]providerConn{}
 
 	for _, name := range plan.Order {
 		m := resolved.Modules[name]
 		client, err := modulehost.Launch(m.Installed.BinaryPath, m.Manifest)
 		if err != nil {
-			return fmt.Errorf("lancement du module %q : %w", name, err)
+			return fmt.Errorf("launching module %q: %w", name, err)
 		}
 		clients[name] = client
 
 		for _, p := range m.Manifest.Provides {
 			conn, err := client.DispenseFunction(p.Function)
 			if err != nil {
-				return fmt.Errorf("connexion à la fonction %q du module %q : %w", p.Function, name, err)
+				return fmt.Errorf("connecting to function %q of module %q: %w", p.Function, name, err)
 			}
 			if p.Fleet {
-				// Fonction « de parc » (ADR-017) : toutes les connexions
-				// accumulées sont appelées (diffusion), pas un seul
-				// fournisseur actif choisi/repointable — pas de clé @phase
-				// ni de clé "active" bare, ce concept n'existe pas ici.
+				// "Fleet" function (ADR-017): every accumulated connection
+				// is called (fan-out), not a single chosen/repointable
+				// active provider — no @phase key and no bare "active"
+				// key, that concept does not exist here.
 				e.Registry.AddFleetProvider(p.Function, conn)
 				continue
 			}
 			register, ok := broker.ForwarderFor(p.Function)
 			if !ok {
-				return fmt.Errorf("fonction %q (module %q) : type de fonction inconnu du cœur", p.Function, name)
+				return fmt.Errorf("function %q (module %q): function type unknown to the core", p.Function, name)
 			}
-			// Clé qualifiée par phase : permet à un module cible de
-			// consommer explicitement la fonction @seed d'un AUTRE module
-			// pendant sa passation (ex. powerdns lit dns.zone/v1@seed chez
-			// coredns), même quand un troisième module fournit la même
-			// fonction en phase cible (docs/05-bootstrap-lifecycle.md).
+			// Phase-qualified key: lets a target module explicitly
+			// consume ANOTHER module's @seed function during its handover
+			// (e.g. powerdns reads dns.zone/v1@seed from coredns), even
+			// when a third module provides the same function in the target
+			// phase (docs/05-bootstrap-lifecycle.md).
 			for _, phase := range p.Phases {
 				e.Registry.SetModuleProvider(p.Function+"@"+phase, conn, register)
 			}
@@ -150,10 +149,10 @@ func (e *Engine) Run(ctx context.Context, resolved *resolver.Resolved, plan *pla
 		}
 	}
 
-	// Clé "active" (sans suffixe @phase) : la graine tant qu'elle existe
-	// (repointée vers la cible après passation, voir repoint), sinon
-	// directement la cible pour les fonctions sans phase graine (ex.
-	// compute.vm/v1) ou quand la graine a déjà été retirée.
+	// "Active" key (no @phase suffix): the seed while it exists (repointed
+	// to the target after the handover, see repoint), otherwise directly the
+	// target for functions without a seed phase (e.g. compute.vm/v1) or once
+	// the seed has been retired.
 	for function, byModule := range providers {
 		phase := "seed"
 		if _, ok := resolved.ProviderFor(function, "seed"); !ok || st.SeedRetired {
@@ -194,9 +193,9 @@ func (e *Engine) runModule(
 ) error {
 	client := clients[m.Name]
 	if st.SeedRetired && !providesInPhase(m, "target") {
-		// Graine pure déjà retirée : ni Check ni SeedUp, elle ne doit
-		// jamais redémarrer.
-		e.audit(m.Name, "check", "graine retirée, ignoré")
+		// Pure seed module already retired: neither Check nor SeedUp, it
+		// must never restart.
+		e.audit(m.Name, "check", "seed retired, skipped")
 		return nil
 	}
 	req, err := e.buildStepRequest(runID, m, client, st)
@@ -208,10 +207,10 @@ func (e *Engine) runModule(
 	if err != nil {
 		return modulehost.WrapModuleError("check", err)
 	}
-	if checkResult.GetStatus() == modulev1.CheckResult_STATUS_CONFORME {
-		e.audit(m.Name, "check", "conforme, aucune action")
-		// Registre neuf à chaque Run : sans ce repoint, un module construit
-		// plus loin dans ce Run consommerait encore la graine.
+	if checkResult.GetStatus() == modulev1.CheckResult_STATUS_COMPLIANT {
+		e.audit(m.Name, "check", "compliant, no action")
+		// A fresh registry on every Run: without this repoint, a module
+		// built later in this Run would still consume the seed.
 		e.repoint(resolved, m, providers)
 		return nil
 	}
@@ -223,9 +222,9 @@ func (e *Engine) runModule(
 	}
 
 	if !providesInPhase(m, "target") {
-		// Module graine pur (ex. coredns) : s'arrête à seed_ready
-		// (docs/03-module-contract.md §5) — SeedDown n'arrive qu'en fin de
-		// Run (retireSeed).
+		// Pure seed module (e.g. coredns): stops at seed_ready
+		// (docs/03-module-contract.md §5) — SeedDown only happens at the end
+		// of Run (retireSeed).
 		return e.action(ctx, runID, m, client, st, "verify", client.Module().Verify)
 	}
 
@@ -244,11 +243,11 @@ func (e *Engine) runModule(
 	}
 
 	if len(handoverSeedModules(resolved, m)) == 0 {
-		return nil // target_ready -> done : pas de passation (docs/03 §5).
+		return nil // target_ready -> done: no handover (docs/03 §5).
 	}
 	if !st.SeedRetired {
-		// Après retrait, la graine n'existe plus : Handover (qui peut la
-		// lire, ex. powerdns via dns.zone/v1@seed) n'a plus d'objet.
+		// After retirement, the seed no longer exists: Handover (which may
+		// read it, e.g. powerdns through dns.zone/v1@seed) is pointless.
 		if err := e.action(ctx, runID, m, client, st, "handover", client.Module().Handover); err != nil {
 			return err
 		}
@@ -257,16 +256,16 @@ func (e *Engine) runModule(
 	return nil
 }
 
-// retireSeed arrête la graine en fin de Run (docs/05-bootstrap-lifecycle.md,
-// phase 4 ; ADR-020), sans intervention de l'opérateur, mais seulement si :
-//   - chaque fonction fournie en phase graine a un fournisseur cible (sinon
-//     la graine reste le seul fournisseur et est conservée) ;
-//   - la capacité "secrets", si présente, a migré vers vault ;
-//   - un Verify final de chaque module cible, dans la configuration
-//     définitive (tous les repoints faits), est vert.
+// retireSeed stops the seed at the end of Run (docs/05-bootstrap-lifecycle.md,
+// phase 4; ADR-020), without operator intervention, but only if:
+//   - every function provided in the seed phase has a target provider
+//     (otherwise the seed remains the only provider and is kept);
+//   - the "secrets" capability, if present, has migrated to vault;
+//   - a final Verify of each target module, in the final configuration
+//     (all repoints done), is green.
 //
-// Les modules graine sont arrêtés dans l'ordre inverse du plan (un service
-// graine peut dépendre d'un autre, ex. step-ca du DNS de coredns).
+// Seed modules are stopped in reverse plan order (a seed service may depend
+// on another, e.g. step-ca on coredns's DNS).
 func (e *Engine) retireSeed(ctx context.Context, runID string, resolved *resolver.Resolved, plan *planner.Plan, clients map[string]*modulehost.Client, st *state.State) error {
 	if st.SeedRetired {
 		return nil
@@ -286,17 +285,17 @@ func (e *Engine) retireSeed(ctx context.Context, runID string, resolved *resolve
 	}
 
 	if missing := functionsWithoutTarget(resolved, seedModules); len(missing) > 0 {
-		e.audit("graine", "seed.retire", "conservée : aucune relève cible pour "+strings.Join(missing, ", "))
+		e.audit("seed", "seed.retire", "kept: no target successor for "+strings.Join(missing, ", "))
 		return nil
 	}
 	if resolved.CapabilityModule["secrets"] != "" && st.SecretsBackend != "vault" {
-		e.audit("graine", "seed.retire", "conservée : secrets pas encore migrés vers vault")
+		e.audit("seed", "seed.retire", "kept: secrets not yet migrated to vault")
 		return nil
 	}
 
 	for _, name := range targetModules {
 		if err := e.action(ctx, runID, resolved.Modules[name], clients[name], st, "verify.final", clients[name].Module().Verify); err != nil {
-			return fmt.Errorf("graine conservée, vérification finale en échec : %w", err)
+			return fmt.Errorf("seed kept, final verification failed: %w", err)
 		}
 	}
 
@@ -309,14 +308,14 @@ func (e *Engine) retireSeed(ctx context.Context, runID string, resolved *resolve
 
 	st.SeedRetired = true
 	if err := state.Save(e.StateDir, st); err != nil {
-		return fmt.Errorf("persistance du retrait de la graine : %w", err)
+		return fmt.Errorf("persisting the seed retirement: %w", err)
 	}
-	e.audit("graine", "seed.retire", "graine retirée")
+	e.audit("seed", "seed.retire", "seed retired")
 	return nil
 }
 
-// functionsWithoutTarget liste, triées, les fonctions fournies en phase
-// graine par seedModules qui n'ont aucun fournisseur en phase cible.
+// functionsWithoutTarget lists, sorted, the functions provided in the seed
+// phase by seedModules that have no provider in the target phase.
 func functionsWithoutTarget(resolved *resolver.Resolved, seedModules []string) []string {
 	seen := map[string]bool{}
 	var out []string
@@ -335,13 +334,12 @@ func functionsWithoutTarget(resolved *resolver.Resolved, seedModules []string) [
 	return out
 }
 
-// handoverSeedModules retourne, dédupliqué et trié, les modules graine
-// distincts dont AU MOINS une fonction fournie par m en phase cible avait
-// un fournisseur actif en phase graine — c'est la définition même d'une
-// passation (docs/05-bootstrap-lifecycle.md). Un module qui fournit une même
-// fonction dans les deux phases (auto-passation, ex. test/modules/test-a)
-// s'y retrouve lui-même : Handover puis SeedDown s'exécutent alors tous
-// deux sur lui.
+// handoverSeedModules returns, deduplicated and sorted, the distinct seed
+// modules for which AT LEAST one function provided by m in the target phase
+// had an active provider in the seed phase — that is the very definition of
+// a handover (docs/05-bootstrap-lifecycle.md). A module that provides the
+// same function in both phases (self-handover, e.g. test/modules/test-a)
+// appears in the list itself: Handover and SeedDown then both run on it.
 func handoverSeedModules(resolved *resolver.Resolved, m *resolver.Module) []string {
 	seen := map[string]bool{}
 	var out []string
@@ -360,10 +358,10 @@ func handoverSeedModules(resolved *resolver.Resolved, m *resolver.Module) []stri
 	return out
 }
 
-// repoint fait de m le nouveau fournisseur actif (clé sans suffixe @phase)
-// de chacune de ses fonctions cible qui vient d'être reprise d'un
-// fournisseur graine — réutilise la connexion déjà dispensée au lancement,
-// aucune redispense.
+// repoint makes m the new active provider (key without the @phase suffix)
+// of each of its target functions that has just been taken over from a seed
+// provider — it reuses the connection already dispensed at launch, with no
+// re-dispensing.
 func (e *Engine) repoint(resolved *resolver.Resolved, m *resolver.Module, providers map[string]map[string]providerConn) {
 	for _, p := range m.Manifest.Provides {
 		if !slices.Contains(p.Phases, "target") {
@@ -378,15 +376,15 @@ func (e *Engine) repoint(resolved *resolver.Resolved, m *resolver.Module, provid
 	}
 }
 
-// migrateSecretsIfNeeded implémente docs/06-secrets-state.md : "Migration
-// file -> vault, déclenchée par la passation de la capacité secrets" — ce
-// n'est PAS un handover de fonction classique (secrets.kv/v1 n'a pas de
-// fournisseur graine à reprendre, c'est core.secrets/v1, natif, qui change
-// de backend), donc pas couvert par handoverSeedModules/repoint : dès que
-// le module choisi pour la capacité "secrets" fournit secrets.kv/v1 en
-// cible et vient de passer Provision/Configure/Verify, chaque secret non
-// `recovery` du backend file est copié, vérifié par relecture, puis le
-// backend actif bascule dans l'état.
+// migrateSecretsIfNeeded implements docs/06-secrets-state.md: "file → vault
+// migration, triggered by the handover of the secrets capability" — this is
+// NOT a classic function handover (secrets.kv/v1 has no seed provider to
+// take over from; it is core.secrets/v1, native, that changes backend), so
+// handoverSeedModules/repoint do not cover it: as soon as the module chosen
+// for the "secrets" capability provides secrets.kv/v1 as a target and has
+// just passed Provision/Configure/Verify, each non-`recovery` secret of the
+// file backend is copied, verified by reading it back, then the active
+// backend switches in the state.
 func (e *Engine) migrateSecretsIfNeeded(ctx context.Context, resolved *resolver.Resolved, m *resolver.Module, client *modulehost.Client, st *state.State) error {
 	if resolved.CapabilityModule["secrets"] != m.Name {
 		return nil
@@ -395,47 +393,47 @@ func (e *Engine) migrateSecretsIfNeeded(ctx context.Context, resolved *resolver.
 		return nil
 	}
 	if st.SecretsBackend == "vault" {
-		return nil // déjà migré (idempotent).
+		return nil // already migrated (idempotent).
 	}
 
 	conn, err := client.DispenseFunction("secrets.kv/v1")
 	if err != nil {
-		return fmt.Errorf("migration des secrets vers %q : %w", m.Name, err)
+		return fmt.Errorf("migrating secrets to %q: %w", m.Name, err)
 	}
 	kv := secretskvv1.NewSecretsKVClient(conn)
 
 	entries, err := e.Secrets.List(ctx, "")
 	if err != nil {
-		return fmt.Errorf("migration des secrets : liste du backend file : %w", err)
+		return fmt.Errorf("migrating secrets: listing the file backend: %w", err)
 	}
 
 	migrated := 0
 	for _, entry := range entries {
 		if entry.Meta.Recovery {
-			continue // docs06 : "Les entrées Recovery: true restent dans file".
+			continue // doc 06: "Recovery: true entries stay in file".
 		}
 		value, err := e.Secrets.Get(ctx, entry.Ref)
 		if err != nil {
-			return fmt.Errorf("migration de %q : lecture file : %w", entry.Ref, err)
+			return fmt.Errorf("migrating %q: reading from file: %w", entry.Ref, err)
 		}
 		if _, err := kv.Write(ctx, &secretskvv1.WriteRequest{Ref: string(entry.Ref), Value: value.ExposeSecret()}); err != nil {
-			return fmt.Errorf("migration de %q : écriture vault : %w", entry.Ref, err)
+			return fmt.Errorf("migrating %q: writing to vault: %w", entry.Ref, err)
 		}
 		readBack, err := kv.Read(ctx, &secretskvv1.ReadRequest{Ref: string(entry.Ref)})
 		if err != nil {
-			return fmt.Errorf("migration de %q : relecture vault : %w", entry.Ref, err)
+			return fmt.Errorf("migrating %q: reading back from vault: %w", entry.Ref, err)
 		}
 		if !readBack.GetFound() || readBack.GetValue() != value.ExposeSecret() {
-			return fmt.Errorf("migration de %q : relecture vault ne correspond pas à la valeur écrite", entry.Ref)
+			return fmt.Errorf("migrating %q: the value read back from vault does not match the value written", entry.Ref)
 		}
 		migrated++
 	}
 
 	st.SecretsBackend = "vault"
 	if err := state.Save(e.StateDir, st); err != nil {
-		return fmt.Errorf("persistance du backend de secrets après migration : %w", err)
+		return fmt.Errorf("persisting the secret backend after migration: %w", err)
 	}
-	e.audit(m.Name, "secrets.migrate", fmt.Sprintf("%d entrée(s) migrée(s) vers vault", migrated))
+	e.audit(m.Name, "secrets.migrate", fmt.Sprintf("%d entry(ies) migrated to vault", migrated))
 	return nil
 }
 
@@ -466,7 +464,7 @@ func (e *Engine) action(
 		return modulehost.WrapModuleError(stepName, err)
 	}
 	if result.GetStatus() != modulev1.StepResult_STATUS_OK {
-		return fmt.Errorf("module %q, étape %s : échec (%s)", m.Name, stepName, diagnosticsString(result.GetDiagnostics()))
+		return fmt.Errorf("module %q, step %s: failed (%s)", m.Name, stepName, diagnosticsString(result.GetDiagnostics()))
 	}
 	if err := e.saveModuleState(m.Name, result.GetState(), st); err != nil {
 		return err
@@ -482,11 +480,11 @@ func (e *Engine) buildStepRequest(runID string, m *resolver.Module, client *modu
 	if ms, ok := st.Modules[m.Name]; ok && len(ms.StateJSON) > 0 {
 		var raw map[string]any
 		if err := json.Unmarshal(ms.StateJSON, &raw); err != nil {
-			return nil, fmt.Errorf("état persisté invalide pour %q : %w", m.Name, err)
+			return nil, fmt.Errorf("invalid persisted state for %q: %w", m.Name, err)
 		}
 		s, err := structpb.NewStruct(raw)
 		if err != nil {
-			return nil, fmt.Errorf("encodage de l'état de %q : %w", m.Name, err)
+			return nil, fmt.Errorf("encoding the state of %q: %w", m.Name, err)
 		}
 		stateStruct = s
 	}
@@ -497,11 +495,11 @@ func (e *Engine) buildStepRequest(runID string, m *resolver.Module, client *modu
 	}
 	resolvedConfig, err := resolveRefs(moduleConfig)
 	if err != nil {
-		return nil, fmt.Errorf("résolution des références de %q : %w", m.Name, err)
+		return nil, fmt.Errorf("resolving the references of %q: %w", m.Name, err)
 	}
 	config, err := structpb.NewStruct(resolvedConfig)
 	if err != nil {
-		return nil, fmt.Errorf("encodage de la config de %q : %w", m.Name, err)
+		return nil, fmt.Errorf("encoding the config of %q: %w", m.Name, err)
 	}
 
 	return &modulev1.StepRequest{
@@ -515,17 +513,17 @@ func (e *Engine) buildStepRequest(runID string, m *resolver.Module, client *modu
 func (e *Engine) saveModuleState(moduleName string, s *structpb.Struct, st *state.State) error {
 	raw, err := json.Marshal(s.AsMap())
 	if err != nil {
-		return fmt.Errorf("encodage de l'état de %q : %w", moduleName, err)
+		return fmt.Errorf("encoding the state of %q: %w", moduleName, err)
 	}
 	st.Modules[moduleName] = state.ModuleState{StateJSON: raw}
 	if err := state.Save(e.StateDir, st); err != nil {
-		return fmt.Errorf("persistance de l'état après l'étape de %q : %w", moduleName, err)
+		return fmt.Errorf("persisting the state after the step of %q: %w", moduleName, err)
 	}
 	return nil
 }
 
 func (e *Engine) audit(module, step, outcome string) {
-	e.Logger.Info("étape", "module", module, "étape", step, "résultat", outcome)
+	e.Logger.Info("step", "module", module, "step", step, "outcome", outcome)
 }
 
 func providesInPhase(m *resolver.Module, phase string) bool {
@@ -539,10 +537,10 @@ func providesInPhase(m *resolver.Module, phase string) bool {
 	return false
 }
 
-// requiredFunctions retourne les fonctions déclarées en requires, telles
-// quelles — suffixe @seed/@target inclus quand présent (docs/03 §1 : force
-// le fournisseur) : la clé de registre correspondante n'existe que sous
-// cette forme qualifiée (voir Run, enregistrement par phase).
+// requiredFunctions returns the functions declared in requires, as is —
+// including the @seed/@target suffix when present (docs/03 §1: forces the
+// provider): the matching registry key only exists in that qualified form
+// (see Run, per-phase registration).
 func requiredFunctions(m *sdk.ManifestFile) []string {
 	seen := map[string]bool{}
 	var out []string
@@ -560,7 +558,7 @@ func requiredFunctions(m *sdk.ManifestFile) []string {
 
 func diagnosticsString(diags []*modulev1.Diagnostic) string {
 	if len(diags) == 0 {
-		return "aucun diagnostic"
+		return "no diagnostics"
 	}
 	parts := make([]string, len(diags))
 	for i, d := range diags {
@@ -572,7 +570,7 @@ func diagnosticsString(diags []*modulev1.Diagnostic) string {
 func newRunID() (string, error) {
 	buf := make([]byte, 8)
 	if _, err := rand.Read(buf); err != nil {
-		return "", fmt.Errorf("génération de l'identifiant d'exécution : %w", err)
+		return "", fmt.Errorf("generating the run ID: %w", err)
 	}
 	return "run-" + hex.EncodeToString(buf), nil
 }

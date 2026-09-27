@@ -1,8 +1,8 @@
 syntax = "proto3";
 
-// Protocole de cycle de vie module <-> cœur (docs/03-module-contract.md).
-// Nommage : package "module.v1" (sans préfixe "genesis.") pour que le
-// répertoire sdk/proto/module/v1/ corresponde au paquet (convention buf).
+// Module <-> core lifecycle protocol (docs/03-module-contract.md).
+// Naming: package "module.v1" (no "genesis." prefix) so that the
+// sdk/proto/module/v1/ directory matches the package (buf convention).
 package module.v1;
 
 import "google/protobuf/struct.proto";
@@ -25,16 +25,17 @@ service Module {
 
 message Empty {}
 
-// FunctionRef identifie une fonction fournie, avec les phases où elle l'est.
+// FunctionRef identifies a provided function, with the phases in which it is
+// provided.
 message FunctionRef {
-  string function = 1; // ex. "pki.issuer/v1"
+  string function = 1; // e.g. "pki.issuer/v1"
   repeated string phases = 2; // "seed" | "target"
 }
 
-// RequireEntry est une fonction requise par le module pour une phase donnée.
+// RequireEntry is a function the module requires for a given phase.
 message RequireEntry {
-  string function = 1; // ex. "compute.vm/v1", peut porter le suffixe "@seed"/"@target"
-  bool optional = 2; // docs/10-adding-a-module.md : dépendances optionnelles
+  string function = 1; // e.g. "compute.vm/v1", may carry the "@seed"/"@target" suffix
+  bool optional = 2; // docs/10-adding-a-module.md: optional dependencies
 }
 
 message RequireList {
@@ -54,30 +55,30 @@ message ResourceDecl {
   string size = 3;
 }
 
-// Manifest reflète module.yaml (docs/03-module-contract.md §1).
+// Manifest mirrors module.yaml (docs/03-module-contract.md §1).
 message Manifest {
   string api_version = 1;
   string name = 2;
   string version = 3;
   string description = 4;
   string layer = 5;
-  string core = 6; // contrainte semver sur le cœur
-  int32 protocol = 7; // version du protocole gRPC module <-> cœur
+  string core = 6; // semver constraint on the core
+  int32 protocol = 7; // version of the module <-> core gRPC protocol
   repeated string capabilities = 8;
   repeated FunctionRef provides = 9;
-  map<string, RequireList> requires = 10; // clé : "seed" | "target"
-  string config_schema = 11; // chemin du JSON Schema, relatif au module
+  map<string, RequireList> requires = 10; // key: "seed" | "target"
+  string config_schema = 11; // path of the JSON Schema, relative to the module
   repeated SecretDecl secrets = 12;
   repeated ResourceDecl resources = 13;
   map<string, bool> defaults = 14;
 }
 
 message ValidateRequest {
-  google.protobuf.Struct config = 1; // section de spec résolue pour ce module
+  google.protobuf.Struct config = 1; // spec section resolved for this module
 }
 
 message Diagnostic {
-  string path = 1; // chemin YAML concerné, si applicable
+  string path = 1; // YAML path concerned, if applicable
   string message = 2;
   string severity = 3; // error | warning
 }
@@ -86,18 +87,18 @@ message Diagnostics {
   repeated Diagnostic diagnostics = 1;
 }
 
-// StepRequest porte tout ce dont un module a besoin pour exécuter une étape
-// (docs/03-module-contract.md §2) : le cœur ne laisse rien d'autre y accéder.
+// StepRequest carries everything a module needs to run a step
+// (docs/03-module-contract.md §2): the core gives it access to nothing else.
 message StepRequest {
   string run_id = 1;
-  google.protobuf.Struct config = 2; // configuration résolue du module
-  google.protobuf.Struct state = 3; // extrait d'état propre au module, opaque pour le cœur
-  string broker_token = 4; // jeton d'accès broker, limité aux fonctions déclarées (J4)
+  google.protobuf.Struct config = 2; // the module's resolved configuration
+  google.protobuf.Struct state = 3; // the module's own slice of the state, opaque to the core
+  string broker_token = 4; // broker access token, limited to the declared functions (M4)
 }
 
 message RepointRequest {
   StepRequest step = 1;
-  string function = 2; // fonction dont le fournisseur vient de changer
+  string function = 2; // function whose provider has just changed
 }
 
 message Endpoint {
@@ -107,18 +108,26 @@ message Endpoint {
 }
 
 message CheckResult {
+  // The English names come first: they are the canonical names (Go String(),
+  // JSON). The original French names stay as aliases of the same numbers so
+  // that existing modules keep compiling; they will be removed in a breaking
+  // release (ADR-054).
   enum Status {
+    option allow_alias = true;
     STATUS_UNSPECIFIED = 0;
-    STATUS_CONFORME = 1;
-    STATUS_A_FAIRE = 2;
-    STATUS_DERIVE = 3;
+    STATUS_COMPLIANT = 1;
+    STATUS_TODO = 2;
+    STATUS_DRIFT = 3;
+    STATUS_CONFORME = 1 [deprecated = true];
+    STATUS_A_FAIRE = 2 [deprecated = true];
+    STATUS_DERIVE = 3 [deprecated = true];
   }
   Status status = 1;
   string detail = 2;
 }
 
-// StepResult : le module ne persiste rien lui-même, state est à
-// persister par le cœur, opaque (docs/03-module-contract.md §2).
+// StepResult: the module persists nothing itself; state is to be persisted
+// by the core, opaque (docs/03-module-contract.md §2).
 message StepResult {
   enum Status {
     STATUS_UNSPECIFIED = 0;

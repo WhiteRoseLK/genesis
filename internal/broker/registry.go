@@ -1,10 +1,9 @@
 // SPDX-License-Identifier: Apache-2.0
 
-// Package broker route les appels de fonction entre modules
-// (docs/02-architecture.md) : registre fonction → fournisseur actif, et
-// contrôle d'accès — un module ne peut appeler que les fonctions déclarées
-// dans son requires résolu (une session de broker n'enregistre jamais
-// autre chose).
+// Package broker routes function calls between modules
+// (docs/02-architecture.md): a function → active provider registry, and access
+// control — a module can only call the functions declared in its resolved
+// requires (a broker session never registers anything else).
 package broker
 
 import (
@@ -13,24 +12,24 @@ import (
 	"google.golang.org/grpc"
 )
 
-// nativeFactory construit, pour un appelant donné, le registrar d'une
-// fonction fournie nativement par le cœur (ex. core.secrets/v1) — l'identité
-// de l'appelant sert au contrôle d'accès (docs/02).
+// nativeFactory builds, for a given caller, the registrar of a function
+// provided natively by the core (e.g. core.secrets/v1) — the caller's identity
+// is used for access control (docs/02).
 type nativeFactory func(caller string) func(*grpc.Server)
 
-// Registry connaît, pour chaque fonction, son fournisseur actif : natif
-// (core) ou module (connexion dispensée en cours).
+// Registry knows, for each function, its active provider: native (core) or
+// module (currently dispensed connection).
 type Registry struct {
 	mu      sync.RWMutex
 	native  map[string]nativeFactory
-	forward map[string]func(*grpc.Server) // fonctions fournies par un module
-	// fleet : fonctions « de parc » (docs/09-decisions.md ADR-017) — toutes
-	// les connexions accumulées sont appelées (diffusion), jamais un seul
-	// fournisseur actif remplaçant le précédent comme dans forward.
+	forward map[string]func(*grpc.Server) // functions provided by a module
+	// fleet: "fleet" functions (docs/09-decisions.md ADR-017) — every
+	// accumulated connection is called (fan-out), never a single active
+	// provider replacing the previous one as in forward.
 	fleet map[string][]*grpc.ClientConn
 }
 
-// NewRegistry construit un registre vide.
+// NewRegistry builds an empty registry.
 func NewRegistry() *Registry {
 	return &Registry{
 		native:  map[string]nativeFactory{},
@@ -39,35 +38,35 @@ func NewRegistry() *Registry {
 	}
 }
 
-// SetNative enregistre une fonction fournie nativement par le cœur.
+// SetNative registers a function provided natively by the core.
 func (r *Registry) SetNative(function string, factory nativeFactory) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	r.native[function] = factory
 }
 
-// SetModuleProvider enregistre/actualise le fournisseur actif d'une fonction
-// fournie par un module : conn est la connexion dispensée du module
-// (internal/modulehost.Client.DispenseFunction), register sait construire un
-// service qui relaie chaque appel vers conn (voir forward_*.go).
+// SetModuleProvider registers/updates the active provider of a function
+// provided by a module: conn is the module's dispensed connection
+// (internal/modulehost.Client.DispenseFunction), register knows how to build a
+// service that relays each call to conn (see forward_*.go).
 func (r *Registry) SetModuleProvider(function string, conn *grpc.ClientConn, register func(*grpc.Server, *grpc.ClientConn)) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	r.forward[function] = func(s *grpc.Server) { register(s, conn) }
 }
 
-// AddFleetProvider accumule une connexion supplémentaire pour une fonction
-// « de parc » (ADR-017) — contrairement à SetModuleProvider, qui remplace
-// le fournisseur actif unique, plusieurs fournisseurs coexistent pour une
-// même fonction fleet, tous appelés (voir ForwardFleetAgent, fan-out).
+// AddFleetProvider accumulates an extra connection for a "fleet" function
+// (ADR-017) — unlike SetModuleProvider, which replaces the single active
+// provider, several providers coexist for the same fleet function, all of them
+// called (see ForwardFleetAgent, fan-out).
 func (r *Registry) AddFleetProvider(function string, conn *grpc.ClientConn) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	r.fleet[function] = append(r.fleet[function], conn)
 }
 
-// Unset retire une fonction du registre (ex. SeedDown du fournisseur graine
-// après passation).
+// Unset removes a function from the registry (e.g. SeedDown of the seed
+// provider after the handover).
 func (r *Registry) Unset(function string) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
@@ -75,7 +74,7 @@ func (r *Registry) Unset(function string) {
 	delete(r.forward, function)
 }
 
-// HasProvider indique si function a un fournisseur actif.
+// HasProvider reports whether function has an active provider.
 func (r *Registry) HasProvider(function string) bool {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
@@ -84,11 +83,11 @@ func (r *Registry) HasProvider(function string) bool {
 	return native || forwarded || len(r.fleet[function]) > 0
 }
 
-// BuildSession construit un grpc.Server n'exposant que les fonctions listées
-// dans allowed (le requires résolu de l'appelant) — c'est le mécanisme même
-// du contrôle d'accès : une fonction non listée n'est jamais enregistrée,
-// l'appeler échoue avec codes.Unimplemented (critère d'acceptation J4,
-// doc 08 : "appel d'une fonction non déclarée refusé par le broker").
+// BuildSession builds a grpc.Server that only exposes the functions listed in
+// allowed (the caller's resolved requires) — this is the access-control
+// mechanism itself: an unlisted function is never registered, and calling it
+// fails with codes.Unimplemented (M4 acceptance criterion, doc 08: "a call to
+// an undeclared function is refused by the broker").
 func (r *Registry) BuildSession(caller string, allowed []string, opts ...grpc.ServerOption) *grpc.Server {
 	s := grpc.NewServer(opts...)
 
@@ -109,10 +108,10 @@ func (r *Registry) BuildSession(caller string, allowed []string, opts ...grpc.Se
 			register(s)
 			continue
 		}
-		// Déclarée mais sans fournisseur actif : rien n'est enregistré, un
-		// appel échouera comme n'importe quelle fonction non déclarée. Le
-		// résolveur (internal/resolver) est censé avoir déjà refusé ce cas
-		// plus tôt, sauf fonction optionnelle absente.
+		// Declared but without an active provider: nothing is registered, and
+		// a call will fail like any undeclared function. The resolver
+		// (internal/resolver) is supposed to have refused this case earlier,
+		// except for a missing optional function.
 	}
 	return s
 }

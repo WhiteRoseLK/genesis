@@ -25,17 +25,17 @@ var envSchema = mustCompileSchema()
 func mustCompileSchema() *jsonschema.Schema {
 	compiler := jsonschema.NewCompiler()
 	if err := compiler.AddResource("environment.json", strings.NewReader(schemaJSON)); err != nil {
-		panic(fmt.Sprintf("spec: schéma JSON invalide : %v", err))
+		panic(fmt.Sprintf("spec: invalid JSON schema: %v", err))
 	}
 	schema, err := compiler.Compile("environment.json")
 	if err != nil {
-		panic(fmt.Sprintf("spec: compilation du schéma JSON : %v", err))
+		panic(fmt.Sprintf("spec: compiling the JSON schema: %v", err))
 	}
 	return schema
 }
 
-// validateSchema valide doc (types JSON natifs) contre le schéma de
-// l'enveloppe générale et retourne une erreur par échec, avec son chemin.
+// validateSchema validates doc (native JSON types) against the schema of the
+// overall envelope and returns one error per failure, with its path.
 func validateSchema(doc any) []error {
 	err := envSchema.Validate(doc)
 	if err == nil {
@@ -59,10 +59,10 @@ func flattenValidationError(ve *jsonschema.ValidationError) []error {
 	return errs
 }
 
-// leafErrors traduit une erreur feuille en une ou plusieurs ValidationError
-// avec chemin. Cas particulier de "missing properties: 'a', 'b'" : le champ
-// manquant n'apparaît que dans le message, pas dans InstanceLocation (qui
-// pointe l'objet parent) ; on l'ajoute au chemin pour rester précis.
+// leafErrors turns a leaf error into one or more ValidationErrors with a path.
+// Special case of "missing properties: 'a', 'b'": the missing field only
+// appears in the message, not in InstanceLocation (which points to the parent
+// object); we add it to the path to stay precise.
 func leafErrors(ve *jsonschema.ValidationError) []error {
 	base := instancePath(ve.InstanceLocation)
 	if m := missingPropertiesPattern.FindStringSubmatch(ve.Message); m != nil {
@@ -70,7 +70,7 @@ func leafErrors(ve *jsonschema.ValidationError) []error {
 		if len(names) > 0 {
 			errs := make([]error, 0, len(names))
 			for _, n := range names {
-				errs = append(errs, &ValidationError{Path: joinPath(base, n[1]), Message: "obligatoire"})
+				errs = append(errs, &ValidationError{Path: joinPath(base, n[1]), Message: "required"})
 			}
 			return errs
 		}

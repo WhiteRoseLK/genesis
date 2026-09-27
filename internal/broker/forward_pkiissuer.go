@@ -10,9 +10,9 @@ import (
 	pkiissuerv1 "github.com/WhiteRoseLK/genesis/sdk/go/gen/functions/pki/issuer/v1"
 )
 
-// ForwardPkiIssuer enregistre un PkiIssuerServer qui relaie chaque appel
-// vers conn, la connexion dispensée du module qui fournit pki.issuer/v1
-// (step-ca en phase graine, vault en cible).
+// ForwardPkiIssuer registers a PkiIssuerServer that relays each call to conn,
+// the dispensed connection of the module currently providing pki.issuer/v1
+// (step-ca in the seed phase, vault as the target).
 func ForwardPkiIssuer(s *grpc.Server, conn *grpc.ClientConn) {
 	pkiissuerv1.RegisterPkiIssuerServer(s, &forwardingPkiIssuer{client: pkiissuerv1.NewPkiIssuerClient(conn)})
 }

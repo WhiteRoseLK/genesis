@@ -40,9 +40,9 @@ func (m *testEModule) Validate(context.Context, *modulev1.ValidateRequest) (*mod
 func (m *testEModule) Check(_ context.Context, req *modulev1.StepRequest) (*modulev1.CheckResult, error) {
 	flags := sdk.StateMap(req.GetState())
 	if boolFlag(flags, "seeded") || boolFlag(flags, "retired") {
-		return &modulev1.CheckResult{Status: modulev1.CheckResult_STATUS_CONFORME}, nil
+		return &modulev1.CheckResult{Status: modulev1.CheckResult_STATUS_COMPLIANT}, nil
 	}
-	return &modulev1.CheckResult{Status: modulev1.CheckResult_STATUS_A_FAIRE}, nil
+	return &modulev1.CheckResult{Status: modulev1.CheckResult_STATUS_TODO}, nil
 }
 
 func (m *testEModule) SeedUp(_ context.Context, req *modulev1.StepRequest) (*modulev1.StepResult, error) {

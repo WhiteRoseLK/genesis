@@ -8,14 +8,14 @@ import (
 	"regexp"
 )
 
-// knownSecretPatterns détecte des motifs de secrets connus qui pourraient
-// fuiter dans un message de log sans passer par le type Secret
-// (docs/06-secrets-state.md "Redaction") : tokens Vault et blocs PEM.
+// knownSecretPatterns detects known secret patterns that could leak into a log
+// message without going through the Secret type (docs/06-secrets-state.md
+// "Redaction"): Vault tokens and PEM blocks.
 var knownSecretPatterns = []*regexp.Regexp{
 	regexp.MustCompile(`\bhvs\.[A-Za-z0-9_-]+\b`),                                   // token Vault (service)
 	regexp.MustCompile(`\bhvb\.[A-Za-z0-9_-]+\b`),                                   // token Vault (batch)
-	regexp.MustCompile(`\bs\.[A-Za-z0-9]{20,}\b`),                                   // ancien format de token Vault
-	regexp.MustCompile(`(?s)-----BEGIN [A-Z0-9 ]+-----.*?-----END [A-Z0-9 ]+-----`), // bloc PEM
+	regexp.MustCompile(`\bs\.[A-Za-z0-9]{20,}\b`),                                   // legacy Vault token format
+	regexp.MustCompile(`(?s)-----BEGIN [A-Z0-9 ]+-----.*?-----END [A-Z0-9 ]+-----`), // PEM block
 }
 
 const redacted = "***"
@@ -27,15 +27,15 @@ func redactString(s string) string {
 	return s
 }
 
-// RedactingHandler enveloppe un slog.Handler : redacte les valeurs de type
-// Secret (via slog.LogValuer, déjà couvert par Secret.LogValue) et les
-// motifs de secrets connus dans le message et les attributs texte, pour
-// couvrir aussi les cas où une valeur sensible fuite hors du type Secret.
+// RedactingHandler wraps a slog.Handler: it redacts values of type Secret
+// (through slog.LogValuer, already covered by Secret.LogValue) and known
+// secret patterns in the message and the text attributes, to also cover the
+// cases where a sensitive value leaks outside the Secret type.
 type RedactingHandler struct {
 	next slog.Handler
 }
 
-// NewRedactingHandler construit un handler de redaction enveloppant next.
+// NewRedactingHandler builds a redacting handler wrapping next.
 func NewRedactingHandler(next slog.Handler) *RedactingHandler {
 	return &RedactingHandler{next: next}
 }
@@ -66,7 +66,7 @@ func (h *RedactingHandler) WithGroup(name string) slog.Handler {
 }
 
 func redactAttr(a slog.Attr) slog.Attr {
-	a.Value = a.Value.Resolve() // déclenche slog.LogValuer (dont Secret.LogValue)
+	a.Value = a.Value.Resolve() // triggers slog.LogValuer (including Secret.LogValue)
 	switch a.Value.Kind() {
 	case slog.KindString:
 		return slog.String(a.Key, redactString(a.Value.String()))

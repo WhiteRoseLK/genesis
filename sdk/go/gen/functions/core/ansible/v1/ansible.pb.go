@@ -4,9 +4,9 @@
 // 	protoc        (unknown)
 // source: functions/core/ansible/v1/ansible.proto
 
-// Fonction core.ansible/v1 (docs/03-module-contract.md, ADR-002) : fournie
-// nativement par le cœur, exécute un playbook dans un conteneur pour
-// n'imposer aucune installation d'Ansible sur la graine.
+// Function core.ansible/v1 (docs/03-module-contract.md, ADR-002): provided
+// natively by the core, runs a playbook in a container so that Ansible
+// never has to be installed on the seed.
 
 package ansiblev1
 
@@ -31,13 +31,13 @@ type Target struct {
 	Host          string                 `protobuf:"bytes,1,opt,name=host,proto3" json:"host,omitempty"`
 	Port          int32                  `protobuf:"varint,2,opt,name=port,proto3" json:"port,omitempty"`
 	User          string                 `protobuf:"bytes,3,opt,name=user,proto3" json:"user,omitempty"`
-	SshPrivateKey string                 `protobuf:"bytes,4,opt,name=ssh_private_key,json=sshPrivateKey,proto3" json:"ssh_private_key,omitempty"` // clé privée OpenSSH, obtenue via core.secrets/v1
-	// ssh_certificate_pem : certificat OpenSSH signé (ex. par la CA Teleport,
-	// "tctl auth sign --format=openssh") accompagnant ssh_private_key —
-	// authentification par certificat plutôt que clé nue, sans rien changer
-	// au transport (SSH standard, docs/09-decisions.md ADR-018 : le service
-	// ssh_service de Teleport parle SSH standard sur son propre port, pas
-	// un protocole propriétaire).
+	SshPrivateKey string                 `protobuf:"bytes,4,opt,name=ssh_private_key,json=sshPrivateKey,proto3" json:"ssh_private_key,omitempty"` // OpenSSH private key, obtained through core.secrets/v1
+	// ssh_certificate_pem: signed OpenSSH certificate (e.g. by the Teleport
+	// CA, "tctl auth sign --format=openssh") that goes with ssh_private_key —
+	// certificate authentication rather than a bare key, with no change to
+	// the transport (standard SSH, docs/09-decisions.md ADR-018: Teleport's
+	// ssh_service speaks standard SSH on its own port, not a proprietary
+	// protocol).
 	SshCertificatePem string `protobuf:"bytes,5,opt,name=ssh_certificate_pem,json=sshCertificatePem,proto3" json:"ssh_certificate_pem,omitempty"`
 	unknownFields     protoimpl.UnknownFields
 	sizeCache         protoimpl.SizeCache
@@ -111,7 +111,7 @@ func (x *Target) GetSshCertificatePem() string {
 type RunPlaybookRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Target        *Target                `protobuf:"bytes,1,opt,name=target,proto3" json:"target,omitempty"`
-	PlaybookYaml  []byte                 `protobuf:"bytes,2,opt,name=playbook_yaml,json=playbookYaml,proto3" json:"playbook_yaml,omitempty"` // contenu du playbook, fourni par le module appelant
+	PlaybookYaml  []byte                 `protobuf:"bytes,2,opt,name=playbook_yaml,json=playbookYaml,proto3" json:"playbook_yaml,omitempty"` // playbook content, provided by the calling module
 	Vars          *structpb.Struct       `protobuf:"bytes,3,opt,name=vars,proto3" json:"vars,omitempty"`                                     // extra-vars
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
@@ -171,7 +171,7 @@ func (x *RunPlaybookRequest) GetVars() *structpb.Struct {
 type RunPlaybookResponse struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Ok            bool                   `protobuf:"varint,1,opt,name=ok,proto3" json:"ok,omitempty"`
-	Output        string                 `protobuf:"bytes,2,opt,name=output,proto3" json:"output,omitempty"` // sortie combinée stdout+stderr, pour diagnostic
+	Output        string                 `protobuf:"bytes,2,opt,name=output,proto3" json:"output,omitempty"` // combined stdout+stderr output, for diagnostics
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }

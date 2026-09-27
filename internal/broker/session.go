@@ -9,17 +9,16 @@ import (
 	"google.golang.org/grpc"
 )
 
-// OpenSession démarre, sur le canal bidirectionnel go-plugin du module
-// appelant (caller), une session de broker n'exposant que les fonctions
-// listées dans allowed. Le jeton retourné est à placer dans
-// StepRequest.broker_token avant d'invoquer l'étape correspondante
-// (docs/03-module-contract.md §2).
+// OpenSession starts, on the bidirectional go-plugin channel of the calling
+// module (caller), a broker session that only exposes the functions listed in
+// allowed. The returned token goes into StepRequest.broker_token before
+// invoking the matching step (docs/03-module-contract.md §2).
 //
-// AcceptAndServe bloque jusqu'à la fermeture de la session (c'est un
-// Accept+Serve, comme http.Server.Serve) : il tourne donc dans sa propre
-// goroutine. Rien à attendre avant de retourner le jeton — Dial, côté
-// module, patiente lui-même jusqu'à 5s que les informations de connexion
-// arrivent (go-plugin grpc_broker.go), pas besoin de synchronisation ici.
+// AcceptAndServe blocks until the session closes (it is an Accept+Serve, like
+// http.Server.Serve): it therefore runs in its own goroutine. Nothing to wait
+// for before returning the token — Dial, on the module side, itself waits up
+// to 5 s for the connection info to arrive (go-plugin grpc_broker.go), no
+// synchronisation needed here.
 func (r *Registry) OpenSession(pb *goplugin.GRPCBroker, caller string, allowed []string) string {
 	id := pb.NextId()
 	go pb.AcceptAndServe(id, func(opts []grpc.ServerOption) *grpc.Server {

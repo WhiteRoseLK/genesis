@@ -44,7 +44,7 @@ func resolveOrFatal(t *testing.T, env *spec.Environment, installed []modulehost.
 	t.Helper()
 	resolved, err := resolver.Resolve(env, installed)
 	if err != nil {
-		t.Fatalf("Resolve : %v", err)
+		t.Fatalf("Resolve: %v", err)
 	}
 	return resolved
 }
@@ -58,8 +58,8 @@ func indexOf(order []string, name string) int {
 	return -1
 }
 
-// TestBuildOrdersLikeDoc05Chain reproduit l'exemple du doc 05 :
-// time -> dns -> pki+secrets -> bastion.
+// TestBuildOrdersLikeDoc05Chain reproduces the doc 05 example: time -> dns ->
+// pki+secrets -> bastion.
 func TestBuildOrdersLikeDoc05Chain(t *testing.T) {
 	env := &spec.Environment{
 		Capabilities: map[string]spec.Capability{
@@ -90,24 +90,24 @@ func TestBuildOrdersLikeDoc05Chain(t *testing.T) {
 	resolved := resolveOrFatal(t, env, installed)
 	plan, err := Build(resolved)
 	if err != nil {
-		t.Fatalf("Build : %v", err)
+		t.Fatalf("Build: %v", err)
 	}
 
 	if len(plan.Order) != 4 {
-		t.Fatalf("Order = %v, attendu 4 modules", plan.Order)
+		t.Fatalf("Order = %v, want 4 modules", plan.Order)
 	}
 	if indexOf(plan.Order, "chrony") >= indexOf(plan.Order, "powerdns") {
-		t.Errorf("chrony devrait précéder powerdns : %v", plan.Order)
+		t.Errorf("chrony should come before powerdns: %v", plan.Order)
 	}
 	if indexOf(plan.Order, "powerdns") >= indexOf(plan.Order, "vault") {
-		t.Errorf("powerdns devrait précéder vault : %v", plan.Order)
+		t.Errorf("powerdns should come before vault: %v", plan.Order)
 	}
 	if indexOf(plan.Order, "vault") >= indexOf(plan.Order, "openssh-bastion") {
-		t.Errorf("vault devrait précéder openssh-bastion : %v", plan.Order)
+		t.Errorf("vault should come before openssh-bastion: %v", plan.Order)
 	}
 }
 
-// TestBuildDetectsCycle est un critère d'acceptation du jalon J4 (doc 08).
+// TestBuildDetectsCycle is an M4 acceptance criterion (doc 08).
 func TestBuildDetectsCycle(t *testing.T) {
 	env := &spec.Environment{
 		Capabilities: map[string]spec.Capability{
@@ -115,8 +115,8 @@ func TestBuildDetectsCycle(t *testing.T) {
 			"b": {Module: "mod-b"},
 		},
 	}
-	// mod-a requiert test.b/v1 (fourni par mod-b), mod-b requiert test.a/v1
-	// (fourni par mod-a) : cycle direct entre les deux modules.
+	// mod-a requires test.b/v1 (provided by mod-b), mod-b requires test.a/v1
+	// (provided by mod-a): a direct cycle between the two modules.
 	installed := []modulehost.Installed{
 		installedModule("mod-a",
 			withCapabilities("a"),
@@ -133,14 +133,14 @@ func TestBuildDetectsCycle(t *testing.T) {
 
 	_, err := Build(resolved)
 	if err == nil {
-		t.Fatal("cycle entre mod-a et mod-b : succès inattendu, devait être détecté")
+		t.Fatal("cycle between mod-a and mod-b: unexpected success, should have been detected")
 	}
-	t.Logf("cycle détecté comme attendu : %v", err)
+	t.Logf("cycle detected as expected: %v", err)
 }
 
-// TestBuildInsertsNewDependentModuleAtCorrectPosition est le critère
-// d'acceptation du jalon J4 (doc 08) : ajouter un module qui dépend d'un
-// module existant l'insère au bon endroit dans le plan.
+// TestBuildInsertsNewDependentModuleAtCorrectPosition is the M4 acceptance
+// criterion (doc 08): adding a module that depends on an existing module
+// inserts it at the right place in the plan.
 func TestBuildInsertsNewDependentModuleAtCorrectPosition(t *testing.T) {
 	env := &spec.Environment{
 		Capabilities: map[string]spec.Capability{
@@ -159,13 +159,13 @@ func TestBuildInsertsNewDependentModuleAtCorrectPosition(t *testing.T) {
 	before := resolveOrFatal(t, env, base)
 	beforePlan, err := Build(before)
 	if err != nil {
-		t.Fatalf("Build (avant test-d) : %v", err)
+		t.Fatalf("Build (before test-d): %v", err)
 	}
 	if len(beforePlan.Order) != 2 {
-		t.Fatalf("Order avant test-d = %v, attendu 2 modules", beforePlan.Order)
+		t.Fatalf("Order before test-d = %v, want 2 modules", beforePlan.Order)
 	}
 
-	// Ajout de test-d, qui dépend de test-a, sans toucher à rien d'autre.
+	// Adding test-d, which depends on test-a, without touching anything else.
 	env.Capabilities["d"] = spec.Capability{Module: "test-d"}
 	withD := append(append([]modulehost.Installed{}, base...),
 		installedModule("test-d",
@@ -176,18 +176,18 @@ func TestBuildInsertsNewDependentModuleAtCorrectPosition(t *testing.T) {
 	after := resolveOrFatal(t, env, withD)
 	afterPlan, err := Build(after)
 	if err != nil {
-		t.Fatalf("Build (avec test-d) : %v", err)
+		t.Fatalf("Build (with test-d): %v", err)
 	}
 
 	if len(afterPlan.Order) != 3 {
-		t.Fatalf("Order avec test-d = %v, attendu 3 modules", afterPlan.Order)
+		t.Fatalf("Order with test-d = %v, want 3 modules", afterPlan.Order)
 	}
 	if indexOf(afterPlan.Order, "test-a") >= indexOf(afterPlan.Order, "test-d") {
-		t.Errorf("test-a devrait précéder test-d : %v", afterPlan.Order)
+		t.Errorf("test-a should come before test-d: %v", afterPlan.Order)
 	}
-	// test-c et test-d dépendent tous deux de test-a mais pas l'un de
-	// l'autre : leur ordre relatif n'est pas contraint, seul leur position
-	// après test-a compte.
+	// test-c and test-d both depend on test-a but not on each other: their
+	// relative order is not constrained, only their position after test-a
+	// matters.
 }
 
 func TestBuildIsDeterministic(t *testing.T) {
@@ -211,11 +211,11 @@ func TestBuildIsDeterministic(t *testing.T) {
 			t.Fatal(err)
 		}
 		if len(again.Order) != len(first.Order) {
-			t.Fatalf("ordre non déterministe : %v vs %v", first.Order, again.Order)
+			t.Fatalf("non-deterministic order: %v vs %v", first.Order, again.Order)
 		}
 		for j := range first.Order {
 			if first.Order[j] != again.Order[j] {
-				t.Fatalf("ordre non déterministe : %v vs %v", first.Order, again.Order)
+				t.Fatalf("non-deterministic order: %v vs %v", first.Order, again.Order)
 			}
 		}
 	}

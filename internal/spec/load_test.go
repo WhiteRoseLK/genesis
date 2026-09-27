@@ -12,25 +12,25 @@ func TestLoadValidFixtures(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			env, err := Load("testdata/valid/" + name)
 			if err != nil {
-				t.Fatalf("Load(%s) inattendu : %v", name, err)
+				t.Fatalf("Load(%s) unexpected error: %v", name, err)
 			}
 			if env.Profile != "connected" {
-				t.Errorf("profile = %q, attendu %q", env.Profile, "connected")
+				t.Errorf("profile = %q, want %q", env.Profile, "connected")
 			}
 			if env.Seed.StateDir != "/var/lib/genesis" {
-				t.Errorf("seed.state_dir = %q, attendu %q", env.Seed.StateDir, "/var/lib/genesis")
+				t.Errorf("seed.state_dir = %q, want %q", env.Seed.StateDir, "/var/lib/genesis")
 			}
 		})
 	}
 }
 
-// TestLoadInvalidFixtures vérifie que chaque spec invalide échoue avec une
-// erreur qui référence le chemin YAML concerné (critère d'acceptation J1,
-// doc 08 : "10 specs invalides échouent avec chemin YAML").
+// TestLoadInvalidFixtures checks that each invalid spec fails with an error
+// that refers to the YAML path concerned (M1 acceptance criterion, doc 08: "10
+// invalid specs fail with a YAML path").
 func TestLoadInvalidFixtures(t *testing.T) {
 	cases := []struct {
 		file       string
-		wantInPath string // sous-chaîne attendue dans l'erreur (chemin YAML)
+		wantInPath string // substring expected in the error (YAML path)
 	}{
 		{"01-missing-apiversion.yaml", "apiVersion"},
 		{"02-bad-apiversion.yaml", "apiVersion"},
@@ -48,17 +48,17 @@ func TestLoadInvalidFixtures(t *testing.T) {
 	}
 
 	if len(cases) < 10 {
-		t.Fatalf("il faut au moins 10 specs invalides, il y en a %d", len(cases))
+		t.Fatalf("at least 10 invalid specs are needed, there are %d", len(cases))
 	}
 
 	for _, c := range cases {
 		t.Run(c.file, func(t *testing.T) {
 			env, err := Load("testdata/invalid/" + c.file)
 			if err == nil {
-				t.Fatalf("Load(%s) : succès inattendu (env=%+v)", c.file, env)
+				t.Fatalf("Load(%s): unexpected success (env=%+v)", c.file, env)
 			}
 			if !strings.Contains(err.Error(), c.wantInPath) {
-				t.Errorf("Load(%s) erreur = %q, attendu qu'elle contienne %q", c.file, err.Error(), c.wantInPath)
+				t.Errorf("Load(%s) error = %q, want it to contain %q", c.file, err.Error(), c.wantInPath)
 			}
 		})
 	}

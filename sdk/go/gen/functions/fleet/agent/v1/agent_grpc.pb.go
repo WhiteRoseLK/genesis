@@ -4,10 +4,10 @@
 // - protoc             (unknown)
 // source: functions/fleet/agent/v1/agent.proto
 
-// Fonction fleet.agent/v1 (docs/02-architecture.md, docs/09-decisions.md
-// ADR-017) : fonction « de parc » — tous les fournisseurs installés sont
-// appelés (diffusion), pas un seul fournisseur actif comme les autres
-// fonctions. Fournisseur MVP : teleport (J8).
+// Function fleet.agent/v1 (docs/02-architecture.md, docs/09-decisions.md
+// ADR-017): a "fleet" function — every installed provider is called
+// (fan-out), not a single active provider as for the other functions. MVP
+// provider: teleport (M8).
 
 package fleetagentv1
 

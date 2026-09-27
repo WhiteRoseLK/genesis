@@ -4,9 +4,9 @@
 // - protoc             (unknown)
 // source: functions/core/ansible/v1/ansible.proto
 
-// Fonction core.ansible/v1 (docs/03-module-contract.md, ADR-002) : fournie
-// nativement par le cœur, exécute un playbook dans un conteneur pour
-// n'imposer aucune installation d'Ansible sur la graine.
+// Function core.ansible/v1 (docs/03-module-contract.md, ADR-002): provided
+// natively by the core, runs a playbook in a container so that Ansible
+// never has to be installed on the seed.
 
 package ansiblev1
 

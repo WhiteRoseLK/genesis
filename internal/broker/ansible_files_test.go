@@ -12,7 +12,7 @@ import (
 
 func TestTarFilesArePrivate(t *testing.T) {
 	archive, err := tarFiles(map[string][]byte{
-		"id_target": []byte("clé"),
+		"id_target": []byte("key"),
 		"vars.json": []byte(`{"a":"b"}`),
 	})
 	if err != nil {
@@ -29,13 +29,13 @@ func TestTarFilesArePrivate(t *testing.T) {
 			t.Fatal(err)
 		}
 		if h.Mode != 0o600 {
-			t.Errorf("%s : mode %o, attendu 0600", h.Name, h.Mode)
+			t.Errorf("%s: mode %o, want 0600", h.Name, h.Mode)
 		}
 		content, _ := io.ReadAll(tr)
 		seen[h.Name] = string(content)
 	}
-	if seen["id_target"] != "clé" || seen["vars.json"] != `{"a":"b"}` {
-		t.Errorf("contenu inattendu : %v", seen)
+	if seen["id_target"] != "key" || seen["vars.json"] != `{"a":"b"}` {
+		t.Errorf("unexpected content: %v", seen)
 	}
 }
 
@@ -53,10 +53,10 @@ func TestRedactValuesMasksSecretsFromVars(t *testing.T) {
 
 	for _, leaked := range []string{"4f1c2e9a-secret-value", "MIIEvQIBADANBgkqhkiG9w0BAQEFAASC", "s3cr3t-in-a-list"} {
 		if strings.Contains(got, leaked) {
-			t.Errorf("valeur secrète %q encore présente : %s", leaked, got)
+			t.Errorf("secret value %q still present: %s", leaked, got)
 		}
 	}
 	if !strings.Contains(got, "port=8200") {
-		t.Errorf("valeur courte masquée à tort : %s", got)
+		t.Errorf("short value wrongly masked: %s", got)
 	}
 }

@@ -10,9 +10,9 @@ import (
 	secretskvv1 "github.com/WhiteRoseLK/genesis/sdk/go/gen/functions/secrets/kv/v1"
 )
 
-// ForwardSecretsKV enregistre un SecretsKVServer qui relaie chaque appel
-// vers conn, la connexion dispensée du module qui fournit secrets.kv/v1
-// (vault en cible).
+// ForwardSecretsKV registers a SecretsKVServer that relays each call to conn,
+// the dispensed connection of the module currently providing secrets.kv/v1
+// (vault as the target).
 func ForwardSecretsKV(s *grpc.Server, conn *grpc.ClientConn) {
 	secretskvv1.RegisterSecretsKVServer(s, &forwardingSecretsKV{client: secretskvv1.NewSecretsKVClient(conn)})
 }

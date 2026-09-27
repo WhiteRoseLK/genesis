@@ -4,10 +4,10 @@
 // 	protoc        (unknown)
 // source: functions/fleet/agent/v1/agent.proto
 
-// Fonction fleet.agent/v1 (docs/02-architecture.md, docs/09-decisions.md
-// ADR-017) : fonction « de parc » — tous les fournisseurs installés sont
-// appelés (diffusion), pas un seul fournisseur actif comme les autres
-// fonctions. Fournisseur MVP : teleport (J8).
+// Function fleet.agent/v1 (docs/02-architecture.md, docs/09-decisions.md
+// ADR-017): a "fleet" function — every installed provider is called
+// (fan-out), not a single active provider as for the other functions. MVP
+// provider: teleport (M8).
 
 package fleetagentv1
 
@@ -31,7 +31,7 @@ type Target struct {
 	Host          string                 `protobuf:"bytes,1,opt,name=host,proto3" json:"host,omitempty"`
 	Port          int32                  `protobuf:"varint,2,opt,name=port,proto3" json:"port,omitempty"`
 	User          string                 `protobuf:"bytes,3,opt,name=user,proto3" json:"user,omitempty"`
-	SshPrivateKey string                 `protobuf:"bytes,4,opt,name=ssh_private_key,json=sshPrivateKey,proto3" json:"ssh_private_key,omitempty"` // clé privée OpenSSH, obtenue via core.secrets/v1
+	SshPrivateKey string                 `protobuf:"bytes,4,opt,name=ssh_private_key,json=sshPrivateKey,proto3" json:"ssh_private_key,omitempty"` // OpenSSH private key, obtained through core.secrets/v1
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }

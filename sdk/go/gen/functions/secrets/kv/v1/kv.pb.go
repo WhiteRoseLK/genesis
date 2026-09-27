@@ -4,11 +4,11 @@
 // 	protoc        (unknown)
 // source: functions/secrets/kv/v1/kv.proto
 
-// Fonction secrets.kv/v1 (docs/03-module-contract.md, docs/06-secrets-state.md) :
-// fournisseur MVP vault (J7, target) — moteur KV v2, chemin
-// genesis/<env>/<ref>, authentifié par AppRole côté appelant (le cœur, pour
-// la migration file->vault ; un module ne lit ses propres secrets que via
-// core.secrets/v1, jamais directement secrets.kv/v1).
+// Function secrets.kv/v1 (docs/03-module-contract.md, docs/06-secrets-state.md):
+// MVP provider vault (M7, target) — KV v2 engine, path genesis/<env>/<ref>,
+// authenticated by AppRole on the caller's side (the core, for the
+// file->vault migration; a module reads its own secrets only through
+// core.secrets/v1, never directly through secrets.kv/v1).
 
 package secretskvv1
 
