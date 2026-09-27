@@ -3,7 +3,7 @@ name: test-kv
 version: 0.1.0
 description: "module de test J7 : fournit secrets.kv/v1 en cible, pour prouver la migration file->vault sans le vrai produit vault"
 layer: platform
-core: ">=0.1.0 <0.2.0"
+core: ">=0.1.0"
 protocol: 1
 
 capabilities: [secrets]

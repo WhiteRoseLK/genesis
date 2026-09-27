@@ -3,7 +3,7 @@ name: test-d
 version: 0.1.0
 description: "module de test J4 : preuve d'extensibilite, ajoute apres coup, depend de test-a"
 layer: platform
-core: ">=0.1.0 <0.2.0"
+core: ">=0.1.0"
 protocol: 1
 
 capabilities: [test-d]

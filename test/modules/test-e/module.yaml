@@ -3,7 +3,7 @@ name: test-e
 version: 0.1.0
 description: "module de test J6 : fournisseur graine PUR (sans phase cible) de test.e/v1, repris par test-f"
 layer: platform
-core: ">=0.1.0 <0.2.0"
+core: ">=0.1.0"
 protocol: 1
 
 capabilities: [test-e]

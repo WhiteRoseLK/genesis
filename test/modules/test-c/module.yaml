@@ -3,7 +3,7 @@ name: test-c
 version: 0.1.0
 description: "module de test J4 : requiert test.b/v1, fournit test.c/v1"
 layer: platform
-core: ">=0.1.0 <0.2.0"
+core: ">=0.1.0"
 protocol: 1
 
 capabilities: [test-c]
