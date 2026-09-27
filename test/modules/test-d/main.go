@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: Apache-2.0
 
-// test-d requiert test.a/v1 et fournit test.d/v1 : preuve d'extensibilité du
-// jalon J4 (docs/08-milestones.md) — ajouté après coup, sans toucher au
-// résolveur, au planificateur, au moteur ni aux autres modules.
+// test-d requires test.a/v1 and provides test.d/v1: the proof of extensibility
+// of milestone M4 (docs/08-milestones.md) — added afterwards, without touching
+// the resolver, the planner, the engine or the other modules.
 package main
 
 import (
@@ -55,14 +55,14 @@ func (m *testDModule) Configure(_ context.Context, req *modulev1.StepRequest) (*
 func (m *testDModule) Verify(ctx context.Context, req *modulev1.StepRequest) (*modulev1.StepResult, error) {
 	conn, err := m.broker.Dial(req.GetBrokerToken())
 	if err != nil {
-		return nil, fmt.Errorf("connexion au broker : %w", err)
+		return nil, fmt.Errorf("connecting to the broker: %w", err)
 	}
-	resp, err := echov1.NewEchoClient(conn).Call(ctx, &echov1.CallRequest{Message: "salut depuis test-d"})
+	resp, err := echov1.NewEchoClient(conn).Call(ctx, &echov1.CallRequest{Message: "hello from test-d"})
 	if err != nil {
-		return nil, fmt.Errorf("appel de test.a/v1 via le broker : %w", err)
+		return nil, fmt.Errorf("calling test.a/v1 through the broker: %w", err)
 	}
 	if resp.GetFrom() != "test-a" {
-		return nil, fmt.Errorf("réponse inattendue de test.a/v1 : %+v", resp)
+		return nil, fmt.Errorf("unexpected response from test.a/v1: %+v", resp)
 	}
 	return setFlag(req, "verified")
 }
@@ -90,7 +90,7 @@ func boolFlag(flags map[string]any, key string) bool {
 	return v
 }
 
-// echoServer implémente functions/test/echo/v1 pour la fonction test.d/v1.
+// echoServer implements functions/test/echo/v1 for the test.d/v1 function.
 type echoServer struct {
 	echov1.UnimplementedEchoServer
 }

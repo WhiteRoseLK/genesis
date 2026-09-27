@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: Apache-2.0
 
-// base-os fournit os.base/v1 (docs/07-mvp-modules.md) : la configuration
-// fonctionnelle nécessaire au bon fonctionnement d'une VM cible (CA,
-// résolveur, NTP). Harden (durcissement SSH, mises à jour, nftables) est un
-// volet de sécurité pure différé à une itération future — voir la
-// discussion de portée du jalon J5, docs/PROGRESS.md.
+// base-os provides os.base/v1 (docs/07-mvp-modules.md): the functional
+// configuration a target VM needs to work (CA, resolver, NTP). Harden (SSH
+// hardening, updates, nftables) is a pure security concern deferred to a
+// future iteration — see the scope discussion of milestone M5,
+// docs/PROGRESS.md.
 package main
 
 import (
@@ -35,9 +35,9 @@ var setResolverPlaybook []byte
 //go:embed playbooks/set_ntp.yml
 var setNTPPlaybook []byte
 
-// baseOSModule porte le cycle de vie du module. Il n'a rien à provisionner
-// pour lui-même : Check est toujours conforme, tout le travail se fait dans
-// osBaseServer en réponse aux appels de la fonction os.base/v1.
+// baseOSModule carries the module's lifecycle. It has nothing to provision for
+// itself: Check is always compliant, and all the work happens in osBaseServer
+// in response to calls to the os.base/v1 function.
 type baseOSModule struct {
 	modulev1.UnimplementedModuleServer
 	manifest    *modulev1.Manifest
@@ -45,7 +45,7 @@ type baseOSModule struct {
 	brokerToken string
 
 	mu            sync.Mutex
-	ansibleClient ansiblev1.AnsibleClient // mis en cache : Dial ne réussit qu'une fois par session
+	ansibleClient ansiblev1.AnsibleClient // cached: Dial only succeeds once per session
 }
 
 func (m *baseOSModule) SetBroker(b *sdk.BrokerClient) { m.broker = b }
@@ -58,21 +58,19 @@ func (m *baseOSModule) Validate(context.Context, *modulev1.ValidateRequest) (*mo
 	return &modulev1.Diagnostics{}, nil
 }
 
-// Check capture le jeton de session de broker de l'étape en cours : c'est la
-// seule occasion pour base-os d'obtenir un accès (scopé à son propre
-// requires) à core.ansible/v1, que ses gestionnaires de fonction
-// réutiliseront ensuite (docs/02-architecture.md : le broker route par
-// appelant, pas par la fonction elle-même).
+// Check captures the broker session token of the current step: it is base-os's
+// only opportunity to get access (scoped to its own requires) to
+// core.ansible/v1, which its function handlers then reuse
+// (docs/02-architecture.md: the broker routes per caller, not per function).
 func (m *baseOSModule) Check(_ context.Context, req *modulev1.StepRequest) (*modulev1.CheckResult, error) {
 	m.brokerToken = req.GetBrokerToken()
 	return &modulev1.CheckResult{Status: modulev1.CheckResult_STATUS_COMPLIANT}, nil
 }
 
-// dialAnsible dial la session de broker au plus une fois : Dial ne peut
-// réussir qu'une seule fois par jeton (les informations de connexion ne
-// sont envoyées qu'une fois côté cœur), mais la connexion gRPC obtenue
-// supporte de nombreux appels — elle est mise en cache et réutilisée par
-// TrustCA/SetResolver/SetNTP.
+// dialAnsible dials the broker session at most once: Dial can only succeed
+// once per token (the connection info is sent only once on the core side), but
+// the resulting gRPC connection supports many calls — it is cached and reused
+// by TrustCA/SetResolver/SetNTP.
 func (m *baseOSModule) dialAnsible() (ansiblev1.AnsibleClient, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
@@ -81,17 +79,17 @@ func (m *baseOSModule) dialAnsible() (ansiblev1.AnsibleClient, error) {
 		return m.ansibleClient, nil
 	}
 	if m.broker == nil || m.brokerToken == "" {
-		return nil, fmt.Errorf("base-os : aucune session de broker (Check n'a pas encore été appelé sur ce module)")
+		return nil, fmt.Errorf("base-os: no broker session (Check has not been called on this module yet)")
 	}
 	conn, err := m.broker.Dial(m.brokerToken)
 	if err != nil {
-		return nil, fmt.Errorf("connexion à core.ansible/v1 : %w", err)
+		return nil, fmt.Errorf("connecting to core.ansible/v1: %w", err)
 	}
 	m.ansibleClient = ansiblev1.NewAnsibleClient(conn)
 	return m.ansibleClient, nil
 }
 
-// osBaseServer implémente la fonction os.base/v1.
+// osBaseServer implements the os.base/v1 function.
 type osBaseServer struct {
 	osbasev1.UnimplementedBaseServer
 	module *baseOSModule
@@ -107,7 +105,7 @@ func toAnsibleTarget(t *osbasev1.Target) *ansiblev1.Target {
 }
 
 func (s *osBaseServer) Harden(context.Context, *osbasev1.HardenRequest) (*osbasev1.HardenResponse, error) {
-	return nil, status.Error(codes.Unimplemented, "Harden : durcissement pur différé à une itération future (docs/PROGRESS.md)")
+	return nil, status.Error(codes.Unimplemented, "Harden: pure hardening deferred to a future iteration (docs/PROGRESS.md)")
 }
 
 func (s *osBaseServer) TrustCA(ctx context.Context, req *osbasev1.TrustCARequest) (*osbasev1.TrustCAResponse, error) {
@@ -128,7 +126,7 @@ func (s *osBaseServer) TrustCA(ctx context.Context, req *osbasev1.TrustCARequest
 		return nil, err
 	}
 	if !resp.GetOk() {
-		return nil, fmt.Errorf("TrustCA a échoué :\n%s", resp.GetOutput())
+		return nil, fmt.Errorf("TrustCA failed:\n%s", resp.GetOutput())
 	}
 	return &osbasev1.TrustCAResponse{}, nil
 }
@@ -155,7 +153,7 @@ func (s *osBaseServer) SetResolver(ctx context.Context, req *osbasev1.SetResolve
 		return nil, err
 	}
 	if !resp.GetOk() {
-		return nil, fmt.Errorf("SetResolver a échoué :\n%s", resp.GetOutput())
+		return nil, fmt.Errorf("SetResolver failed:\n%s", resp.GetOutput())
 	}
 	return &osbasev1.SetResolverResponse{}, nil
 }
@@ -182,7 +180,7 @@ func (s *osBaseServer) SetNTP(ctx context.Context, req *osbasev1.SetNTPRequest) 
 		return nil, err
 	}
 	if !resp.GetOk() {
-		return nil, fmt.Errorf("SetNTP a échoué :\n%s", resp.GetOutput())
+		return nil, fmt.Errorf("SetNTP failed:\n%s", resp.GetOutput())
 	}
 	return &osbasev1.SetNTPResponse{}, nil
 }

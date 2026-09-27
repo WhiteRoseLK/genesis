@@ -20,10 +20,10 @@ import (
 	modulev1 "github.com/WhiteRoseLK/genesis/sdk/go/gen/module/v1"
 )
 
-// fakeProxmoxServer simule juste assez de l'API Proxmox VE pour exercer
-// proxmox de bout en bout : liste de VM, next-id, clone, config cloud-init,
-// start, status, delete, version, time (docs/08-milestones.md, J5 — pas de
-// cluster réel dans cet environnement, voir docs/PROGRESS.md).
+// fakeProxmoxServer simulates just enough of the Proxmox VE API to exercise
+// proxmox end to end: VM list, next-id, clone, cloud-init config, start,
+// status, delete, version, time (docs/08-milestones.md, M5 — no real cluster
+// in this environment, see docs/PROGRESS.md).
 type fakeProxmoxServer struct {
 	mu       sync.Mutex
 	nextID   int
@@ -83,20 +83,20 @@ func (f *fakeProxmoxServer) handler() http.HandlerFunc {
 			f.writeData(w, list)
 
 		case strings.HasSuffix(path, "/clone"):
-			// {vmid} dans le chemin est le template SOURCE ; le nouvel
-			// identifiant arrive dans le champ de formulaire "newid", pas
-			// dans le chemin (vraie forme de l'API Proxmox).
+			// {vmid} in the path is the SOURCE template; the new ID arrives in
+			// the "newid" form field, not in the path (the real shape of the
+			// Proxmox API).
 			_ = r.ParseForm()
 			newID, err := strconv.Atoi(r.FormValue("newid"))
 			if err != nil {
-				http.Error(w, `{"data":null,"errors":"newid manquant ou invalide"}`, http.StatusBadRequest)
+				http.Error(w, `{"data":null,"errors":"missing or invalid newid"}`, http.StatusBadRequest)
 				return
 			}
 			f.vms[newID] = &fakeVM{VMID: newID, Name: r.FormValue("name"), Status: "stopped"}
 			f.writeData(w, nil)
 
 		case strings.HasSuffix(path, "/config"):
-			f.writeData(w, nil) // VM arrêtée : appliqué de façon synchrone
+			f.writeData(w, nil) // stopped VM: applied synchronously
 
 		case strings.HasSuffix(path, "/status/start"):
 			id := extractVMID(path, "/nodes/pve01/qemu/", "/status/start")
@@ -120,7 +120,7 @@ func (f *fakeProxmoxServer) handler() http.HandlerFunc {
 			f.writeData(w, nil)
 
 		default:
-			http.Error(w, `{"data":null,"errors":"route de fixture inconnue: `+path+`"}`, http.StatusNotImplemented)
+			http.Error(w, `{"data":null,"errors":"unknown fixture route: `+path+`"}`, http.StatusNotImplemented)
 		}
 	}
 }
@@ -130,8 +130,8 @@ func itoa(i int) string {
 	return string(b)
 }
 
-// extractVMID extrait l'identifiant numérique entre prefix et suffix dans
-// un chemin comme /api2/json/nodes/pve01/qemu/101/clone.
+// extractVMID extracts the numeric ID between prefix and suffix in a path such
+// as /api2/json/nodes/pve01/qemu/101/clone.
 func extractVMID(path, prefix, suffix string) int {
 	rest := path[strings.Index(path, prefix)+len(prefix):]
 	if suffix != "" {
@@ -154,10 +154,10 @@ func stepRequestWithConfig(t *testing.T, cfg map[string]any) *modulev1.StepReque
 	return &modulev1.StepRequest{RunId: "test", Config: s}
 }
 
-// TestProxmoxEnsureVMIsIdempotentAndLifecycleWorks est le critère
-// d'acceptation du jalon J5 (doc 08) : "spec compute + une VM placée -> VM
-// créée... ; relance -> 0 changement ; destroy la supprime" — vérifié contre
-// des fixtures HTTP fidèles à l'API Proxmox documentée, pas un vrai cluster.
+// TestProxmoxEnsureVMIsIdempotentAndLifecycleWorks is the M5 acceptance
+// criterion (doc 08): "compute spec + one placed VM -> VM created... ; re-run
+// -> 0 changes; destroy deletes it" — checked against HTTP fixtures faithful
+// to the documented Proxmox API, not a real cluster.
 func TestProxmoxEnsureVMIsIdempotentAndLifecycleWorks(t *testing.T) {
 	fake := newFakeProxmoxServer()
 	srv := httptest.NewServer(fake.handler())
@@ -166,7 +166,7 @@ func TestProxmoxEnsureVMIsIdempotentAndLifecycleWorks(t *testing.T) {
 	binaryPath, manifest := buildModule(t, "proxmox")
 	client, err := modulehost.Launch(binaryPath, manifest)
 	if err != nil {
-		t.Fatalf("Launch : %v", err)
+		t.Fatalf("Launch: %v", err)
 	}
 	defer client.Close()
 	ctx := context.Background()
@@ -183,73 +183,73 @@ func TestProxmoxEnsureVMIsIdempotentAndLifecycleWorks(t *testing.T) {
 
 	checkResp, err := client.Module().Check(ctx, stepRequestWithConfig(t, cfg))
 	if err != nil {
-		t.Fatalf("Check : %v", err)
+		t.Fatalf("Check: %v", err)
 	}
 	if checkResp.GetStatus() != modulev1.CheckResult_STATUS_COMPLIANT {
-		t.Fatalf("Check().Status = %v, attendu CONFORME (connexion à l'API de fixtures)", checkResp.GetStatus())
+		t.Fatalf("Check().Status = %v, want COMPLIANT (connection to the fixture API)", checkResp.GetStatus())
 	}
 
 	conn, err := client.DispenseFunction("compute.vm/v1")
 	if err != nil {
-		t.Fatalf("DispenseFunction : %v", err)
+		t.Fatalf("DispenseFunction: %v", err)
 	}
 	vmClient := computevmv1.NewComputeVMClient(conn)
 
 	if _, err := vmClient.EnsureImage(ctx, &computevmv1.EnsureImageRequest{Image: "debian-13"}); err != nil {
-		t.Fatalf("EnsureImage : %v", err)
+		t.Fatalf("EnsureImage: %v", err)
 	}
 
 	first, err := vmClient.EnsureVM(ctx, &computevmv1.EnsureVMRequest{
 		Name: "infra01", Env: "lab", Ip: "10.10.0.55/24", Gateway: "10.10.0.1", User: "genesis",
 	})
 	if err != nil {
-		t.Fatalf("EnsureVM (première fois) : %v", err)
+		t.Fatalf("EnsureVM (first time): %v", err)
 	}
 	if first.GetStatus() != "running" {
-		t.Errorf("VM.Status = %q, attendu running après le démarrage", first.GetStatus())
+		t.Errorf("VM.Status = %q, want running after the start", first.GetStatus())
 	}
 
-	// Relance -> 0 changement : la seconde EnsureVM doit retrouver la même
-	// VM (idempotence par nom, docs/07) sans en créer une nouvelle.
+	// Re-run -> 0 changes: the second EnsureVM must find the same VM again
+	// (idempotence by name, docs/07) without creating a new one.
 	second, err := vmClient.EnsureVM(ctx, &computevmv1.EnsureVMRequest{Name: "infra01", Env: "lab"})
 	if err != nil {
-		t.Fatalf("EnsureVM (seconde fois) : %v", err)
+		t.Fatalf("EnsureVM (second time): %v", err)
 	}
 	if second.GetId() != first.GetId() {
-		t.Errorf("EnsureVM a créé une nouvelle VM au lieu de retrouver infra01 : %s puis %s", first.GetId(), second.GetId())
+		t.Errorf("EnsureVM created a new VM instead of finding infra01 again: %s then %s", first.GetId(), second.GetId())
 	}
 
 	got, err := vmClient.GetVM(ctx, &computevmv1.GetVMRequest{Name: "infra01"})
 	if err != nil {
-		t.Fatalf("GetVM : %v", err)
+		t.Fatalf("GetVM: %v", err)
 	}
 	if got.GetId() != first.GetId() {
-		t.Errorf("GetVM = %+v, attendu id=%s", got, first.GetId())
+		t.Errorf("GetVM = %+v, want id=%s", got, first.GetId())
 	}
-	// Les consommateurs (chrony, powerdns, teleport…) se connectent en SSH sur
-	// VM.ssh_port : 0 produirait `ansible_port=0` sur une vraie VM.
+	// Consumers (chrony, powerdns, teleport…) connect over SSH on VM.ssh_port:
+	// 0 would produce `ansible_port=0` on a real VM.
 	for _, vm := range []*computevmv1.VM{first, second, got} {
 		if vm.GetSshPort() != 22 {
-			t.Errorf("VM %s : ssh_port = %d, attendu 22", vm.GetId(), vm.GetSshPort())
+			t.Errorf("VM %s: ssh_port = %d, want 22", vm.GetId(), vm.GetSshPort())
 		}
 	}
 
 	now, err := vmClient.Now(ctx, &computevmv1.NowRequest{})
 	if err != nil {
-		t.Fatalf("Now : %v", err)
+		t.Fatalf("Now: %v", err)
 	}
 	if now.GetTime().AsTime().Unix() != 1234567890 {
-		t.Errorf("Now = %v, attendu 1234567890", now.GetTime().AsTime().Unix())
+		t.Errorf("Now = %v, want 1234567890", now.GetTime().AsTime().Unix())
 	}
 
 	if _, err := vmClient.DeleteVM(ctx, &computevmv1.DeleteVMRequest{Name: "infra01"}); err != nil {
-		t.Fatalf("DeleteVM : %v", err)
+		t.Fatalf("DeleteVM: %v", err)
 	}
 	if _, err := vmClient.GetVM(ctx, &computevmv1.GetVMRequest{Name: "infra01"}); err == nil {
-		t.Error("GetVM après DeleteVM : succès inattendu")
+		t.Error("GetVM after DeleteVM: unexpected success")
 	}
-	// DeleteVM est idempotent : une seconde suppression n'est pas une erreur.
+	// DeleteVM is idempotent: a second deletion is not an error.
 	if _, err := vmClient.DeleteVM(ctx, &computevmv1.DeleteVMRequest{Name: "infra01"}); err != nil {
-		t.Errorf("second DeleteVM (déjà supprimée) : erreur inattendue : %v", err)
+		t.Errorf("second DeleteVM (already deleted): unexpected error: %v", err)
 	}
 }

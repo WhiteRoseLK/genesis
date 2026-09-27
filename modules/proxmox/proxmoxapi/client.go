@@ -1,12 +1,11 @@
 // SPDX-License-Identifier: Apache-2.0
 
-// Package proxmoxapi est un client minimal de l'API REST Proxmox VE — juste
-// ce dont le module a besoin (docs/07-mvp-modules.md), pas une bibliothèque
-// générique. Écrit à la main plutôt qu'avec un SDK tiers : la surface
-// nécessaire est étroite, et un SDK tiers ajouterait une dépendance qu'on ne
-// peut de toute façon pas valider contre un vrai cluster dans cet
-// environnement (docs/PROGRESS.md, J5 : "pas d'accès Proxmox pour
-// l'instant").
+// Package proxmoxapi is a minimal client of the Proxmox VE REST API — just
+// what the module needs (docs/07-mvp-modules.md), not a generic library.
+// Written by hand rather than with a third-party SDK: the surface needed is
+// narrow, and a third-party SDK would add a dependency that cannot be
+// validated against a real cluster in this environment anyway
+// (docs/PROGRESS.md, M5: "no Proxmox access for now").
 package proxmoxapi
 
 import (
@@ -20,7 +19,7 @@ import (
 	"time"
 )
 
-// Client parle à l'API REST d'un cluster Proxmox VE.
+// Client talks to the REST API of a Proxmox VE cluster.
 type Client struct {
 	baseURL     string // ex. https://pve01.home.arpa:8006/api2/json
 	tokenID     string
@@ -28,8 +27,8 @@ type Client struct {
 	httpClient  *http.Client
 }
 
-// New construit un Client. httpClient nil utilise http.DefaultClient — passer
-// un client dédié en test pour pointer vers un serveur de fixtures.
+// New builds a Client. A nil httpClient uses http.DefaultClient — pass a
+// dedicated client in tests to point to a fixture server.
 func New(endpoint, tokenID, tokenSecret string, httpClient *http.Client) *Client {
 	if httpClient == nil {
 		httpClient = http.DefaultClient
@@ -42,23 +41,23 @@ func New(endpoint, tokenID, tokenSecret string, httpClient *http.Client) *Client
 	}
 }
 
-// apiError est l'erreur renvoyée par l'API Proxmox (statut non-2xx).
+// apiError is the error returned by the Proxmox API (non-2xx status).
 type apiError struct {
 	StatusCode int
 	Message    string
 }
 
 func (e *apiError) Error() string {
-	return fmt.Sprintf("proxmox : %s (HTTP %d)", e.Message, e.StatusCode)
+	return fmt.Sprintf("proxmox: %s (HTTP %d)", e.Message, e.StatusCode)
 }
 
-// envelope est la forme commune de toutes les réponses Proxmox : {"data": ...}.
+// envelope is the common shape of every Proxmox response: {"data": ...}.
 type envelope struct {
 	Data json.RawMessage `json:"data"`
 }
 
-// do exécute une requête et décode son enveloppe "data" dans out (nil pour
-// ignorer le corps).
+// do runs a request and decodes its "data" envelope into out (nil to ignore
+// the body).
 func (c *Client) do(ctx context.Context, method, path string, form url.Values, out any) error {
 	var body io.Reader
 	if form != nil {
@@ -67,7 +66,7 @@ func (c *Client) do(ctx context.Context, method, path string, form url.Values, o
 
 	req, err := http.NewRequestWithContext(ctx, method, c.baseURL+path, body)
 	if err != nil {
-		return fmt.Errorf("construction de la requête %s %s : %w", method, path, err)
+		return fmt.Errorf("building the request %s %s: %w", method, path, err)
 	}
 	req.Header.Set("Authorization", fmt.Sprintf("PVEAPIToken=%s=%s", c.tokenID, c.tokenSecret))
 	if form != nil {
@@ -76,13 +75,13 @@ func (c *Client) do(ctx context.Context, method, path string, form url.Values, o
 
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
-		return fmt.Errorf("%s %s : %w", method, path, err)
+		return fmt.Errorf("%s %s: %w", method, path, err)
 	}
 	defer func() { _ = resp.Body.Close() }()
 
 	raw, err := io.ReadAll(resp.Body)
 	if err != nil {
-		return fmt.Errorf("lecture de la réponse de %s %s : %w", method, path, err)
+		return fmt.Errorf("reading the response of %s %s: %w", method, path, err)
 	}
 
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
@@ -94,44 +93,46 @@ func (c *Client) do(ctx context.Context, method, path string, form url.Values, o
 	}
 	var env envelope
 	if err := json.Unmarshal(raw, &env); err != nil {
-		return fmt.Errorf("réponse inattendue de %s %s : %w\n%s", method, path, err, raw)
+		return fmt.Errorf("unexpected response from %s %s: %w\n%s", method, path, err, raw)
 	}
 	if err := json.Unmarshal(env.Data, out); err != nil {
-		return fmt.Errorf("décodage de la réponse de %s %s : %w", method, path, err)
+		return fmt.Errorf("decoding the response of %s %s: %w", method, path, err)
 	}
 	return nil
 }
 
-// TaskStatus est l'état d'une tâche asynchrone Proxmox (identifiée par UPID).
+// TaskStatus is the state of an asynchronous Proxmox task (identified by its
+// UPID).
 type TaskStatus struct {
 	Status     string `json:"status"`     // running | stopped
-	ExitStatus string `json:"exitstatus"` // "OK" ou un message d'erreur, une fois stopped
+	ExitStatus string `json:"exitstatus"` // "OK" or an error message, once stopped
 }
 
-// WaitForTask sonde /nodes/{node}/tasks/{upid}/status jusqu'à ce que la
-// tâche se termine, ou que ctx expire.
+// WaitForTask polls /nodes/{node}/tasks/{upid}/status until the task ends, or
+// ctx expires.
 func (c *Client) WaitForTask(ctx context.Context, node, upid string) error {
 	path := fmt.Sprintf("/nodes/%s/tasks/%s/status", node, url.PathEscape(upid))
 	for {
 		var status TaskStatus
 		if err := c.do(ctx, http.MethodGet, path, nil, &status); err != nil {
-			return fmt.Errorf("suivi de la tâche %s : %w", upid, err)
+			return fmt.Errorf("tracking task %s: %w", upid, err)
 		}
 		if status.Status == "stopped" {
 			if status.ExitStatus != "OK" {
-				return fmt.Errorf("tâche %s en échec : %s", upid, status.ExitStatus)
+				return fmt.Errorf("task %s failed: %s", upid, status.ExitStatus)
 			}
 			return nil
 		}
 		select {
 		case <-ctx.Done():
-			return fmt.Errorf("tâche %s : %w", upid, ctx.Err())
+			return fmt.Errorf("task %s: %w", upid, ctx.Err())
 		case <-time.After(time.Second):
 		}
 	}
 }
 
-// Version vérifie l'accès à l'API (docs/05-bootstrap-lifecycle.md, Phase 0 : Validate).
+// Version checks access to the API (docs/05-bootstrap-lifecycle.md, Phase 0:
+// Validate).
 func (c *Client) Version(ctx context.Context) (string, error) {
 	var v struct {
 		Version string `json:"version"`

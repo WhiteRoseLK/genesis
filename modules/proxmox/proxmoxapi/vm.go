@@ -12,15 +12,15 @@ import (
 	"strings"
 )
 
-// VM est le sous-ensemble de champs d'une VM Proxmox dont le module a besoin.
+// VM is the subset of a Proxmox VM's fields that the module needs.
 type VM struct {
 	VMID     int    `json:"vmid"`
 	Name     string `json:"name"`
 	Status   string `json:"status"`
-	Template int    `json:"template,omitempty"` // 1 si c'est un template
+	Template int    `json:"template,omitempty"` // 1 if it is a template
 }
 
-// NextID demande au cluster un identifiant de VM libre.
+// NextID asks the cluster for a free VM ID.
 func (c *Client) NextID(ctx context.Context) (int, error) {
 	var idStr string
 	if err := c.do(ctx, http.MethodGet, "/cluster/nextid", nil, &idStr); err != nil {
@@ -28,12 +28,12 @@ func (c *Client) NextID(ctx context.Context) (int, error) {
 	}
 	id, err := strconv.Atoi(idStr)
 	if err != nil {
-		return 0, fmt.Errorf("identifiant inattendu depuis /cluster/nextid : %q", idStr)
+		return 0, fmt.Errorf("unexpected ID from /cluster/nextid: %q", idStr)
 	}
 	return id, nil
 }
 
-// ListVMs liste les VM (et templates) du nœud.
+// ListVMs lists the node's VMs (and templates).
 func (c *Client) ListVMs(ctx context.Context, node string) ([]VM, error) {
 	var vms []VM
 	if err := c.do(ctx, http.MethodGet, fmt.Sprintf("/nodes/%s/qemu", node), nil, &vms); err != nil {
@@ -42,8 +42,8 @@ func (c *Client) ListVMs(ctx context.Context, node string) ([]VM, error) {
 	return vms, nil
 }
 
-// FindVMByName cherche une VM existante par nom — clé d'idempotence
-// d'EnsureVM avec le tag genesis-env (docs/07-mvp-modules.md).
+// FindVMByName looks for an existing VM by name — EnsureVM's idempotence key,
+// with the genesis-env tag (docs/07-mvp-modules.md).
 func (c *Client) FindVMByName(ctx context.Context, node, name string) (*VM, error) {
 	vms, err := c.ListVMs(ctx, node)
 	if err != nil {
@@ -57,7 +57,7 @@ func (c *Client) FindVMByName(ctx context.Context, node, name string) (*VM, erro
 	return nil, nil
 }
 
-// FindTemplateByName cherche un template existant par nom.
+// FindTemplateByName looks for an existing template by name.
 func (c *Client) FindTemplateByName(ctx context.Context, node, name string) (*VM, error) {
 	vms, err := c.ListVMs(ctx, node)
 	if err != nil {
@@ -71,10 +71,9 @@ func (c *Client) FindTemplateByName(ctx context.Context, node, name string) (*VM
 	return nil, nil
 }
 
-// doMaybeAsync exécute une opération dont la réponse est soit un UPID à
-// attendre (VM en cours d'exécution : changement différé), soit vide
-// (VM arrêtée : appliqué de façon synchrone) — les deux existent réellement
-// selon l'état de la VM au moment de l'appel.
+// doMaybeAsync runs an operation whose response is either a UPID to wait for
+// (running VM: deferred change) or empty (stopped VM: applied synchronously) —
+// both really happen, depending on the VM's state at the time of the call.
 func (c *Client) doMaybeAsync(ctx context.Context, node, method, path string, form url.Values) error {
 	var raw json.RawMessage
 	if err := c.do(ctx, method, path, form, &raw); err != nil {
@@ -87,14 +86,15 @@ func (c *Client) doMaybeAsync(ctx context.Context, node, method, path string, fo
 	return nil
 }
 
-// CloneVMOptions décrit un clone lié (docs/07 : "clone lié du template").
+// CloneVMOptions describes a linked clone (docs/07: "linked clone of the
+// template").
 type CloneVMOptions struct {
 	TemplateID int
 	NewID      int
 	Name       string
 }
 
-// CloneVM clone (lié) le template vers une nouvelle VM.
+// CloneVM makes a (linked) clone of the template into a new VM.
 func (c *Client) CloneVM(ctx context.Context, node string, opts CloneVMOptions) error {
 	form := url.Values{}
 	form.Set("newid", strconv.Itoa(opts.NewID))
@@ -104,25 +104,26 @@ func (c *Client) CloneVM(ctx context.Context, node string, opts CloneVMOptions) 
 	return c.doMaybeAsync(ctx, node, http.MethodPost, path, form)
 }
 
-// CloudInitOptions configure cloud-init sur une VM (docs/07 : "IP, clé SSH
-// de service, utilisateur genesis").
+// CloudInitOptions configures cloud-init on a VM (docs/07: "IP, service SSH
+// key, genesis user").
 type CloudInitOptions struct {
 	User         string
 	SSHPublicKey string
-	IP           string // vide = dhcp
+	IP           string // empty = dhcp
 	Gateway      string
 	Tags         []string
 }
 
-// ConfigureCloudInit applique la configuration cloud-init.
+// ConfigureCloudInit applies the cloud-init configuration.
 func (c *Client) ConfigureCloudInit(ctx context.Context, node string, vmid int, opts CloudInitOptions) error {
 	form := url.Values{}
 	if opts.User != "" {
 		form.Set("ciuser", opts.User)
 	}
 	if opts.SSHPublicKey != "" {
-		// L'API Proxmox attend sshkeys ré-encodé en URL avant l'encodage de
-		// formulaire lui-même (double encodage, quirk documenté de l'API).
+		// The Proxmox API expects sshkeys to be URL-encoded again before the
+		// form encoding itself (double encoding, a documented quirk of the
+		// API).
 		form.Set("sshkeys", url.QueryEscape(opts.SSHPublicKey))
 	}
 	if opts.IP != "" {
@@ -141,26 +142,26 @@ func (c *Client) ConfigureCloudInit(ctx context.Context, node string, vmid int, 
 	return c.doMaybeAsync(ctx, node, http.MethodPut, path, form)
 }
 
-// StartVM démarre une VM.
+// StartVM starts a VM.
 func (c *Client) StartVM(ctx context.Context, node string, vmid int) error {
 	path := fmt.Sprintf("/nodes/%s/qemu/%d/status/start", node, vmid)
 	return c.doMaybeAsync(ctx, node, http.MethodPost, path, nil)
 }
 
-// DeleteVM supprime une VM.
+// DeleteVM deletes a VM.
 func (c *Client) DeleteVM(ctx context.Context, node string, vmid int) error {
 	path := fmt.Sprintf("/nodes/%s/qemu/%d", node, vmid)
 	return c.doMaybeAsync(ctx, node, http.MethodDelete, path, nil)
 }
 
-// VMStatus est le statut courant d'une VM.
+// VMStatus is a VM's current status.
 type VMStatus struct {
 	VMID   int    `json:"vmid"`
 	Name   string `json:"name"`
 	Status string `json:"status"`
 }
 
-// Status interroge le statut courant d'une VM.
+// Status queries a VM's current status.
 func (c *Client) Status(ctx context.Context, node string, vmid int) (*VMStatus, error) {
 	var s VMStatus
 	path := fmt.Sprintf("/nodes/%s/qemu/%d/status/current", node, vmid)
@@ -170,12 +171,12 @@ func (c *Client) Status(ctx context.Context, node string, vmid int) (*VMStatus, 
 	return &s, nil
 }
 
-// NodeTime est l'heure du nœud (docs/05-bootstrap-lifecycle.md : contrôle d'horloge).
+// NodeTime is the node's clock (docs/05-bootstrap-lifecycle.md: clock check).
 type NodeTime struct {
-	Time int64 `json:"time"` // secondes Unix
+	Time int64 `json:"time"` // Unix seconds
 }
 
-// Time interroge l'heure du nœud.
+// Time queries the node's clock.
 func (c *Client) Time(ctx context.Context, node string) (*NodeTime, error) {
 	var t NodeTime
 	if err := c.do(ctx, http.MethodGet, fmt.Sprintf("/nodes/%s/time", node), nil, &t); err != nil {

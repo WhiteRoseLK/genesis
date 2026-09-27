@@ -1,7 +1,7 @@
 apiVersion: genesis/module/v1
 name: panicking
 version: 0.1.0
-description: "module de test - panique volontairement dans Check (internal/modulehost)"
+description: "test module - panics on purpose in Check (internal/modulehost)"
 layer: platform
 core: ">=0.1.0"
 protocol: 1

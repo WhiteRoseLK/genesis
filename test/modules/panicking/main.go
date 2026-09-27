@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: Apache-2.0
 
-// Module de test pour internal/modulehost : Check panique volontairement,
-// pour vérifier que le cœur produit une erreur propre sans s'arrêter
-// (critère d'acceptation du jalon J3, docs/08-milestones.md).
+// Test module for internal/modulehost: Check panics on purpose, to check that
+// the core produces a clean error without stopping (M3 acceptance criterion,
+// docs/08-milestones.md).
 package main
 
 import (
@@ -26,7 +26,7 @@ func (m *panickingModule) Describe(context.Context, *modulev1.Empty) (*modulev1.
 }
 
 func (m *panickingModule) Check(context.Context, *modulev1.StepRequest) (*modulev1.CheckResult, error) {
-	panic("panicking : panique intentionnelle pour le test de supervision")
+	panic("panicking: intentional panic for the supervision test")
 }
 
 func main() {

@@ -12,15 +12,15 @@ import (
 	dnszonev1 "github.com/WhiteRoseLK/genesis/sdk/go/gen/functions/dns/zone/v1"
 )
 
-// newTestPDNSServer simule l'API REST de PowerDNS Authoritative sur les
-// routes que api.go utilise réellement — prouve la forme exacte des
-// requêtes/réponses HTTP sans dépendre de Docker (le vrai produit est
-// installé/configuré par ansible, mécanisme déjà prouvé en dehors de ce
+// newTestPDNSServer simulates the PowerDNS Authoritative REST API on the
+// routes api.go really uses — it proves the exact shape of the HTTP
+// requests/responses without depending on Docker (the real product is
+// installed/configured by ansible, a mechanism already proven outside this
 // module, internal/broker/ansible_test.go).
 type testPDNSServer struct {
 	zones map[string]*pdnsZoneResponse
-	// lastAPIKey capture le dernier en-tête X-API-Key reçu, pour prouver
-	// qu'il est bien transmis.
+	// lastAPIKey records the last X-API-Key header received, to prove that it
+	// is passed on.
 	lastAPIKey string
 }
 
@@ -91,16 +91,16 @@ func removeRRset(rrsets []pdnsRRset, name, typ string) []pdnsRRset {
 	return out
 }
 
-// TestPowerDNSZoneServerRoundTrip prouve le round-trip réel Upsert -> List
-// -> Delete -> List à travers de vraies requêtes HTTP (httptest), y compris
-// la création automatique de zone au premier UpsertRecord et le filtrage
-// des enregistrements SOA/NS auto-créés (docs/07-mvp-modules.md).
+// TestPowerDNSZoneServerRoundTrip proves the real Upsert -> List -> Delete ->
+// List round trip through real HTTP requests (httptest), including the
+// automatic zone creation on the first UpsertRecord and the filtering of the
+// automatically created SOA/NS records (docs/07-mvp-modules.md).
 func TestPowerDNSZoneServerRoundTrip(t *testing.T) {
 	ts, srv := newTestPDNSServer()
 	defer srv.Close()
 
 	zoneServer := &powerdnsZoneServer{
-		client: newPDNSClient(srv.URL, "clé-de-test"),
+		client: newPDNSClient(srv.URL, "test-key"),
 		vmIP:   "10.10.0.20",
 		domain: "lab.internal",
 	}
@@ -109,48 +109,48 @@ func TestPowerDNSZoneServerRoundTrip(t *testing.T) {
 	if _, err := zoneServer.UpsertRecord(ctx, &dnszonev1.Record{
 		Zone: "lab.internal", Name: "infra01", Type: "A", Values: []string{"10.10.0.5"}, Ttl: 300,
 	}); err != nil {
-		t.Fatalf("UpsertRecord : %v", err)
+		t.Fatalf("UpsertRecord: %v", err)
 	}
-	if ts.lastAPIKey != "clé-de-test" {
-		t.Errorf("X-API-Key = %q, attendu la clé de test", ts.lastAPIKey)
+	if ts.lastAPIKey != "test-key" {
+		t.Errorf("X-API-Key = %q, want the test key", ts.lastAPIKey)
 	}
 
 	records, err := zoneServer.ListRecords(ctx, &dnszonev1.Zone{Zone: "lab.internal"})
 	if err != nil {
-		t.Fatalf("ListRecords : %v", err)
+		t.Fatalf("ListRecords: %v", err)
 	}
 	if len(records.GetRecords()) != 1 {
-		t.Fatalf("ListRecords = %+v, attendu 1 enregistrement (SOA/NS filtrés)", records.GetRecords())
+		t.Fatalf("ListRecords = %+v, want 1 record (SOA/NS filtered out)", records.GetRecords())
 	}
 	got := records.GetRecords()[0]
 	if got.GetName() != "infra01" || got.GetType() != "A" || got.GetValues()[0] != "10.10.0.5" {
-		t.Errorf("enregistrement = %+v, attendu infra01 A 10.10.0.5", got)
+		t.Errorf("record = %+v, want infra01 A 10.10.0.5", got)
 	}
 
 	if _, err := zoneServer.DeleteRecord(ctx, &dnszonev1.RecordKey{Zone: "lab.internal", Name: "infra01", Type: "A"}); err != nil {
-		t.Fatalf("DeleteRecord : %v", err)
+		t.Fatalf("DeleteRecord: %v", err)
 	}
 	records, err = zoneServer.ListRecords(ctx, &dnszonev1.Zone{Zone: "lab.internal"})
 	if err != nil {
-		t.Fatalf("ListRecords après DeleteRecord : %v", err)
+		t.Fatalf("ListRecords after DeleteRecord: %v", err)
 	}
 	if len(records.GetRecords()) != 0 {
-		t.Errorf("ListRecords après DeleteRecord = %+v, attendu vide", records.GetRecords())
+		t.Errorf("ListRecords after DeleteRecord = %+v, want empty", records.GetRecords())
 	}
 }
 
-// TestEnsureZoneIdempotent prouve que créer deux fois la même zone (409 de
-// PowerDNS) n'est pas une erreur (docs03 §4 règle 3 : idempotence).
+// TestEnsureZoneIdempotent proves that creating the same zone twice (a 409
+// from PowerDNS) is not an error (doc 03 §4 rule 3: idempotence).
 func TestEnsureZoneIdempotent(t *testing.T) {
 	_, srv := newTestPDNSServer()
 	defer srv.Close()
-	client := newPDNSClient(srv.URL, "clé-de-test")
+	client := newPDNSClient(srv.URL, "test-key")
 	ctx := context.Background()
 
 	if err := client.ensureZone(ctx, "lab.internal"); err != nil {
-		t.Fatalf("premier ensureZone : %v", err)
+		t.Fatalf("first ensureZone: %v", err)
 	}
 	if err := client.ensureZone(ctx, "lab.internal"); err != nil {
-		t.Fatalf("second ensureZone (déjà existante) : %v", err)
+		t.Fatalf("second ensureZone (already exists): %v", err)
 	}
 }

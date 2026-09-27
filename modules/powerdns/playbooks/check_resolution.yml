@@ -1,34 +1,34 @@
 ---
-# Verify (functions/dns/zone/v1 + dns/resolver/v1, module powerdns) : exécuté
-# sur une VM tierce jetable, résolution directe + inverse + nom externe
-# (docs/07-mvp-modules.md : "Verify : résolution directe/inverse depuis une
-# VM tierce + nom externe").
+# Verify (functions/dns/zone/v1 + dns/resolver/v1, powerdns module): runs on a
+# disposable third-party VM, forward + reverse resolution + an external name
+# (docs/07-mvp-modules.md: "Verify: forward/reverse resolution from a
+# third-party VM + an external name").
 - hosts: target
   gather_facts: false
   become: true
   tasks:
-    - name: installer les outils DNS de vérification
+    - name: install the DNS verification tools
       ansible.builtin.apt:
         name: dnsutils
         state: present
         update_cache: true
 
-    - name: résolution directe
+    - name: forward resolution
       ansible.builtin.command: dig @{{ dns_server }} +short {{ forward_name }} A
       register: forward
       changed_when: false
 
-    - name: résolution inverse
+    - name: reverse resolution
       ansible.builtin.command: dig @{{ dns_server }} +short -x {{ reverse_ip }}
       register: reverse
       changed_when: false
 
-    - name: résolution d'un nom externe (via le recursor)
+    - name: resolve an external name (through the recursor)
       ansible.builtin.command: dig @{{ dns_server }} +short {{ external_name }} A
       register: external
       changed_when: false
 
-    - name: afficher les résultats
+    - name: show the results
       ansible.builtin.debug:
         msg:
           forward: "{{ forward.stdout }}"

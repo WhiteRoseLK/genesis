@@ -1,20 +1,19 @@
 // SPDX-License-Identifier: Apache-2.0
 
-// teleport fournit access.ssh/v1 et fleet.agent/v1 en phase cible
-// (docs/07-mvp-modules.md) : Teleport Community (Auth + Proxy) sur sa
-// propre VM, avec sa propre CA interne pour les certificats SSH (pas de
-// délégation à pki.issuer/v1 pour la signature SSH, docs/09-decisions.md
-// ADR-018). fleet.agent/v1 est une fonction « de parc » (ADR-017) : chaque
-// module qui provisionne une VM (chrony, powerdns, vault…) l'appelle depuis
-// Configure pour installer l'agent Teleport -- c'est ce qui rend Teleport
-// actif sur tout le parc dès sa présence dans la spec, sans qu'aucun module
-// existant ne le connaisse spécifiquement.
+// teleport provides access.ssh/v1 and fleet.agent/v1 in the target phase
+// (docs/07-mvp-modules.md): Teleport Community (Auth + Proxy) on its own VM,
+// with its own internal CA for SSH certificates (no delegation to
+// pki.issuer/v1 for SSH signing, docs/09-decisions.md ADR-018). fleet.agent/v1
+// is a "fleet" function (ADR-017): every module that provisions a VM (chrony,
+// powerdns, vault…) calls it from Configure to install the Teleport agent --
+// this is what makes Teleport active across the whole fleet as soon as it is
+// in the spec, without any existing module knowing about it specifically.
 //
-// Portée assumée pour ce jalon : fleet.agent/v1.Install installe et enrôle
-// l'agent mais NE désactive PAS le sshd natif -- le cœur ne bascule pas
-// encore ses runners core.ansible/v1 vers l'agent (Repoint différé,
-// décision explicite, docs/PROGRESS.md), ce qui casserait tout appel
-// ultérieur de core.ansible/v1 sur la VM concernée (ex. Handover de vault).
+// Accepted scope for this milestone: fleet.agent/v1.Install installs and
+// enrols the agent but does NOT disable the native sshd -- the core does not
+// switch its core.ansible/v1 runners to the agent yet (deferred Repoint, an
+// explicit decision, docs/PROGRESS.md), which would break every later
+// core.ansible/v1 call on the VM concerned (e.g. vault's Handover).
 package main
 
 import (
@@ -67,21 +66,21 @@ const (
 	verifyTeleportUser = "genesis-verify"
 	verifyCertTTL      = "5m"
 	authPort           = 3025
-	leafTTLSeconds     = int64(90 * 24 * 60 * 60) // 90 jours, même choix que modules/vault
+	leafTTLSeconds     = int64(90 * 24 * 60 * 60) // 90 days, the same choice as modules/vault
 	joinTokenTTL       = "10m"
 )
 
-// sshKeyPair reflète la valeur JSON produite par le générateur
-// GENERATOR_SSH_KEYPAIR côté cœur (internal/secrets.SSHKeyPair) -- les
-// modules n'important jamais internal/, la forme est dupliquée ici par son
-// seul contrat, même choix que modules/vault et modules/powerdns.
+// sshKeyPair mirrors the JSON value produced by the core's
+// GENERATOR_SSH_KEYPAIR generator (internal/secrets.SSHKeyPair) -- since
+// modules never import internal/, the shape is duplicated here from its
+// contract alone, the same choice as modules/vault and modules/powerdns.
 type sshKeyPair struct {
 	PrivateKeyOpenSSH   string `json:"private_key_openssh"`
 	PublicKeyAuthorized string `json:"public_key_authorized"`
 }
 
-// connTarget porte les coordonnées de connexion à une VM cible, indépendant
-// du type protobuf de la fonction qui les consomme.
+// connTarget holds the connection details of a target VM, independently of the
+// protobuf type of the function that consumes them.
 type connTarget struct {
 	Host       string
 	Port       int32
@@ -112,10 +111,10 @@ type teleportModule struct {
 	dnsResolverClient dnsresolverv1.DnsResolverClient
 	pkiClient         pkiissuerv1.PkiIssuerClient
 
-	// Actif une fois Configure passé (même dette qu'ailleurs, en mémoire
-	// seulement, docs/PROGRESS.md) : requis par fleet.agent/v1.Install et
-	// access.ssh/v1.JumpHost, qui n'ont pas accès à req.State (appelés hors
-	// du cycle Provision/Configure/Verify du cœur).
+	// Active once Configure has passed (the same debt as elsewhere, in memory
+	// only, docs/PROGRESS.md): required by fleet.agent/v1.Install and
+	// access.ssh/v1.JumpHost, which have no access to req.State (called
+	// outside the core's Provision/Configure/Verify cycle).
 	ownTarget   connTarget
 	clusterName string
 	caPin       string
@@ -136,8 +135,8 @@ func (m *teleportModule) Check(_ context.Context, req *modulev1.StepRequest) (*m
 	return &modulev1.CheckResult{Status: modulev1.CheckResult_STATUS_COMPLIANT}, nil
 }
 
-// dial dial la session de broker au plus une fois -- même précaution que
-// modules/vault et modules/powerdns.
+// dial dials the broker session at most once -- the same precaution as
+// modules/vault and modules/powerdns.
 func (m *teleportModule) dial() error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
@@ -145,11 +144,11 @@ func (m *teleportModule) dial() error {
 		return nil
 	}
 	if m.broker == nil || m.brokerToken == "" {
-		return fmt.Errorf("teleport : aucune session de broker (Check n'a pas encore été appelé)")
+		return fmt.Errorf("teleport: no broker session (Check has not been called yet)")
 	}
 	conn, err := m.broker.Dial(m.brokerToken)
 	if err != nil {
-		return fmt.Errorf("connexion aux fonctions requises : %w", err)
+		return fmt.Errorf("connecting to the required functions: %w", err)
 	}
 	m.vmClient = computevmv1.NewComputeVMClient(conn)
 	m.osBaseClient = osbasev1.NewBaseClient(conn)
@@ -185,15 +184,15 @@ func (m *teleportModule) sshKeyPair(ctx context.Context, name string) (sshKeyPai
 		Ref: ref, Generator: secretsv1.Generator_GENERATOR_SSH_KEYPAIR,
 		Meta: &secretsv1.Meta{Owner: "teleport", Consumers: []string{"teleport"}, Kind: "ssh_keypair"},
 	}); err != nil {
-		return sshKeyPair{}, fmt.Errorf("génération de la paire SSH : %w", err)
+		return sshKeyPair{}, fmt.Errorf("generating the SSH pair: %w", err)
 	}
 	resp, err := m.secretsClient.Get(ctx, &secretsv1.GetRequest{Ref: ref})
 	if err != nil {
-		return sshKeyPair{}, fmt.Errorf("lecture de la paire SSH : %w", err)
+		return sshKeyPair{}, fmt.Errorf("reading the SSH pair: %w", err)
 	}
 	var pair sshKeyPair
 	if err := json.Unmarshal([]byte(resp.GetValue()), &pair); err != nil {
-		return sshKeyPair{}, fmt.Errorf("décodage de la paire SSH : %w", err)
+		return sshKeyPair{}, fmt.Errorf("decoding the SSH pair: %w", err)
 	}
 	return pair, nil
 }
@@ -210,8 +209,8 @@ func targetFromState(req *modulev1.StepRequest, pair sshKeyPair) connTarget {
 	return connTarget{Host: fmt.Sprint(state["vm_ip"]), Port: int32(port), User: sshUser, PrivateKey: pair.PrivateKeyOpenSSH}
 }
 
-// Provision crée (ou retrouve, EnsureVM est idempotent) la VM dédiée
-// Auth+Proxy de teleport.
+// Provision creates (or finds again, EnsureVM is idempotent) teleport's
+// dedicated Auth+Proxy VM.
 func (m *teleportModule) Provision(ctx context.Context, req *modulev1.StepRequest) (*modulev1.StepResult, error) {
 	if err := m.dial(); err != nil {
 		return nil, err
@@ -225,7 +224,7 @@ func (m *teleportModule) Provision(ctx context.Context, req *modulev1.StepReques
 		Name: name, Env: name, SshPublicKey: pair.PublicKeyAuthorized, User: sshUser,
 	})
 	if err != nil {
-		return nil, fmt.Errorf("EnsureVM(%q) : %w", name, err)
+		return nil, fmt.Errorf("EnsureVM(%q): %w", name, err)
 	}
 	state := sdk.StateMap(req.GetState())
 	state["vm_name"] = name
@@ -245,7 +244,7 @@ func (m *teleportModule) Destroy(ctx context.Context, req *modulev1.StepRequest)
 	}
 	name := vmName(req)
 	if _, err := m.vmClient.DeleteVM(ctx, &computevmv1.DeleteVMRequest{Name: name}); err != nil {
-		return nil, fmt.Errorf("DeleteVM(%q) : %w", name, err)
+		return nil, fmt.Errorf("DeleteVM(%q): %w", name, err)
 	}
 	return &modulev1.StepResult{Status: modulev1.StepResult_STATUS_OK, State: req.GetState()}, nil
 }

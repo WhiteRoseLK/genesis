@@ -33,19 +33,19 @@ func buildModule(t *testing.T, name string) (binaryPath string, manifest *sdk.Ma
 	build := exec.Command("go", "build", "-o", binaryPath, ".")
 	build.Dir = sourceDir
 	if out, err := build.CombinedOutput(); err != nil {
-		t.Fatalf("compilation de %s : %v\n%s", name, err, out)
+		t.Fatalf("compilation de %s: %v\n%s", name, err, out)
 	}
 	manifest, err = sdk.LoadManifest(filepath.Join(sourceDir, "module.yaml"))
 	if err != nil {
-		t.Fatalf("chargement du manifest de %s : %v", name, err)
+		t.Fatalf("loading the manifest of %s: %v", name, err)
 	}
 	return binaryPath, manifest
 }
 
-// fakeAnsibleServer capture les appels RunPlaybook reçus, pour vérifier ce
-// que base-os envoie réellement sans dépendre de Docker pour ce test (le
-// mécanisme de transport de core.ansible/v1 est déjà prouvé pour de vrai
-// dans internal/broker/ansible_test.go).
+// fakeAnsibleServer records the RunPlaybook calls it receives, to check what
+// base-os really sends without depending on Docker for this test (the
+// core.ansible/v1 transport mechanism is already proven for real in
+// internal/broker/ansible_test.go).
 type fakeAnsibleServer struct {
 	ansiblev1.UnimplementedAnsibleServer
 	mu    sync.Mutex
@@ -68,15 +68,16 @@ func (f *fakeAnsibleServer) lastCall() *ansiblev1.RunPlaybookRequest {
 	return f.calls[len(f.calls)-1]
 }
 
-// TestBaseOSCallsAnsibleWithExpectedPlaybooks vérifie que TrustCA/SetResolver/
-// SetNTP dialent la session de broker capturée par Check et envoient le bon
-// playbook avec les bonnes variables (docs/08-milestones.md, J5).
+// TestBaseOSCallsAnsibleWithExpectedPlaybooks checks that
+// TrustCA/SetResolver/SetNTP dial the broker session captured by Check and
+// send the right playbook with the right variables (docs/08-milestones.md,
+// M5).
 func TestBaseOSCallsAnsibleWithExpectedPlaybooks(t *testing.T) {
 	binaryPath, manifest := buildModule(t, "base-os")
 
 	client, err := modulehost.Launch(binaryPath, manifest)
 	if err != nil {
-		t.Fatalf("Launch : %v", err)
+		t.Fatalf("Launch: %v", err)
 	}
 	defer client.Close()
 	ctx := context.Background()
@@ -89,50 +90,50 @@ func TestBaseOSCallsAnsibleWithExpectedPlaybooks(t *testing.T) {
 		return s
 	})
 
-	// Simule ce que fait l'engine : Check en premier, avec le jeton de
-	// session, pour que base-os le capture (docs/02-architecture.md).
+	// Simulates what the engine does: Check first, with the session token, so
+	// that base-os captures it (docs/02-architecture.md).
 	token := strconv.FormatUint(uint64(sessionID), 10)
 	checkResp, err := client.Module().Check(ctx, &modulev1.StepRequest{RunId: "test", BrokerToken: token})
 	if err != nil {
-		t.Fatalf("Check : %v", err)
+		t.Fatalf("Check: %v", err)
 	}
 	if checkResp.GetStatus() != modulev1.CheckResult_STATUS_COMPLIANT {
-		t.Fatalf("Check().Status = %v, attendu CONFORME", checkResp.GetStatus())
+		t.Fatalf("Check().Status = %v, want COMPLIANT", checkResp.GetStatus())
 	}
 
 	conn, err := client.DispenseFunction("os.base/v1")
 	if err != nil {
-		t.Fatalf("DispenseFunction : %v", err)
+		t.Fatalf("DispenseFunction: %v", err)
 	}
 	osBase := osbasev1.NewBaseClient(conn)
 
-	target := &osbasev1.Target{Host: "10.0.0.5", Port: 22, User: "genesis", SshPrivateKey: "clé-test"}
+	target := &osbasev1.Target{Host: "10.0.0.5", Port: 22, User: "genesis", SshPrivateKey: "test-key"}
 
 	if _, err := osBase.TrustCA(ctx, &osbasev1.TrustCARequest{Target: target, CaCertPem: "CERT-PEM"}); err != nil {
-		t.Fatalf("TrustCA : %v", err)
+		t.Fatalf("TrustCA: %v", err)
 	}
-	if call := fake.lastCall(); call == nil || !strings.Contains(string(call.GetPlaybookYaml()), "installer le certificat CA") {
-		t.Errorf("TrustCA n'a pas envoyé le playbook trust_ca.yml : %+v", call)
+	if call := fake.lastCall(); call == nil || !strings.Contains(string(call.GetPlaybookYaml()), "install the CA certificate") {
+		t.Errorf("TrustCA did not send the trust_ca.yml playbook: %+v", call)
 	} else if call.GetVars().AsMap()["ca_cert_pem"] != "CERT-PEM" {
-		t.Errorf("TrustCA vars = %+v, attendu ca_cert_pem=CERT-PEM", call.GetVars().AsMap())
+		t.Errorf("TrustCA vars = %+v, want ca_cert_pem=CERT-PEM", call.GetVars().AsMap())
 	}
 
 	if _, err := osBase.SetResolver(ctx, &osbasev1.SetResolverRequest{Target: target, Nameservers: []string{"10.10.0.5"}, Domain: "lab.internal"}); err != nil {
-		t.Fatalf("SetResolver : %v", err)
+		t.Fatalf("SetResolver: %v", err)
 	}
-	if call := fake.lastCall(); call == nil || !strings.Contains(string(call.GetPlaybookYaml()), "configurer le résolveur DNS") {
-		t.Errorf("SetResolver n'a pas envoyé le playbook set_resolver.yml : %+v", call)
+	if call := fake.lastCall(); call == nil || !strings.Contains(string(call.GetPlaybookYaml()), "configure the DNS resolver") {
+		t.Errorf("SetResolver did not send the set_resolver.yml playbook: %+v", call)
 	}
 
 	if _, err := osBase.SetNTP(ctx, &osbasev1.SetNTPRequest{Target: target, Servers: []string{"10.10.0.6"}}); err != nil {
-		t.Fatalf("SetNTP : %v", err)
+		t.Fatalf("SetNTP: %v", err)
 	}
-	if call := fake.lastCall(); call == nil || !strings.Contains(string(call.GetPlaybookYaml()), "configurer les serveurs NTP") {
-		t.Errorf("SetNTP n'a pas envoyé le playbook set_ntp.yml : %+v", call)
+	if call := fake.lastCall(); call == nil || !strings.Contains(string(call.GetPlaybookYaml()), "configure the NTP servers") {
+		t.Errorf("SetNTP did not send the set_ntp.yml playbook: %+v", call)
 	}
 
-	// Harden reste un stub explicite pour ce jalon (voir docs/PROGRESS.md).
+	// Harden stays an explicit stub for this milestone (see docs/PROGRESS.md).
 	if _, err := osBase.Harden(ctx, &osbasev1.HardenRequest{Target: target}); err == nil {
-		t.Error("Harden : succès inattendu, devrait encore être Unimplemented")
+		t.Error("Harden: unexpected success, should still be Unimplemented")
 	}
 }

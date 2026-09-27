@@ -11,9 +11,9 @@ import (
 	"testing"
 )
 
-// newTestServer construit un serveur de fixtures : handler mappe méthode+chemin
-// vers une fonction qui écrit la réponse JSON (déjà enveloppée en {"data": ...}
-// par writeData, ou une erreur via writeError).
+// newTestServer builds a fixture server: handler maps method+path to a
+// function that writes the JSON response (already wrapped in {"data": ...} by
+// writeData, or an error through writeError).
 func newTestServer(t *testing.T, handler func(w http.ResponseWriter, r *http.Request)) (*Client, *httptest.Server) {
 	t.Helper()
 	srv := httptest.NewServer(http.HandlerFunc(handler))
@@ -38,11 +38,11 @@ func TestAuthorizationHeader(t *testing.T) {
 	})
 
 	if _, err := client.Version(context.Background()); err != nil {
-		t.Fatalf("Version : %v", err)
+		t.Fatalf("Version: %v", err)
 	}
 	want := "PVEAPIToken=genesis@pve!token=secret-uuid"
 	if gotAuth != want {
-		t.Errorf("Authorization = %q, attendu %q", gotAuth, want)
+		t.Errorf("Authorization = %q, want %q", gotAuth, want)
 	}
 }
 
@@ -56,7 +56,7 @@ func TestVersionUsesAPIPrefix(t *testing.T) {
 		t.Fatal(err)
 	}
 	if gotPath != "/api2/json/version" {
-		t.Errorf("path = %q, attendu /api2/json/version", gotPath)
+		t.Errorf("path = %q, want /api2/json/version", gotPath)
 	}
 }
 
@@ -67,7 +67,7 @@ func TestNonSuccessStatusReturnsError(t *testing.T) {
 	})
 	_, err := client.Version(context.Background())
 	if err == nil {
-		t.Fatal("réponse 403 : succès inattendu")
+		t.Fatal("403 response: unexpected success")
 	}
 }
 
@@ -75,7 +75,7 @@ func TestWaitForTaskPollsUntilStopped(t *testing.T) {
 	calls := 0
 	client, _ := newTestServer(t, func(w http.ResponseWriter, r *http.Request) {
 		if !strings.Contains(r.URL.Path, "/tasks/") {
-			t.Fatalf("chemin inattendu : %s", r.URL.Path)
+			t.Fatalf("unexpected path: %s", r.URL.Path)
 		}
 		calls++
 		if calls < 3 {
@@ -86,20 +86,20 @@ func TestWaitForTaskPollsUntilStopped(t *testing.T) {
 	})
 
 	if err := client.WaitForTask(context.Background(), "pve01", "UPID:pve01:test"); err != nil {
-		t.Fatalf("WaitForTask : %v", err)
+		t.Fatalf("WaitForTask: %v", err)
 	}
 	if calls != 3 {
-		t.Errorf("calls = %d, attendu 3 sondages avant stopped", calls)
+		t.Errorf("calls = %d, want 3 polls before stopped", calls)
 	}
 }
 
 func TestWaitForTaskReturnsErrorOnFailedTask(t *testing.T) {
 	client, _ := newTestServer(t, func(w http.ResponseWriter, r *http.Request) {
-		writeData(t, w, TaskStatus{Status: "stopped", ExitStatus: "erreur simulée"})
+		writeData(t, w, TaskStatus{Status: "stopped", ExitStatus: "simulated error"})
 	})
 	err := client.WaitForTask(context.Background(), "pve01", "UPID:pve01:test")
 	if err == nil {
-		t.Fatal("tâche en échec : succès inattendu")
+		t.Fatal("failed task: unexpected success")
 	}
 }
 
@@ -112,10 +112,10 @@ func TestFindVMByNameSkipsTemplates(t *testing.T) {
 	})
 	vm, err := client.FindVMByName(context.Background(), "pve01", "infra01")
 	if err != nil {
-		t.Fatalf("FindVMByName : %v", err)
+		t.Fatalf("FindVMByName: %v", err)
 	}
 	if vm == nil || vm.VMID != 100 {
-		t.Errorf("FindVMByName = %+v, attendu vmid=100", vm)
+		t.Errorf("FindVMByName = %+v, want vmid=100", vm)
 	}
 
 	notFound, err := client.FindVMByName(context.Background(), "pve01", "debian-13")
@@ -123,7 +123,7 @@ func TestFindVMByNameSkipsTemplates(t *testing.T) {
 		t.Fatal(err)
 	}
 	if notFound != nil {
-		t.Errorf("FindVMByName(debian-13) = %+v, ne devrait pas retourner le template", notFound)
+		t.Errorf("FindVMByName(debian-13) = %+v, should not return the template", notFound)
 	}
 }
 
@@ -136,10 +136,10 @@ func TestFindTemplateByName(t *testing.T) {
 	})
 	tmpl, err := client.FindTemplateByName(context.Background(), "pve01", "debian-13")
 	if err != nil {
-		t.Fatalf("FindTemplateByName : %v", err)
+		t.Fatalf("FindTemplateByName: %v", err)
 	}
 	if tmpl == nil || tmpl.VMID != 9000 {
-		t.Errorf("FindTemplateByName = %+v, attendu vmid=9000", tmpl)
+		t.Errorf("FindTemplateByName = %+v, want vmid=9000", tmpl)
 	}
 }
 
@@ -157,24 +157,24 @@ func TestCloneVMWaitsForAsyncTask(t *testing.T) {
 			taskCalls++
 			writeData(t, w, TaskStatus{Status: "stopped", ExitStatus: "OK"})
 		default:
-			t.Fatalf("chemin inattendu : %s", r.URL.Path)
+			t.Fatalf("unexpected path: %s", r.URL.Path)
 		}
 	})
 
 	err := client.CloneVM(context.Background(), "pve01", CloneVMOptions{TemplateID: 9000, NewID: 101, Name: "infra01"})
 	if err != nil {
-		t.Fatalf("CloneVM : %v", err)
+		t.Fatalf("CloneVM: %v", err)
 	}
 	if taskCalls == 0 {
-		t.Error("CloneVM n'a jamais sondé la tâche asynchrone")
+		t.Error("CloneVM never polled the asynchronous task")
 	}
 	if !strings.Contains(gotForm, "newid=101") || !strings.Contains(gotForm, "full=0") {
-		t.Errorf("formulaire envoyé = %q, attendu newid=101 et full=0 (clone lié)", gotForm)
+		t.Errorf("form sent = %q, want newid=101 and full=0 (linked clone)", gotForm)
 	}
 }
 
 func TestConfigureCloudInitHandlesSyncResponse(t *testing.T) {
-	// VM arrêtée : Proxmox applique la config de façon synchrone, data=null.
+	// Stopped VM: Proxmox applies the config synchronously, data=null.
 	client, _ := newTestServer(t, func(w http.ResponseWriter, r *http.Request) {
 		writeData(t, w, nil)
 	})
@@ -182,7 +182,7 @@ func TestConfigureCloudInitHandlesSyncResponse(t *testing.T) {
 		User: "genesis", IP: "10.10.0.55/24", Gateway: "10.10.0.1",
 	})
 	if err != nil {
-		t.Fatalf("ConfigureCloudInit (réponse synchrone) : %v", err)
+		t.Fatalf("ConfigureCloudInit (synchronous response): %v", err)
 	}
 }
 
@@ -193,9 +193,9 @@ func TestDeleteVM(t *testing.T) {
 		writeData(t, w, nil)
 	})
 	if err := client.DeleteVM(context.Background(), "pve01", 101); err != nil {
-		t.Fatalf("DeleteVM : %v", err)
+		t.Fatalf("DeleteVM: %v", err)
 	}
 	if gotMethod != http.MethodDelete {
-		t.Errorf("method = %q, attendu DELETE", gotMethod)
+		t.Errorf("method = %q, want DELETE", gotMethod)
 	}
 }

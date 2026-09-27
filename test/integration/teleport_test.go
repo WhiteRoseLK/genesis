@@ -30,24 +30,23 @@ import (
 	modulev1 "github.com/WhiteRoseLK/genesis/sdk/go/gen/module/v1"
 )
 
-// Teleport, comme vault, ne peut pas être installé via apt+systemd sur les
-// conteneurs SSH jetables (Alpine, sans systemd) utilisés ailleurs dans ce
-// dépôt : teleportFakeAnsibleServer simule donc « ce qu'ansible aurait
-// fait » en pilotant directement deux VRAIS conteneurs Teleport
-// (auth+proxy, puis agent) avec les VRAIS certificats/jetons/pins que le
-// module teleport lui a transmis -- tout le reste (démarrage, jonction du
-// nœud, émission de certificat utilisateur, connexion SSH via l'agent)
-// tourne pour de vrai, contre un vrai Teleport. Même méthode que
-// internal/modulehost/vault_test.go.
+// Teleport, like vault, cannot be installed with apt+systemd on the disposable
+// SSH containers (Alpine, no systemd) used elsewhere in this repository:
+// teleportFakeAnsibleServer therefore simulates "what ansible would have done"
+// by driving two REAL Teleport containers directly (auth+proxy, then agent)
+// with the REAL certificates/tokens/pins the teleport module passed to it --
+// everything else (startup, node join, user certificate issuance, SSH
+// connection through the agent) runs for real, against a real Teleport. The
+// same method as internal/modulehost/vault_test.go.
 //
-// Image : teleportTestImage (teleport_image_test.go), construite localement
-// avec la même version majeure que celle qu'installe le module
-// (playbooks/install_teleport.yml, install_agent.yml : canal stable/v17).
+// Image: teleportTestImage (teleport_image_test.go), built locally with the
+// same major version as the one the module installs
+// (playbooks/install_teleport.yml, install_agent.yml: stable/v17 channel).
 const (
 	teleportNodePort = "13022"
-	// teleportTestSSHUser doit correspondre à sshUser (modules/teleport/main.go) :
-	// internal/ ne peut pas importer modules/, cette constante est donc
-	// dupliquée ici pour créer le compte OS attendu dans le conteneur agent.
+	// teleportTestSSHUser must match sshUser (modules/teleport/main.go):
+	// internal/ cannot import modules/, so this constant is duplicated here to
+	// create the OS account expected in the agent container.
 	teleportTestSSHUser = "genesis"
 )
 
@@ -113,8 +112,8 @@ type teleportFakeAnsibleServer struct {
 	mu    sync.Mutex
 	dir   string
 	net   string
-	auth  string // nom du conteneur auth+proxy
-	agent string // nom du conteneur agent (une fois installé)
+	auth  string // name of the auth+proxy container
+	agent string // name of the agent container (once installed)
 	calls int
 }
 
@@ -130,18 +129,18 @@ func (f *teleportFakeAnsibleServer) RunPlaybook(_ context.Context, req *ansiblev
 		err error
 	)
 	switch {
-	case strings.Contains(playbook, "configurer teleport.yaml (Auth + Proxy)"):
+	case strings.Contains(playbook, "configure teleport.yaml (Auth + Proxy)"):
 		out, err = f.deployAuthProxy(vars)
-	case strings.Contains(playbook, "generer un jeton d'enrolement de noeud"):
+	case strings.Contains(playbook, "generate a node join token"):
 		out, err = f.newToken(vars)
-	case strings.Contains(playbook, "configurer teleport.yaml (agent SSH seul)"):
+	case strings.Contains(playbook, "configure teleport.yaml (SSH agent only)"):
 		out, err = f.deployAgent(vars)
-	case strings.Contains(playbook, "signer un certificat SSH court terme"):
+	case strings.Contains(playbook, "sign a short-lived SSH certificate"):
 		out, err = f.generateUserCert(vars)
-	case strings.Contains(playbook, "connexion via l'agent teleport"):
+	case strings.Contains(playbook, "connect through the teleport agent"):
 		out, err = f.checkSSH(vars)
 	default:
-		return &ansiblev1.RunPlaybookResponse{Ok: false, Output: "playbook inconnu du fake"}, nil
+		return &ansiblev1.RunPlaybookResponse{Ok: false, Output: "playbook unknown to the fake"}, nil
 	}
 	if err != nil {
 		return &ansiblev1.RunPlaybookResponse{Ok: false, Output: out + "\n" + err.Error()}, nil
@@ -182,16 +181,16 @@ func (f *teleportFakeAnsibleServer) ensureDirAndNetwork() error {
 		name := "genesis-teleport-test-net"
 		_ = exec.Command("docker", "network", "rm", name).Run()
 		if out, err := exec.Command("docker", "network", "create", name).CombinedOutput(); err != nil {
-			return fmt.Errorf("docker network create : %w : %s", err, out)
+			return fmt.Errorf("docker network create: %w: %s", err, out)
 		}
 		f.net = name
 	}
 	return nil
 }
 
-// deployAuthProxy pilote directement Docker avec les VRAIS certificats TLS
-// reçus du module (émis par le vrai step-ca) -- équivalent réel de ce que
-// install_teleport.yml ferait sur une VM.
+// deployAuthProxy drives Docker directly with the REAL TLS certificates
+// received from the module (issued by the real step-ca) -- the real equivalent
+// of what install_teleport.yml would do on a VM.
 func (f *teleportFakeAnsibleServer) deployAuthProxy(vars map[string]any) (string, error) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
@@ -204,7 +203,7 @@ func (f *teleportFakeAnsibleServer) deployAuthProxy(vars map[string]any) (string
 	caChainPEM, _ := vars["ca_chain_pem"].(string)
 	clusterName, _ := vars["cluster_name"].(string)
 	if certPEM == "" || keyPEM == "" || caChainPEM == "" || clusterName == "" {
-		return "", fmt.Errorf("vars tls_cert_pem/tls_key_pem/ca_chain_pem/cluster_name manquantes")
+		return "", fmt.Errorf("missing tls_cert_pem/tls_key_pem/ca_chain_pem/cluster_name vars")
 	}
 	if err := os.WriteFile(f.dir+"/auth/proxy-cert.pem", []byte(certPEM), 0o644); err != nil {
 		return "", err
@@ -212,11 +211,11 @@ func (f *teleportFakeAnsibleServer) deployAuthProxy(vars map[string]any) (string
 	if err := os.WriteFile(f.dir+"/auth/proxy-key.pem", []byte(keyPEM), 0o644); err != nil {
 		return "", err
 	}
-	// Le conteneur ne fait pas confiance à la racine pki.issuer/v1 (step-ca de
-	// test) par défaut : la Proxy Service de teleport valide sa propre chaîne
-	// TLS au démarrage contre le magasin système -- même mécanisme que
-	// playbooks/install_teleport.yml (update-ca-certificates), via
-	// SSL_CERT_FILE ici (suggéré par le message d'erreur de teleport lui-même).
+	// The container does not trust the pki.issuer/v1 root (the test step-ca)
+	// by default: teleport's Proxy Service validates its own TLS chain at
+	// startup against the system store -- the same mechanism as
+	// playbooks/install_teleport.yml (update-ca-certificates), through
+	// SSL_CERT_FILE here (suggested by teleport's own error message).
 	if err := os.WriteFile(f.dir+"/auth/ca-chain.pem", []byte(caChainPEM), 0o644); err != nil {
 		return "", err
 	}
@@ -253,7 +252,7 @@ ssh_service:
 		f.image, "start", "--config=/etc/teleport/teleport.yaml")
 	out, err := cmd.CombinedOutput()
 	if err != nil {
-		return string(out), fmt.Errorf("docker run teleport (auth+proxy) : %w", err)
+		return string(out), fmt.Errorf("docker run teleport (auth+proxy): %w", err)
 	}
 	f.auth = name
 
@@ -264,9 +263,9 @@ ssh_service:
 	return string(out) + "\n" + statusOut, nil
 }
 
-// waitTctl réessaie une commande tctl jusqu'à ce que l'API Auth réponde
-// (le conteneur vient de démarrer) -- même précaution que
-// modules/vault.waitForVault, vérifiée manuellement dans Docker.
+// waitTctl retries a tctl command until the Auth API answers (the container
+// has just started) -- the same precaution as modules/vault.waitForVault,
+// checked by hand in Docker.
 func (f *teleportFakeAnsibleServer) waitTctl(container string, args ...string) (string, error) {
 	fullArgs := append([]string{"exec", container, "tctl"}, append(args, "--config=/etc/teleport/teleport.yaml")...)
 	deadline := time.Now().Add(60 * time.Second)
@@ -280,26 +279,26 @@ func (f *teleportFakeAnsibleServer) waitTctl(container string, args ...string) (
 		lastOut, lastErr = out, err
 		time.Sleep(2 * time.Second)
 	}
-	return string(lastOut), fmt.Errorf("tctl %v ne répond pas après 60s : %w", args, lastErr)
+	return string(lastOut), fmt.Errorf("tctl %v is not answering after 60s: %w", args, lastErr)
 }
 
-// newToken réessaie comme waitTctl (même si "tctl status" a déjà réussi
-// plus tôt dans Configure, "tctl tokens add" peut transitoirement échouer
-// sous charge -- observé en exécutant la suite complète des modules en
-// parallèle sur cette machine).
+// newToken retries like waitTctl (even though "tctl status" already succeeded
+// earlier in Configure, "tctl tokens add" can fail transiently under load --
+// observed while running the whole module suite in parallel on this machine).
 func (f *teleportFakeAnsibleServer) newToken(_ map[string]any) (string, error) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	out, err := f.waitTctl(f.auth, "tokens", "add", "--type=node", "--ttl=10m")
 	if err != nil {
-		return out, fmt.Errorf("tctl tokens add : %w", err)
+		return out, fmt.Errorf("tctl tokens add: %w", err)
 	}
 	return out, nil
 }
 
-// deployAgent pilote directement Docker avec le VRAI jeton/pin/adresse
-// reçus du module -- équivalent réel de install_agent.yml, rejoint le
-// cluster via le réseau docker dédié (résolution DNS par nom de conteneur).
+// deployAgent drives Docker directly with the REAL token/pin/address received
+// from the module -- the real equivalent of install_agent.yml, it joins the
+// cluster through the dedicated docker network (DNS resolution by container
+// name).
 func (f *teleportFakeAnsibleServer) deployAgent(vars map[string]any) (string, error) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
@@ -307,9 +306,9 @@ func (f *teleportFakeAnsibleServer) deployAgent(vars map[string]any) (string, er
 	joinToken, _ := vars["join_token"].(string)
 	caPin, _ := vars["ca_pin"].(string)
 	if joinToken == "" || caPin == "" {
-		return "", fmt.Errorf("vars join_token/ca_pin manquantes")
+		return "", fmt.Errorf("missing join_token/ca_pin vars")
 	}
-	authServer := f.auth + ":3025" // ownTarget.Host est 127.0.0.1 côté fake VM : on ignore la valeur reçue et on résout via le réseau docker dédié.
+	authServer := f.auth + ":3025" // ownTarget.Host is 127.0.0.1 on the fake VM side: ignore the received value and resolve through the dedicated docker network.
 
 	cfg := fmt.Sprintf(`version: v3
 teleport:
@@ -342,23 +341,23 @@ ssh_service:
 		f.image, "start", "--config=/etc/teleport/teleport.yaml")
 	out, err := cmd.CombinedOutput()
 	if err != nil {
-		return string(out), fmt.Errorf("docker run teleport (agent) : %w", err)
+		return string(out), fmt.Errorf("docker run teleport (agent): %w", err)
 	}
 	f.agent = name
 
-	// Le conteneur agent est une image Debian avec teleport, sans l'utilisateur
-	// "genesis" qu'une vraie VM (os.base/v1) aurait déjà créé -- ssh_service
-	// de teleport a besoin d'un compte OS local réel pour ouvrir une session.
+	// The agent container is a Debian image with teleport, without the
+	// "genesis" user a real VM (os.base/v1) would already have created --
+	// teleport's ssh_service needs a real local OS account to open a session.
 	if userOut, err := exec.Command("docker", "exec", name, "useradd", "-m", "-s", "/bin/bash", teleportTestSSHUser).CombinedOutput(); err != nil {
-		return string(out) + "\n" + string(userOut), fmt.Errorf("création de l'utilisateur %q dans le conteneur agent : %w", teleportTestSSHUser, err)
+		return string(out) + "\n" + string(userOut), fmt.Errorf("creating user %q in the agent container: %w", teleportTestSSHUser, err)
 	}
 
 	deadline := time.Now().Add(60 * time.Second)
 	var lastOut []byte
 	for time.Now().Before(deadline) {
-		// --format=json : la table par défaut de "tctl nodes ls" tronque le
-		// nom d'hôte ("teleport-agent-t..."), ce qui casse la recherche de
-		// substring ci-dessous.
+		// --format=json: the default table of "tctl nodes ls" truncates the
+		// host name ("teleport-agent-t..."), which breaks the substring search
+		// below.
 		nodesOut, nodesErr := exec.Command("docker", "exec", f.auth, "tctl", "nodes", "ls", "--format=json",
 			"--config=/etc/teleport/teleport.yaml").CombinedOutput()
 		if nodesErr == nil && strings.Contains(string(nodesOut), "teleport-agent-test") {
@@ -367,12 +366,12 @@ ssh_service:
 		lastOut = nodesOut
 		time.Sleep(2 * time.Second)
 	}
-	return string(out) + "\n" + string(lastOut), fmt.Errorf("l'agent n'a jamais rejoint le cluster après 60s")
+	return string(out) + "\n" + string(lastOut), fmt.Errorf("the agent never joined the cluster after 60s")
 }
 
-// generateUserCert crée l'utilisateur de vérification et signe son
-// certificat SSH via le VRAI tctl auth sign, sur le conteneur auth --
-// équivalent réel de playbooks/generate_user_cert.yml.
+// generateUserCert creates the verification user and signs its SSH certificate
+// with the REAL tctl auth sign, on the auth container -- the real equivalent
+// of playbooks/generate_user_cert.yml.
 func (f *teleportFakeAnsibleServer) generateUserCert(vars map[string]any) (string, error) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
@@ -380,7 +379,7 @@ func (f *teleportFakeAnsibleServer) generateUserCert(vars map[string]any) (strin
 	verifyUser, _ := vars["verify_user"].(string)
 	sshLogin, _ := vars["ssh_login"].(string)
 	if verifyUser == "" || sshLogin == "" {
-		return "", fmt.Errorf("vars verify_user/ssh_login manquantes")
+		return "", fmt.Errorf("missing verify_user/ssh_login vars")
 	}
 
 	listOut, _ := exec.Command("docker", "exec", f.auth, "tctl", "users", "ls",
@@ -389,7 +388,7 @@ func (f *teleportFakeAnsibleServer) generateUserCert(vars map[string]any) (strin
 		addOut, err := exec.Command("docker", "exec", f.auth, "tctl", "users", "add", verifyUser,
 			"--roles=access", "--logins="+sshLogin, "--config=/etc/teleport/teleport.yaml").CombinedOutput()
 		if err != nil {
-			return string(addOut), fmt.Errorf("tctl users add : %w", err)
+			return string(addOut), fmt.Errorf("tctl users add: %w", err)
 		}
 	}
 
@@ -397,32 +396,32 @@ func (f *teleportFakeAnsibleServer) generateUserCert(vars map[string]any) (strin
 		"--user="+verifyUser, "--out=/tmp/genesis-verify", "--ttl=5m", "--format=openssh", "--overwrite",
 		"--config=/etc/teleport/teleport.yaml").CombinedOutput()
 	if err != nil {
-		return string(signOut), fmt.Errorf("tctl auth sign : %w", err)
+		return string(signOut), fmt.Errorf("tctl auth sign: %w", err)
 	}
 
 	priv, err := exec.Command("docker", "exec", f.auth, "cat", "/tmp/genesis-verify").Output()
 	if err != nil {
-		return string(signOut), fmt.Errorf("lecture de la clé privée générée : %w", err)
+		return string(signOut), fmt.Errorf("reading the generated private key: %w", err)
 	}
 	cert, err := exec.Command("docker", "exec", f.auth, "cat", "/tmp/genesis-verify-cert.pub").Output()
 	if err != nil {
-		return string(signOut), fmt.Errorf("lecture du certificat généré : %w", err)
+		return string(signOut), fmt.Errorf("reading the generated certificate: %w", err)
 	}
 
 	return fmt.Sprintf("PRIVATE_KEY_B64:%s\nCERTIFICATE_B64:%s",
 		base64.StdEncoding.EncodeToString(priv), base64.StdEncoding.EncodeToString(cert)), nil
 }
 
-// checkSSH exécute réellement, depuis le process de test (point de vue
-// « VM vérificateur »), une connexion SSH à travers l'agent Teleport (port
-// node publié sur l'hôte) avec le certificat reçu -- équivalent réel de
+// checkSSH really opens, from the test process (the "verifier VM" point of
+// view), an SSH connection through the Teleport agent (node port published on
+// the host) with the received certificate -- the real equivalent of
 // playbooks/check_ssh.yml.
 func (f *teleportFakeAnsibleServer) checkSSH(vars map[string]any) (string, error) {
 	privPEM, _ := vars["user_private_key_pem"].(string)
 	certOpenSSH, _ := vars["user_certificate_openssh"].(string)
 	agentUser, _ := vars["agent_user"].(string)
 	if privPEM == "" || certOpenSSH == "" || agentUser == "" {
-		return "", fmt.Errorf("vars user_private_key_pem/user_certificate_openssh/agent_user manquantes")
+		return "", fmt.Errorf("missing user_private_key_pem/user_certificate_openssh/agent_user vars")
 	}
 
 	f.mu.Lock()
@@ -452,7 +451,7 @@ func (f *teleportFakeAnsibleServer) checkSSH(vars map[string]any) (string, error
 		}
 		time.Sleep(2 * time.Second)
 	}
-	return string(out), fmt.Errorf("connexion SSH via l'agent a échoué : %w", err)
+	return string(out), fmt.Errorf("SSH connection through the agent failed: %w", err)
 }
 
 func (f *teleportFakeAnsibleServer) cleanup() {
@@ -489,31 +488,31 @@ func launchTeleportTest(t *testing.T) teleportTestHandle {
 	registry.SetNative("core.container/v1", broker.NativeContainer(rt))
 	registry.SetNative("core.secrets/v1", broker.NativeSecrets(store))
 
-	// step-ca réel : seul fournisseur pki.issuer/v1 crédible pour ce test
-	// (même choix que internal/modulehost/vault_test.go).
+	// Real step-ca: the only credible pki.issuer/v1 provider for this test
+	// (the same choice as internal/modulehost/vault_test.go).
 	stepCABinary, stepCAManifest := buildModule(t, "step-ca")
 	stepCAClient, err := modulehost.Launch(stepCABinary, stepCAManifest)
 	if err != nil {
-		t.Fatalf("modulehost.Launch(step-ca) : %v", err)
+		t.Fatalf("modulehost.Launch(step-ca): %v", err)
 	}
 	t.Cleanup(stepCAClient.Close)
 	stepCAToken := registry.OpenSession(stepCAClient.Broker(), "step-ca", []string{"core.container/v1", "core.secrets/v1"})
 	if _, err := stepCAClient.Module().Check(ctx, &modulev1.StepRequest{RunId: "test", BrokerToken: stepCAToken}); err != nil {
-		t.Fatalf("Check(step-ca) : %v", err)
+		t.Fatalf("Check(step-ca): %v", err)
 	}
 	seedToken := registry.OpenSession(stepCAClient.Broker(), "step-ca", []string{"core.container/v1", "core.secrets/v1"})
 	if _, err := stepCAClient.Module().SeedUp(ctx, &modulev1.StepRequest{RunId: "test", BrokerToken: seedToken}); err != nil {
-		t.Fatalf("SeedUp(step-ca) : %v", err)
+		t.Fatalf("SeedUp(step-ca): %v", err)
 	}
 	stepCAConn, err := stepCAClient.DispenseFunction("pki.issuer/v1")
 	if err != nil {
-		t.Fatalf("DispenseFunction(step-ca, pki.issuer/v1) : %v", err)
+		t.Fatalf("DispenseFunction(step-ca, pki.issuer/v1): %v", err)
 	}
 
 	binaryPath, manifest := buildModule(t, "teleport")
 	client, err := modulehost.Launch(binaryPath, manifest)
 	if err != nil {
-		t.Fatalf("modulehost.Launch(teleport) : %v", err)
+		t.Fatalf("modulehost.Launch(teleport): %v", err)
 	}
 	t.Cleanup(client.Close)
 
@@ -522,7 +521,7 @@ func launchTeleportTest(t *testing.T) teleportTestHandle {
 	t.Cleanup(ansibleServer.cleanup)
 
 	sessionID := stepCAClient.Broker().NextId()
-	_ = sessionID // NextId() n'est qu'un compteur partagé ; on en veut un côté teleport.
+	_ = sessionID // NextId() is only a shared counter; we want one on the teleport side.
 	teleportSessionID := client.Broker().NextId()
 	go client.Broker().AcceptAndServe(teleportSessionID, func(opts []grpc.ServerOption) *grpc.Server {
 		s := grpc.NewServer(opts...)
@@ -538,15 +537,15 @@ func launchTeleportTest(t *testing.T) teleportTestHandle {
 	token := strconv.FormatUint(uint64(teleportSessionID), 10)
 
 	if _, err := client.Module().Check(ctx, &modulev1.StepRequest{RunId: "test", BrokerToken: token}); err != nil {
-		t.Fatalf("Check(teleport) : %v", err)
+		t.Fatalf("Check(teleport): %v", err)
 	}
 	provisionResp, err := client.Module().Provision(ctx, &modulev1.StepRequest{RunId: "test", BrokerToken: token})
 	if err != nil {
-		t.Fatalf("Provision(teleport) : %v", err)
+		t.Fatalf("Provision(teleport): %v", err)
 	}
 	configureResp, err := client.Module().Configure(ctx, &modulev1.StepRequest{RunId: "test", BrokerToken: token, State: provisionResp.GetState()})
 	if err != nil {
-		t.Fatalf("Configure(teleport) : %v", err)
+		t.Fatalf("Configure(teleport): %v", err)
 	}
 	if configureResp.GetStatus() != modulev1.StepResult_STATUS_OK {
 		t.Fatalf("Configure(teleport).Status = %v", configureResp.GetStatus())
@@ -555,22 +554,21 @@ func launchTeleportTest(t *testing.T) teleportTestHandle {
 	return teleportTestHandle{client: client, token: token, configured: configureResp, ansibleServer: ansibleServer}
 }
 
-// TestTeleportConfiguresAuthProxy prouve, contre un vrai conteneur
-// Teleport et un vrai step-ca, le déploiement Auth+Proxy (docs07 : TLS émis
-// par pki.issuer/v1, pin de la CA lu via tctl status).
+// TestTeleportConfiguresAuthProxy proves, against a real Teleport container
+// and a real step-ca, the Auth+Proxy deployment (doc 07: TLS issued by
+// pki.issuer/v1, CA pin read through tctl status).
 func TestTeleportConfiguresAuthProxy(t *testing.T) {
 	h := launchTeleportTest(t)
 	if h.ansibleServer.calls < 1 {
-		t.Error("install_teleport.yml n'a jamais été envoyé")
+		t.Error("install_teleport.yml was never sent")
 	}
 }
 
-// TestTeleportFleetAgentInstallJoinsClusterAndAllowsSSH prouve, de bout en
-// bout et contre de vrais conteneurs Teleport, fleet.agent/v1.Install
-// (ADR-017 : jeton d'enrôlement, jonction du cluster) puis une connexion
-// SSH réelle via l'agent avec un certificat signé par la CA interne
-// (ADR-018) -- exactement le scénario testé à la main dans Docker avant
-// d'écrire ce module.
+// TestTeleportFleetAgentInstallJoinsClusterAndAllowsSSH proves, end to end and
+// against real Teleport containers, fleet.agent/v1.Install (ADR-017: enrolment
+// token, cluster join) followed by a real SSH connection through the agent
+// with a certificate signed by the internal CA (ADR-018) -- exactly the
+// scenario tested by hand in Docker before writing this module.
 func TestTeleportFleetAgentInstallJoinsClusterAndAllowsSSH(t *testing.T) {
 	h := launchTeleportTest(t)
 	ctx := context.Background()
@@ -579,12 +577,12 @@ func TestTeleportFleetAgentInstallJoinsClusterAndAllowsSSH(t *testing.T) {
 		RunId: "test", BrokerToken: h.token, State: h.configured.GetState(),
 	})
 	if err != nil {
-		t.Fatalf("Verify(teleport) : %v", err)
+		t.Fatalf("Verify(teleport): %v", err)
 	}
 	if verifyResp.GetStatus() != modulev1.StepResult_STATUS_OK {
 		t.Fatalf("Verify(teleport).Status = %v", verifyResp.GetStatus())
 	}
 	if h.ansibleServer.calls < 5 {
-		t.Errorf("les playbooks de Verify n'ont pas tous été envoyés (appels ansible = %d)", h.ansibleServer.calls)
+		t.Errorf("not all of Verify's playbooks were sent (ansible calls = %d)", h.ansibleServer.calls)
 	}
 }

@@ -1,11 +1,11 @@
 // SPDX-License-Identifier: Apache-2.0
 
-// chrony fournit time.ntp/v1 en phase cible (docs/07-mvp-modules.md) :
-// contrairement à base-os ou fake-compute, chrony possède sa propre VM
-// (compute.vm/v1) et l'installe/configure lui-même en serveur chronyd
-// (core.ansible/v1) — os.base/v1 reste déclaré en requires (ADR-016) mais
-// n'est pas encore appelé : ni CA ni résolveur ne sont orchestrés à ce
-// stade (step-ca/vault arrivent en J7), noté en dette dans docs/PROGRESS.md.
+// chrony provides time.ntp/v1 in the target phase (docs/07-mvp-modules.md):
+// unlike base-os or fake-compute, chrony owns its own VM (compute.vm/v1) and
+// installs/configures it itself as a chronyd server (core.ansible/v1) —
+// os.base/v1 stays declared in requires (ADR-016) but is not called yet:
+// neither CA nor resolver is orchestrated at this stage (step-ca/vault arrive
+// in M7), noted as debt in docs/PROGRESS.md.
 package main
 
 import (
@@ -30,10 +30,10 @@ import (
 	modulev1 "github.com/WhiteRoseLK/genesis/sdk/go/gen/module/v1"
 )
 
-// sshKeyPair reflète la valeur JSON produite par le générateur
-// GENERATOR_SSH_KEYPAIR côté cœur (internal/secrets.SSHKeyPair) — les
-// modules n'important jamais internal/, la forme est dupliquée ici par son
-// seul contrat (deux champs JSON), pas par import.
+// sshKeyPair mirrors the JSON value produced by the core's
+// GENERATOR_SSH_KEYPAIR generator (internal/secrets.SSHKeyPair) — since
+// modules never import internal/, the shape is duplicated here from its
+// contract alone (two JSON fields), not by import.
 type sshKeyPair struct {
 	PrivateKeyOpenSSH   string `json:"private_key_openssh"`
 	PublicKeyAuthorized string `json:"public_key_authorized"`
@@ -85,9 +85,9 @@ func (m *chronyModule) Check(_ context.Context, req *modulev1.StepRequest) (*mod
 	return &modulev1.CheckResult{Status: modulev1.CheckResult_STATUS_COMPLIANT}, nil
 }
 
-// dial dial la session de broker au plus une fois (Dial ne réussit qu'une
-// fois par jeton) et construit les trois clients typés sur la même
-// connexion gRPC — même précaution que modules/base-os et modules/fake-compute.
+// dial dials the broker session at most once (Dial only succeeds once per
+// token) and builds the three typed clients on the same gRPC connection — the
+// same precaution as modules/base-os and modules/fake-compute.
 func (m *chronyModule) dial() error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
@@ -95,11 +95,11 @@ func (m *chronyModule) dial() error {
 		return nil
 	}
 	if m.broker == nil || m.brokerToken == "" {
-		return fmt.Errorf("chrony : aucune session de broker (Check n'a pas encore été appelé)")
+		return fmt.Errorf("chrony: no broker session (Check has not been called yet)")
 	}
 	conn, err := m.broker.Dial(m.brokerToken)
 	if err != nil {
-		return fmt.Errorf("connexion aux fonctions requises : %w", err)
+		return fmt.Errorf("connecting to the required functions: %w", err)
 	}
 	m.vmClient = computevmv1.NewComputeVMClient(conn)
 	m.ansibleClient = ansiblev1.NewAnsibleClient(conn)
@@ -108,17 +108,17 @@ func (m *chronyModule) dial() error {
 	return nil
 }
 
-// installFleetAgents appelle fleet.agent/v1.Install(target) (docs/09-decisions.md
-// ADR-017) : diffusé vers tout module « de parc » installé (ex. teleport),
-// no-op silencieux si aucun n'est présent (fleet.agent/v1 est un requires
-// optionnel — Unimplemented est alors la réponse normale du broker, pas
-// une erreur).
+// installFleetAgents calls fleet.agent/v1.Install(target)
+// (docs/09-decisions.md ADR-017): fanned out to every installed "fleet" module
+// (e.g. teleport), a silent no-op if none is present (fleet.agent/v1 is an
+// optional requires — Unimplemented is then the broker's normal answer, not an
+// error).
 func (m *chronyModule) installFleetAgents(ctx context.Context, target *ansiblev1.Target) error {
 	_, err := m.fleetAgentClient.Install(ctx, &fleetagentv1.InstallRequest{
 		Target: &fleetagentv1.Target{Host: target.GetHost(), Port: target.GetPort(), User: target.GetUser(), SshPrivateKey: target.GetSshPrivateKey()},
 	})
 	if err != nil && status.Code(err) != codes.Unimplemented {
-		return fmt.Errorf("fleet.agent/v1.Install : %w", err)
+		return fmt.Errorf("fleet.agent/v1.Install: %w", err)
 	}
 	return nil
 }
@@ -148,9 +148,9 @@ func ntpPools(req *modulev1.StepRequest) []string {
 	return pools
 }
 
-// sshKeyPair génère (idempotent, via core.secrets/v1) puis récupère la paire
-// SSH de service de la VM chrony — clé publique injectée en cloud-init,
-// clé privée réutilisée pour les connexions ansible.
+// sshKeyPair generates (idempotently, through core.secrets/v1) then fetches
+// the service SSH pair of the chrony VM — the public key is injected through
+// cloud-init, the private key is reused for the ansible connections.
 func (m *chronyModule) sshKeyPair(ctx context.Context, name string) (sshKeyPair, error) {
 	ref := fmt.Sprintf(sshKeyRefFmt, name)
 	if _, err := m.secretsClient.Ensure(ctx, &secretsv1.EnsureRequest{
@@ -158,21 +158,21 @@ func (m *chronyModule) sshKeyPair(ctx context.Context, name string) (sshKeyPair,
 		Generator: secretsv1.Generator_GENERATOR_SSH_KEYPAIR,
 		Meta:      &secretsv1.Meta{Owner: "chrony", Consumers: []string{"chrony"}, Kind: "ssh_keypair"},
 	}); err != nil {
-		return sshKeyPair{}, fmt.Errorf("génération de la paire SSH : %w", err)
+		return sshKeyPair{}, fmt.Errorf("generating the SSH pair: %w", err)
 	}
 	resp, err := m.secretsClient.Get(ctx, &secretsv1.GetRequest{Ref: ref})
 	if err != nil {
-		return sshKeyPair{}, fmt.Errorf("lecture de la paire SSH : %w", err)
+		return sshKeyPair{}, fmt.Errorf("reading the SSH pair: %w", err)
 	}
 	var pair sshKeyPair
 	if err := json.Unmarshal([]byte(resp.GetValue()), &pair); err != nil {
-		return sshKeyPair{}, fmt.Errorf("décodage de la paire SSH : %w", err)
+		return sshKeyPair{}, fmt.Errorf("decoding the SSH pair: %w", err)
 	}
 	return pair, nil
 }
 
-// Provision crée (ou retrouve, EnsureVM est idempotent) la VM dédiée de
-// chrony et conserve son nom et sa référence de clé SSH dans l'état.
+// Provision creates (or finds again, EnsureVM is idempotent) chrony's
+// dedicated VM and keeps its name and SSH key reference in the state.
 func (m *chronyModule) Provision(ctx context.Context, req *modulev1.StepRequest) (*modulev1.StepResult, error) {
 	if err := m.dial(); err != nil {
 		return nil, err
@@ -191,7 +191,7 @@ func (m *chronyModule) Provision(ctx context.Context, req *modulev1.StepRequest)
 		User:         sshUser,
 	})
 	if err != nil {
-		return nil, fmt.Errorf("EnsureVM(%q) : %w", name, err)
+		return nil, fmt.Errorf("EnsureVM(%q): %w", name, err)
 	}
 
 	state := sdk.StateMap(req.GetState())
@@ -214,7 +214,7 @@ func targetFromState(req *modulev1.StepRequest, pair sshKeyPair) (*ansiblev1.Tar
 		}
 	}
 	if port < 1 || port > 65535 {
-		return nil, fmt.Errorf("configure : port SSH %d invalide dans l'état du module (attendu 1-65535), relancer provision", port)
+		return nil, fmt.Errorf("configure: invalid SSH port %d in the module state (expected 1-65535), run provision again", port)
 	}
 	return &ansiblev1.Target{
 		Host:          fmt.Sprint(state["vm_ip"]),
@@ -224,7 +224,7 @@ func targetFromState(req *modulev1.StepRequest, pair sshKeyPair) (*ansiblev1.Tar
 	}, nil
 }
 
-// Configure installe et configure chronyd en serveur sur la VM de chrony
+// Configure installs and configures chronyd as a server on chrony's VM
 // (docs/07-mvp-modules.md).
 func (m *chronyModule) Configure(ctx context.Context, req *modulev1.StepRequest) (*modulev1.StepResult, error) {
 	if err := m.dial(); err != nil {
@@ -242,7 +242,7 @@ func (m *chronyModule) Configure(ctx context.Context, req *modulev1.StepRequest)
 
 	vars, err := sdk.NewState(map[string]any{
 		"ntp_pools":  toAnySlice(ntpPools(req)),
-		"allow_cidr": "0.0.0.0/0", // MVP : pas encore de CIDR réseau propagé (dette, docs/PROGRESS.md)
+		"allow_cidr": "0.0.0.0/0", // MVP: no network CIDR propagated yet (debt, docs/PROGRESS.md)
 	})
 	if err != nil {
 		return nil, err
@@ -256,7 +256,7 @@ func (m *chronyModule) Configure(ctx context.Context, req *modulev1.StepRequest)
 		return nil, err
 	}
 	if !resp.GetOk() {
-		return nil, fmt.Errorf("Configure(chrony) a échoué :\n%s", resp.GetOutput())
+		return nil, fmt.Errorf("Configure(chrony) failed:\n%s", resp.GetOutput())
 	}
 	if err := m.installFleetAgents(ctx, target); err != nil {
 		return nil, err
@@ -271,9 +271,9 @@ func (m *chronyModule) Configure(ctx context.Context, req *modulev1.StepRequest)
 
 var systemTimeRe = regexp.MustCompile(`System time\s*:\s*([-\d.]+) seconds`)
 
-// Verify prouve une synchronisation réelle depuis une VM tierce jetable
-// pointée vers le serveur chrony (docs/03-module-contract.md règle 2 : test
-// depuis un point de vue consommateur, pas l'état d'un processus).
+// Verify proves a real synchronisation from a disposable third-party VM
+// pointed at the chrony server (docs/03-module-contract.md rule 2: a test from
+// a consumer's point of view, not the state of a process).
 func (m *chronyModule) Verify(ctx context.Context, req *modulev1.StepRequest) (*modulev1.StepResult, error) {
 	if err := m.dial(); err != nil {
 		return nil, err
@@ -292,7 +292,7 @@ func (m *chronyModule) Verify(ctx context.Context, req *modulev1.StepRequest) (*
 		User:         sshUser,
 	})
 	if err != nil {
-		return nil, fmt.Errorf("EnsureVM(%q) (vérificateur) : %w", verifierName, err)
+		return nil, fmt.Errorf("EnsureVM(%q) (verifier): %w", verifierName, err)
 	}
 	defer func() {
 		_, _ = m.vmClient.DeleteVM(context.Background(), &computevmv1.DeleteVMRequest{Name: verifierName})
@@ -319,31 +319,31 @@ func (m *chronyModule) Verify(ctx context.Context, req *modulev1.StepRequest) (*
 		return nil, err
 	}
 	if !resp.GetOk() {
-		return nil, fmt.Errorf("Verify(chrony) a échoué :\n%s", resp.GetOutput())
+		return nil, fmt.Errorf("Verify(chrony) failed:\n%s", resp.GetOutput())
 	}
 
 	offsetMs, err := parseOffsetMs(resp.GetOutput())
 	if err != nil {
-		return nil, fmt.Errorf("Verify(chrony) : %w\nsortie :\n%s", err, resp.GetOutput())
+		return nil, fmt.Errorf("Verify(chrony): %w\nsortie:\n%s", err, resp.GetOutput())
 	}
 	if offsetMs >= maxOffsetMs {
-		return nil, fmt.Errorf("Verify(chrony) : écart de %.3f ms >= %.0f ms", offsetMs, maxOffsetMs)
+		return nil, fmt.Errorf("Verify(chrony): offset of %.3f ms >= %.0f ms", offsetMs, maxOffsetMs)
 	}
 
 	return &modulev1.StepResult{Status: modulev1.StepResult_STATUS_OK, State: req.GetState()}, nil
 }
 
-// parseOffsetMs extrait la ligne « System time » de la sortie de
-// `chronyc tracking` (docs07 : écart < 100 ms).
+// parseOffsetMs extracts the "System time" line from the output of `chronyc
+// tracking` (doc 07: offset < 100 ms).
 func parseOffsetMs(output string) (float64, error) {
 	matches := systemTimeRe.FindAllStringSubmatch(output, -1)
 	if len(matches) == 0 {
-		return 0, fmt.Errorf("ligne « System time » introuvable dans la sortie de chronyc tracking")
+		return 0, fmt.Errorf("\"System time\" line not found in the output of chronyc tracking")
 	}
 	last := matches[len(matches)-1]
 	seconds, err := strconv.ParseFloat(last[1], 64)
 	if err != nil {
-		return 0, fmt.Errorf("valeur d'écart illisible %q : %w", last[1], err)
+		return 0, fmt.Errorf("unreadable offset value %q: %w", last[1], err)
 	}
 	if seconds < 0 {
 		seconds = -seconds
@@ -365,13 +365,13 @@ func (m *chronyModule) Destroy(ctx context.Context, req *modulev1.StepRequest) (
 	}
 	name := vmName(req)
 	if _, err := m.vmClient.DeleteVM(ctx, &computevmv1.DeleteVMRequest{Name: name}); err != nil {
-		return nil, fmt.Errorf("DeleteVM(%q) : %w", name, err)
+		return nil, fmt.Errorf("DeleteVM(%q): %w", name, err)
 	}
 	return &modulev1.StepResult{Status: modulev1.StepResult_STATUS_OK, State: req.GetState()}, nil
 }
 
-// timeNTPServer implémente time.ntp/v1 : point d'accès du serveur chrony
-// configuré par Configure.
+// timeNTPServer implements time.ntp/v1: the access point of the chrony server
+// configured by Configure.
 type timeNTPServer struct {
 	timentpv1.UnimplementedTimeNTPServer
 	module *chronyModule
@@ -381,7 +381,7 @@ func (s *timeNTPServer) Endpoint(context.Context, *timentpv1.Empty) (*timentpv1.
 	s.module.mu.Lock()
 	defer s.module.mu.Unlock()
 	if s.module.ntpEndpoint == nil {
-		return nil, fmt.Errorf("time.ntp/v1 : chrony pas encore configuré (Configure n'a pas encore réussi)")
+		return nil, fmt.Errorf("time.ntp/v1: chrony not configured yet (Configure has not succeeded yet)")
 	}
 	return s.module.ntpEndpoint, nil
 }

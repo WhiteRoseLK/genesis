@@ -1,8 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
-// Package integration teste chaque module du dépôt à travers le vrai hôte
-// de modules du cœur (internal/modulehost, internal/broker), fonctions
-// requises simulées (docs/03-module-contract.md, règle 7). Les tests qui
-// pilotent de vrais conteneurs portent le build tag `docker` :
-// `make test-docker`.
+// Package integration tests each module of the repository through the core's
+// real module host (internal/modulehost, internal/broker), with simulated
+// required functions (docs/03-module-contract.md, rule 7). The tests that
+// drive real containers carry the `docker` build tag: `make test-docker`.
 package integration

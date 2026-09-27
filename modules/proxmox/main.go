@@ -1,16 +1,16 @@
 // SPDX-License-Identifier: Apache-2.0
 
-// proxmox fournit compute.vm/v1 sur un cluster Proxmox VE existant
-// (docs/07-mvp-modules.md). Pas d'accès à un vrai cluster dans cet
-// environnement de développement (voir docs/PROGRESS.md, J5) : construit et
-// testé contre des fixtures HTTP, jamais exécuté contre une instance réelle.
+// proxmox provides compute.vm/v1 on an existing Proxmox VE cluster
+// (docs/07-mvp-modules.md). There is no access to a real cluster in this
+// development environment (see docs/PROGRESS.md, M5): built and tested against
+// HTTP fixtures, never run against a real instance.
 //
-// Portée assumée pour ce jalon : EnsureImage suppose qu'un template existe
-// déjà sous le nom demandé (`image` dans la config) plutôt que de
-// télécharger l'image cloud et de créer le template automatiquement — cette
-// chaîne d'opérations est la plus complexe et la moins vérifiable sans
-// cluster réel ; à construire quand elle pourra être validée (J9 ou sur
-// demande explicite).
+// Accepted scope for this milestone: EnsureImage assumes a template already
+// exists under the requested name (`image` in the config) rather than
+// downloading the cloud image and creating the template automatically — that
+// chain of operations is the most complex and the least verifiable without a
+// real cluster; to be built once it can be validated (M9 or on explicit
+// request).
 package main
 
 import (
@@ -51,21 +51,21 @@ type proxmoxConfig struct {
 func parseConfig(s *structpb.Struct) (*proxmoxConfig, error) {
 	raw, err := json.Marshal(s.AsMap())
 	if err != nil {
-		return nil, fmt.Errorf("encodage de la config : %w", err)
+		return nil, fmt.Errorf("encodage de la config: %w", err)
 	}
 	var cfg proxmoxConfig
 	if err := json.Unmarshal(raw, &cfg); err != nil {
-		return nil, fmt.Errorf("décodage de la config : %w", err)
+		return nil, fmt.Errorf("decoding the config: %w", err)
 	}
 	if cfg.Endpoint == "" || cfg.Node == "" {
-		return nil, fmt.Errorf("config proxmox incomplète : endpoint et node sont requis")
+		return nil, fmt.Errorf("incomplete proxmox config: endpoint and node are required")
 	}
 	return &cfg, nil
 }
 
-// proxmoxModule porte le cycle de vie. Sa seule responsabilité propre est de
-// vérifier la connexion à l'API ; le travail réel se fait dans
-// computeVMServer en réponse aux appels de compute.vm/v1.
+// proxmoxModule carries the lifecycle. Its only own responsibility is to check
+// the API connection; the real work happens in computeVMServer in response to
+// compute.vm/v1 calls.
 type proxmoxModule struct {
 	modulev1.UnimplementedModuleServer
 	manifest *modulev1.Manifest
@@ -86,10 +86,10 @@ func (m *proxmoxModule) Validate(_ context.Context, req *modulev1.ValidateReques
 	return &modulev1.Diagnostics{}, nil
 }
 
-// ensureClient construit (et met en cache) le client Proxmox à partir de la
-// config résolue — réutilisé ensuite par computeVMServer, qui n'a pas
-// d'accès direct à StepRequest.config (docs/02-architecture.md : la config
-// n'arrive qu'aux étapes du cycle de vie, pas aux appels de fonction).
+// ensureClient builds (and caches) the Proxmox client from the resolved config
+// — reused afterwards by computeVMServer, which has no direct access to
+// StepRequest.config (docs/02-architecture.md: the config only reaches
+// lifecycle steps, not function calls).
 func (m *proxmoxModule) ensureClient(cfgStruct *structpb.Struct) (*proxmoxapi.Client, *proxmoxConfig, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
@@ -111,7 +111,7 @@ func (m *proxmoxModule) Check(ctx context.Context, req *modulev1.StepRequest) (*
 		return nil, err
 	}
 	if _, err := client.Version(ctx); err != nil {
-		return nil, fmt.Errorf("connexion à Proxmox : %w", err)
+		return nil, fmt.Errorf("connecting to Proxmox: %w", err)
 	}
 	return &modulev1.CheckResult{Status: modulev1.CheckResult_STATUS_COMPLIANT}, nil
 }
@@ -136,7 +136,7 @@ func (m *proxmoxModule) Destroy(_ context.Context, req *modulev1.StepRequest) (*
 	return m.stepOK(req)
 }
 
-// computeVMServer implémente la fonction compute.vm/v1.
+// computeVMServer implements the compute.vm/v1 function.
 type computeVMServer struct {
 	computevmv1.UnimplementedComputeVMServer
 	module *proxmoxModule
@@ -146,7 +146,7 @@ func (s *computeVMServer) client() (*proxmoxapi.Client, *proxmoxConfig, error) {
 	s.module.mu.Lock()
 	defer s.module.mu.Unlock()
 	if s.module.client == nil {
-		return nil, nil, fmt.Errorf("proxmox : aucune configuration (Check n'a pas encore été appelé sur ce module)")
+		return nil, nil, fmt.Errorf("proxmox: no configuration (Check has not been called on this module yet)")
 	}
 	return s.module.client, s.module.config, nil
 }
@@ -162,14 +162,14 @@ func (s *computeVMServer) EnsureImage(ctx context.Context, req *computevmv1.Ensu
 	}
 	if tmpl == nil {
 		return nil, fmt.Errorf(
-			"template %q introuvable sur le nœud %q : la création automatique du template (téléchargement de l'image cloud) n'est pas encore prise en charge à ce jalon — créez-le manuellement au préalable",
+			"template %q not found on node %q: automatic template creation (cloud image download) is not supported yet — create it manually beforehand",
 			req.GetImage(), cfg.Node,
 		)
 	}
 	return &computevmv1.EnsureImageResponse{}, nil
 }
 
-// EnsureVM est idempotent par nom (clé d'idempotence, docs/07).
+// EnsureVM is idempotent by name (idempotence key, docs/07).
 func (s *computeVMServer) EnsureVM(ctx context.Context, req *computevmv1.EnsureVMRequest) (*computevmv1.VM, error) {
 	client, cfg, err := s.client()
 	if err != nil {
@@ -191,18 +191,18 @@ func (s *computeVMServer) EnsureVM(ctx context.Context, req *computevmv1.EnsureV
 		return nil, err
 	}
 	if template == nil {
-		return nil, fmt.Errorf("template %q introuvable : appelez EnsureImage au préalable", cfg.Image)
+		return nil, fmt.Errorf("template %q not found: call EnsureImage first", cfg.Image)
 	}
 
 	newID, err := client.NextID(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("obtention d'un identifiant de VM : %w", err)
+		return nil, fmt.Errorf("getting a VM ID: %w", err)
 	}
 
 	if err := client.CloneVM(ctx, cfg.Node, proxmoxapi.CloneVMOptions{
 		TemplateID: template.VMID, NewID: newID, Name: req.GetName(),
 	}); err != nil {
-		return nil, fmt.Errorf("clonage de %q : %w", req.GetName(), err)
+		return nil, fmt.Errorf("cloning %q: %w", req.GetName(), err)
 	}
 
 	if err := client.ConfigureCloudInit(ctx, cfg.Node, newID, proxmoxapi.CloudInitOptions{
@@ -212,11 +212,11 @@ func (s *computeVMServer) EnsureVM(ctx context.Context, req *computevmv1.EnsureV
 		Gateway:      req.GetGateway(),
 		Tags:         []string{"genesis-env=" + req.GetEnv()},
 	}); err != nil {
-		return nil, fmt.Errorf("configuration cloud-init de %q : %w", req.GetName(), err)
+		return nil, fmt.Errorf("configuration cloud-init de %q: %w", req.GetName(), err)
 	}
 
 	if err := client.StartVM(ctx, cfg.Node, newID); err != nil {
-		return nil, fmt.Errorf("démarrage de %q : %w", req.GetName(), err)
+		return nil, fmt.Errorf("starting %q: %w", req.GetName(), err)
 	}
 
 	status, err := client.Status(ctx, cfg.Node, newID)
@@ -226,8 +226,8 @@ func (s *computeVMServer) EnsureVM(ctx context.Context, req *computevmv1.EnsureV
 	return &computevmv1.VM{Id: strconv.Itoa(newID), Name: req.GetName(), Ip: req.GetIp(), Status: status.Status, SshPort: sshPort}, nil
 }
 
-// sshPort : une VM Proxmox est une vraie VM, SSH écoute sur le port standard
-// (compute.vm/v1 : les consommateurs utilisent VM.ssh_port, jamais 22 en dur).
+// sshPort: a Proxmox VM is a real VM, SSH listens on the standard port
+// (compute.vm/v1: consumers use VM.ssh_port, never a hard-coded 22).
 const sshPort = 22
 
 func (s *computeVMServer) GetVM(ctx context.Context, req *computevmv1.GetVMRequest) (*computevmv1.VM, error) {
@@ -240,7 +240,7 @@ func (s *computeVMServer) GetVM(ctx context.Context, req *computevmv1.GetVMReque
 		return nil, err
 	}
 	if vm == nil {
-		return nil, fmt.Errorf("VM %q introuvable", req.GetName())
+		return nil, fmt.Errorf("VM %q not found", req.GetName())
 	}
 	status, err := client.Status(ctx, cfg.Node, vm.VMID)
 	if err != nil {
@@ -249,7 +249,7 @@ func (s *computeVMServer) GetVM(ctx context.Context, req *computevmv1.GetVMReque
 	return &computevmv1.VM{Id: strconv.Itoa(vm.VMID), Name: vm.Name, Status: status.Status, SshPort: sshPort}, nil
 }
 
-// DeleteVM est idempotent : une VM déjà absente n'est pas une erreur.
+// DeleteVM is idempotent: a VM that is already gone is not an error.
 func (s *computeVMServer) DeleteVM(ctx context.Context, req *computevmv1.DeleteVMRequest) (*computevmv1.DeleteVMResponse, error) {
 	client, cfg, err := s.client()
 	if err != nil {
@@ -268,8 +268,8 @@ func (s *computeVMServer) DeleteVM(ctx context.Context, req *computevmv1.DeleteV
 	return &computevmv1.DeleteVMResponse{}, nil
 }
 
-// Now interroge l'heure du nœud (docs/05-bootstrap-lifecycle.md : contrôle
-// d'horloge de la graine, première dépendance de toute la chaîne).
+// Now queries the node's clock (docs/05-bootstrap-lifecycle.md: the seed's
+// clock check, the first dependency of the whole chain).
 func (s *computeVMServer) Now(ctx context.Context, _ *computevmv1.NowRequest) (*computevmv1.NowResponse, error) {
 	client, cfg, err := s.client()
 	if err != nil {

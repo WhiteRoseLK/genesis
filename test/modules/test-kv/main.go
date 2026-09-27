@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: Apache-2.0
 
-// test-kv fournit secrets.kv/v1 en phase cible (docs/08-milestones.md, J7) :
-// stockage en mémoire, pour prouver le mécanisme de migration file->vault
-// dans internal/engine sans dépendre du vrai produit Vault.
+// test-kv provides secrets.kv/v1 in the target phase (docs/08-milestones.md,
+// M7): in-memory storage, to prove the file->vault migration mechanism in
+// internal/engine without depending on the real Vault product.
 package main
 
 import (

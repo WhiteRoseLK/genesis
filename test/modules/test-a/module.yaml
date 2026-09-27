@@ -1,7 +1,7 @@
 apiVersion: genesis/module/v1
 name: test-a
 version: 0.1.0
-description: "module de test J4 : racine de la chaine test-a -> test-b -> test-c, phase graine + passation"
+description: "M4 test module: root of the test-a -> test-b -> test-c chain, seed phase + handover"
 layer: platform
 core: ">=0.1.0"
 protocol: 1

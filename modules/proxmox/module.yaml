@@ -1,7 +1,7 @@
 apiVersion: genesis/module/v1
 name: proxmox
 version: 0.1.0
-description: "module compute (docs/07-mvp-modules.md) : fournit compute.vm/v1 sur un cluster Proxmox VE existant"
+description: "compute module (docs/07-mvp-modules.md): provides compute.vm/v1 on an existing Proxmox VE cluster"
 layer: platform
 core: ">=0.1.0 <0.3.0"
 protocol: 1

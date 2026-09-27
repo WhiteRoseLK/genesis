@@ -1,15 +1,15 @@
 // SPDX-License-Identifier: Apache-2.0
 
-// vault fournit pki.issuer/v1 et secrets.kv/v1 en phase cible
-// (docs/07-mvp-modules.md) : Raft mono-nœud, TLS initial via
-// pki.issuer/v1@seed (step-ca), moteur PKI intermédiaire (pki_int) signé
-// par step-ca, KV v2, AppRole "genesis" — même principe que modules/powerdns
-// (api.go parle directement à l'API REST du produit, ansible se limite à
-// l'installation/configuration système).
+// vault provides pki.issuer/v1 and secrets.kv/v1 in the target phase
+// (docs/07-mvp-modules.md): single-node Raft, initial TLS through
+// pki.issuer/v1@seed (step-ca), an intermediate PKI engine (pki_int) signed by
+// step-ca, KV v2, the "genesis" AppRole — the same principle as
+// modules/powerdns (api.go talks directly to the product's REST API, ansible
+// is limited to system installation/configuration).
 //
-// Portée assumée : comme coredns/powerdns, le client HTTP actif (URL, pool
-// TLS, token AppRole) vit en mémoire dans le process du module, peuplé par
-// Configure (dette, docs/PROGRESS.md).
+// Accepted scope: like coredns/powerdns, the active HTTP client (URL, TLS
+// pool, AppRole token) lives in memory in the module process, populated by
+// Configure (debt, docs/PROGRESS.md).
 package main
 
 import (
@@ -49,7 +49,7 @@ const (
 	defaultVMName      = "vault01"
 	sshUser            = "genesis"
 	sshKeyRefFmt       = "vault/%s/ssh-key"
-	unsealKeysRef      = "vault/unseal-keys" // JSON array de 5 clés (docs06 : shamir-shares, recovery)
+	unsealKeysRef      = "vault/unseal-keys" // JSON array of 5 keys (doc 06: shamir-shares, recovery)
 	rootTokenRef       = "vault/root-token"
 	approleRoleIDRef   = "vault/approle-role-id"
 	approleSecretIDRef = "vault/approle-secret-id"
@@ -63,11 +63,11 @@ const (
 	unsealThreshold    = 3
 )
 
-// genesisPolicy autorise le KV applicatif (docs03, exemple de manifest) et
-// l'émission/signature via pki_int — sans ce dernier volet, IssueCert/
-// SignCSR échoueraient avec "permission denied" en utilisant le token
-// AppRole plutôt que le root token (bug réel trouvé en testant contre un
-// vrai Vault avant d'écrire cette policy correctement).
+// genesisPolicy allows the application KV (doc 03, manifest example) and
+// issuing/signing through pki_int — without the latter, IssueCert/SignCSR
+// would fail with "permission denied" when using the AppRole token rather than
+// the root token (a real bug found while testing against a real Vault, before
+// this policy was written correctly).
 const genesisPolicy = `
 path "genesis/data/*" {
   capabilities = ["create", "read", "update", "delete", "list"]
@@ -83,9 +83,9 @@ path "pki_int/sign/*" {
 }
 `
 
-// sshKeyPair reflète la valeur JSON du générateur GENERATOR_SSH_KEYPAIR
-// côté cœur (internal/secrets.SSHKeyPair) — dupliqué ici par son contrat
-// JSON, comme modules/chrony et modules/powerdns.
+// sshKeyPair mirrors the JSON value of the core's GENERATOR_SSH_KEYPAIR
+// generator (internal/secrets.SSHKeyPair) — duplicated here from its JSON
+// contract, like modules/chrony and modules/powerdns.
 type sshKeyPair struct {
 	PrivateKeyOpenSSH   string `json:"private_key_openssh"`
 	PublicKeyAuthorized string `json:"public_key_authorized"`
@@ -107,13 +107,13 @@ type vaultModule struct {
 	pkiSeedClient     pkiissuerv1.PkiIssuerClient
 	fleetAgentClient  fleetagentv1.FleetAgentClient
 
-	// Actif une fois Configure passé (docs/PROGRESS.md : dette, en mémoire
-	// seulement).
+	// Active once Configure has passed (docs/PROGRESS.md: debt, in memory
+	// only).
 	api          *vaultClient
 	vmIP         string
 	approleToken string
-	rootCAPEM    string // racine + intermédiaire step-ca, pool de confiance TLS
-	pkiIntPEM    string // certificat pki_int actif de vault lui-même
+	rootCAPEM    string // step-ca root + intermediate, TLS trust pool
+	pkiIntPEM    string // vault's own active pki_int certificate
 }
 
 func (m *vaultModule) SetBroker(b *sdk.BrokerClient) { m.broker = b }
@@ -138,11 +138,11 @@ func (m *vaultModule) dial() error {
 		return nil
 	}
 	if m.broker == nil || m.brokerToken == "" {
-		return fmt.Errorf("vault : aucune session de broker (Check n'a pas encore été appelé)")
+		return fmt.Errorf("vault: no broker session (Check has not been called yet)")
 	}
 	conn, err := m.broker.Dial(m.brokerToken)
 	if err != nil {
-		return fmt.Errorf("connexion aux fonctions requises : %w", err)
+		return fmt.Errorf("connecting to the required functions: %w", err)
 	}
 	m.vmClient = computevmv1.NewComputeVMClient(conn)
 	m.osBaseClient = osbasev1.NewBaseClient(conn)
@@ -155,17 +155,17 @@ func (m *vaultModule) dial() error {
 	return nil
 }
 
-// installFleetAgents appelle fleet.agent/v1.Install(target) (docs/09-decisions.md
-// ADR-017) : diffusé vers tout module « de parc » installé (ex. teleport),
-// no-op silencieux si aucun n'est présent (fleet.agent/v1 est un requires
-// optionnel — Unimplemented est alors la réponse normale du broker, pas
-// une erreur), même méthode que modules/chrony et modules/powerdns.
+// installFleetAgents calls fleet.agent/v1.Install(target)
+// (docs/09-decisions.md ADR-017): fanned out to every installed "fleet" module
+// (e.g. teleport), a silent no-op if none is present (fleet.agent/v1 is an
+// optional requires — Unimplemented is then the broker's normal answer, not an
+// error), the same method as modules/chrony and modules/powerdns.
 func (m *vaultModule) installFleetAgents(ctx context.Context, target connTarget) error {
 	_, err := m.fleetAgentClient.Install(ctx, &fleetagentv1.InstallRequest{
 		Target: &fleetagentv1.Target{Host: target.Host, Port: target.Port, User: target.User, SshPrivateKey: target.PrivateKey},
 	})
 	if err != nil && status.Code(err) != codes.Unimplemented {
-		return fmt.Errorf("fleet.agent/v1.Install : %w", err)
+		return fmt.Errorf("fleet.agent/v1.Install: %w", err)
 	}
 	return nil
 }
@@ -186,15 +186,15 @@ func (m *vaultModule) sshKeyPair(ctx context.Context, name string) (sshKeyPair, 
 		Ref: ref, Generator: secretsv1.Generator_GENERATOR_SSH_KEYPAIR,
 		Meta: &secretsv1.Meta{Owner: "vault", Consumers: []string{"vault"}, Kind: "ssh_keypair"},
 	}); err != nil {
-		return sshKeyPair{}, fmt.Errorf("génération de la paire SSH : %w", err)
+		return sshKeyPair{}, fmt.Errorf("generating the SSH pair: %w", err)
 	}
 	resp, err := m.secretsClient.Get(ctx, &secretsv1.GetRequest{Ref: ref})
 	if err != nil {
-		return sshKeyPair{}, fmt.Errorf("lecture de la paire SSH : %w", err)
+		return sshKeyPair{}, fmt.Errorf("reading the SSH pair: %w", err)
 	}
 	var pair sshKeyPair
 	if err := json.Unmarshal([]byte(resp.GetValue()), &pair); err != nil {
-		return sshKeyPair{}, fmt.Errorf("décodage de la paire SSH : %w", err)
+		return sshKeyPair{}, fmt.Errorf("decoding the SSH pair: %w", err)
 	}
 	return pair, nil
 }
@@ -242,7 +242,8 @@ func targetFromState(req *modulev1.StepRequest, pair sshKeyPair) connTarget {
 	return connTarget{Host: fmt.Sprint(state["vm_ip"]), Port: int32(port), User: sshUser, PrivateKey: pair.PrivateKeyOpenSSH}
 }
 
-// Provision crée (ou retrouve, EnsureVM est idempotent) la VM dédiée de vault.
+// Provision creates (or finds again, EnsureVM is idempotent) vault's dedicated
+// VM.
 func (m *vaultModule) Provision(ctx context.Context, req *modulev1.StepRequest) (*modulev1.StepResult, error) {
 	if err := m.dial(); err != nil {
 		return nil, err
@@ -256,7 +257,7 @@ func (m *vaultModule) Provision(ctx context.Context, req *modulev1.StepRequest) 
 		Name: name, Env: name, SshPublicKey: pair.PublicKeyAuthorized, User: sshUser,
 	})
 	if err != nil {
-		return nil, fmt.Errorf("EnsureVM(%q) : %w", name, err)
+		return nil, fmt.Errorf("EnsureVM(%q): %w", name, err)
 	}
 	state := sdk.StateMap(req.GetState())
 	state["vm_name"] = name
@@ -275,7 +276,7 @@ func (m *vaultModule) Destroy(ctx context.Context, req *modulev1.StepRequest) (*
 	}
 	name := vmName(req)
 	if _, err := m.vmClient.DeleteVM(ctx, &computevmv1.DeleteVMRequest{Name: name}); err != nil {
-		return nil, fmt.Errorf("DeleteVM(%q) : %w", name, err)
+		return nil, fmt.Errorf("DeleteVM(%q): %w", name, err)
 	}
 	return &modulev1.StepResult{Status: modulev1.StepResult_STATUS_OK, State: req.GetState()}, nil
 }

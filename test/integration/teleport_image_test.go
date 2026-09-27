@@ -22,21 +22,21 @@ import (
 	"time"
 )
 
-// Image de test Teleport, construite localement au lieu d'être téléchargée
-// (#51) : gravitational ne publie ses images que sur public.ecr.aws, dont le
-// quota anonyme par adresse IP, partagé entre les runners GitHub, bloquait
-// la CI ; et depuis la v16 elles sont « distroless » (sans shell), ce qui
-// empêche l'agent d'ouvrir une session SSH. L'image assemble donc une base
-// Debian épinglée par empreinte (tirée d'avance par `make pull-images`) et
-// les binaires teleport/tctl de l'archive officielle, vérifiée par somme de
-// contrôle : même version majeure que celle qu'installe le module
-// (playbooks/install_teleport.yml, canal stable/v17).
+// Teleport test image, built locally instead of being downloaded (#51):
+// gravitational only publishes its images on public.ecr.aws, whose anonymous
+// per-IP quota, shared between GitHub runners, was blocking CI; and since v16
+// they are "distroless" (no shell), which prevents the agent from opening an
+// SSH session. The image therefore assembles a Debian base pinned by digest
+// (pulled ahead of time by `make pull-images`) and the teleport/tctl binaries
+// of the official archive, verified by checksum: the same major version as the
+// one the module installs (playbooks/install_teleport.yml, stable/v17
+// channel).
 const (
 	teleportVersion   = "17.7.29"
 	teleportBaseImage = "debian:13.7-slim@sha256:a99cfc517144bc59b1978475ec53b46ecabec7e43635402ee5b77cc54cd1b20a"
 )
 
-// Sommes publiées à côté de chaque archive (…-bin.tar.gz.sha256 sur
+// Checksums published next to each archive (…-bin.tar.gz.sha256 on
 // cdn.teleport.dev).
 var teleportArchiveSHA256 = map[string]string{
 	"amd64": "ffe83412cc91dfeef533ac2627021cd20f9d017d6b1dbe7db3d1bebfcb17bfdf",
@@ -49,17 +49,17 @@ var (
 	teleportImageErr  error
 )
 
-// teleportTestImage renvoie le nom de l'image de test, construite au premier
-// appel. Son étiquette dérive de ses entrées (somme de l'archive,
-// Dockerfile, donc image de base) : une image déjà construite avec les
-// mêmes entrées est réutilisée telle quelle.
+// teleportTestImage returns the name of the test image, built on the first
+// call. Its tag derives from its inputs (archive checksum, Dockerfile, hence
+// the base image): an image already built with the same inputs is reused as
+// is.
 func teleportTestImage(t *testing.T) string {
 	t.Helper()
 	teleportImageOnce.Do(func() {
 		teleportImageRef, teleportImageErr = buildTeleportImage()
 	})
 	if teleportImageErr != nil {
-		t.Fatalf("image de test teleport : %v", teleportImageErr)
+		t.Fatalf("image de test teleport: %v", teleportImageErr)
 	}
 	return teleportImageRef
 }
@@ -67,7 +67,7 @@ func teleportTestImage(t *testing.T) string {
 func buildTeleportImage() (string, error) {
 	sum, ok := teleportArchiveSHA256[runtime.GOARCH]
 	if !ok {
-		return "", fmt.Errorf("architecture %s non prise en charge (amd64, arm64)", runtime.GOARCH)
+		return "", fmt.Errorf("unsupported architecture %s (amd64, arm64)", runtime.GOARCH)
 	}
 	dockerfile := "FROM " + teleportBaseImage + "\nCOPY teleport tctl /usr/local/bin/\nENTRYPOINT [\"teleport\"]\n"
 	inputs := sha256.Sum256([]byte(sum + dockerfile))
@@ -86,21 +86,21 @@ func buildTeleportImage() (string, error) {
 	}
 	defer func() { _ = os.RemoveAll(buildDir) }()
 	if err := extractTeleportBinaries(archive, buildDir, "teleport", "tctl"); err != nil {
-		return "", fmt.Errorf("extraction de %s : %w", archive, err)
+		return "", fmt.Errorf("extraction de %s: %w", archive, err)
 	}
 	if err := os.WriteFile(filepath.Join(buildDir, "Dockerfile"), []byte(dockerfile), 0o644); err != nil {
 		return "", err
 	}
 	if out, err := exec.Command("docker", "build", "-q", "-t", ref, buildDir).CombinedOutput(); err != nil {
-		return "", fmt.Errorf("docker build : %w : %s", err, out)
+		return "", fmt.Errorf("docker build: %w: %s", err, out)
 	}
 	return ref, nil
 }
 
-// teleportArchive renvoie le chemin de l'archive officielle, téléchargée
-// depuis cdn.teleport.dev si elle n'est pas déjà dans le cache
-// (GENESIS_TEST_CACHE, sinon le cache utilisateur ; conservé par la CI
-// entre deux exécutions). Toute archive dont la somme diffère est rejetée.
+// teleportArchive returns the path of the official archive, downloaded from
+// cdn.teleport.dev unless it is already in the cache (GENESIS_TEST_CACHE,
+// otherwise the user cache; kept by CI between runs). Any archive whose
+// checksum differs is rejected.
 func teleportArchive(sum string) (string, error) {
 	dir := os.Getenv("GENESIS_TEST_CACHE")
 	if dir == "" {
@@ -122,11 +122,11 @@ func teleportArchive(sum string) (string, error) {
 	client := &http.Client{Timeout: 10 * time.Minute}
 	resp, err := client.Get("https://cdn.teleport.dev/" + name)
 	if err != nil {
-		return "", fmt.Errorf("téléchargement de %s : %w", name, err)
+		return "", fmt.Errorf("downloading %s: %w", name, err)
 	}
 	defer func() { _ = resp.Body.Close() }()
 	if resp.StatusCode != http.StatusOK {
-		return "", fmt.Errorf("téléchargement de %s : %s", name, resp.Status)
+		return "", fmt.Errorf("downloading %s: %s", name, resp.Status)
 	}
 	tmp, err := os.CreateTemp(dir, name+".*")
 	if err != nil {
@@ -139,10 +139,10 @@ func teleportArchive(sum string) (string, error) {
 		copyErr = closeErr
 	}
 	if copyErr != nil {
-		return "", fmt.Errorf("téléchargement de %s : %w", name, copyErr)
+		return "", fmt.Errorf("downloading %s: %w", name, copyErr)
 	}
 	if got := hex.EncodeToString(h.Sum(nil)); got != sum {
-		return "", fmt.Errorf("%s : somme sha256 %s, attendue %s", name, got, sum)
+		return "", fmt.Errorf("%s: sha256 checksum %s, expected %s", name, got, sum)
 	}
 	if err := os.Rename(tmp.Name(), path); err != nil {
 		return "", err
@@ -163,8 +163,8 @@ func fileSHA256(path string) (string, error) {
 	return hex.EncodeToString(h.Sum(nil)), nil
 }
 
-// extractTeleportBinaries copie teleport/<nom> de l'archive dans dir, pour
-// chaque nom demandé.
+// extractTeleportBinaries copies teleport/<name> from the archive into dir,
+// for each requested name.
 func extractTeleportBinaries(archive, dir string, names ...string) error {
 	f, err := os.Open(archive)
 	if err != nil {
@@ -206,7 +206,7 @@ func extractTeleportBinaries(archive, dir string, names ...string) error {
 		delete(wanted, hdr.Name)
 	}
 	if len(wanted) > 0 {
-		return fmt.Errorf("fichiers absents de l'archive : %v", wanted)
+		return fmt.Errorf("files missing from the archive: %v", wanted)
 	}
 	return nil
 }
