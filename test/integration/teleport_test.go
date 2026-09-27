@@ -33,24 +33,17 @@ import (
 // Teleport, comme vault, ne peut pas être installé via apt+systemd sur les
 // conteneurs SSH jetables (Alpine, sans systemd) utilisés ailleurs dans ce
 // dépôt : teleportFakeAnsibleServer simule donc « ce qu'ansible aurait
-// fait » en pilotant directement deux VRAIS conteneurs teleportImage
+// fait » en pilotant directement deux VRAIS conteneurs Teleport
 // (auth+proxy, puis agent) avec les VRAIS certificats/jetons/pins que le
 // module teleport lui a transmis -- tout le reste (démarrage, jonction du
 // nœud, émission de certificat utilisateur, connexion SSH via l'agent)
 // tourne pour de vrai, contre un vrai Teleport. Même méthode que
 // internal/modulehost/vault_test.go.
 //
-// Image : à partir de la v16, gravitational ne publie plus que des images
-// "distroless" (aucun shell, /bin/sh absent), ce qui casse l'exécution de
-// commande via le ssh_service de l'agent (le shell de connexion de
-// l'utilisateur cible n'existe pas dans le conteneur). v14 est la dernière
-// version pour laquelle une image classique (avec shell) est publiée sur
-// public.ecr.aws/gravitational/teleport ; elle sert ici uniquement de
-// doublure de test pour un vrai Teleport -- l'installation réelle du module
-// (playbooks/install_teleport.yml, install_agent.yml) cible le dépôt APT
-// officiel en canal stable/v17, indépendamment de cette image de test.
+// Image : teleportTestImage (teleport_image_test.go), construite localement
+// avec la même version majeure que celle qu'installe le module
+// (playbooks/install_teleport.yml, install_agent.yml : canal stable/v17).
 const (
-	teleportImage    = "public.ecr.aws/gravitational/teleport:14.4.1@sha256:1a0b1561362e5203197908d9a0769078f6df6dd3ae3654697f7000c1280bc293"
 	teleportNodePort = "13022"
 	// teleportTestSSHUser doit correspondre à sshUser (modules/teleport/main.go) :
 	// internal/ ne peut pas importer modules/, cette constante est donc
@@ -116,6 +109,7 @@ func (teleportFakeDnsResolverServer) Endpoint(context.Context, *dnsresolverv1.Em
 type teleportFakeAnsibleServer struct {
 	ansiblev1.UnimplementedAnsibleServer
 	t     *testing.T
+	image string // teleportTestImage
 	mu    sync.Mutex
 	dir   string
 	net   string
@@ -256,7 +250,7 @@ ssh_service:
 		"-e", "SSL_CERT_FILE=/etc/teleport/ca-chain.pem",
 		"-v", f.dir+"/auth:/etc/teleport",
 		"-v", f.dir+"/auth/data:/var/lib/teleport",
-		teleportImage, "start", "--config=/etc/teleport/teleport.yaml")
+		f.image, "start", "--config=/etc/teleport/teleport.yaml")
 	out, err := cmd.CombinedOutput()
 	if err != nil {
 		return string(out), fmt.Errorf("docker run teleport (auth+proxy) : %w", err)
@@ -345,14 +339,14 @@ ssh_service:
 		"-p", "127.0.0.1:"+teleportNodePort+":3022",
 		"-v", f.dir+"/agent:/etc/teleport",
 		"-v", f.dir+"/agent/data:/var/lib/teleport",
-		teleportImage, "start", "--config=/etc/teleport/teleport.yaml")
+		f.image, "start", "--config=/etc/teleport/teleport.yaml")
 	out, err := cmd.CombinedOutput()
 	if err != nil {
 		return string(out), fmt.Errorf("docker run teleport (agent) : %w", err)
 	}
 	f.agent = name
 
-	// Le conteneur agent est une image teleport nue, sans l'utilisateur
+	// Le conteneur agent est une image Debian avec teleport, sans l'utilisateur
 	// "genesis" qu'une vraie VM (os.base/v1) aurait déjà créé -- ssh_service
 	// de teleport a besoin d'un compte OS local réel pour ouvrir une session.
 	if userOut, err := exec.Command("docker", "exec", name, "useradd", "-m", "-s", "/bin/bash", teleportTestSSHUser).CombinedOutput(); err != nil {
@@ -524,7 +518,7 @@ func launchTeleportTest(t *testing.T) teleportTestHandle {
 	t.Cleanup(client.Close)
 
 	vmServer := newTeleportFakeComputeVMServer()
-	ansibleServer := &teleportFakeAnsibleServer{t: t}
+	ansibleServer := &teleportFakeAnsibleServer{t: t, image: teleportTestImage(t)}
 	t.Cleanup(ansibleServer.cleanup)
 
 	sessionID := stepCAClient.Broker().NextId()
