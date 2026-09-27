@@ -156,7 +156,7 @@ Génère `modules/mon-module/` : manifeste, `main.go` avec chaque étape en atte
 - [x] **J6** · `chrony`, `coredns`, `powerdns`, première passation graine → cible
 - [x] **J7** · `step-ca`, `vault`, migration des secrets vers Vault
 - [x] **J8** · `teleport`, retrait automatique de la graine
-- [ ] **J9** · Durcissement et preuve d'extensibilité de bout en bout ([#2](https://github.com/WhiteRoseLK/genesis/issues/2))
+- [ ] **J9** · Durcissement et preuve d'extensibilité de bout en bout ([milestone](https://github.com/WhiteRoseLK/genesis/milestone/1), [#2](https://github.com/WhiteRoseLK/genesis/issues/2))
 
 Au-delà de l'itération 1 : mode déconnecté (air-gap), supervision, forge logicielle, construction de l'hyperviseur sur matériel nu. Détail : [docs/PROGRESS.md](docs/PROGRESS.md) et [docs/08-jalons.md](docs/08-jalons.md).
 

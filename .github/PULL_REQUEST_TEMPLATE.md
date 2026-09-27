@@ -13,5 +13,5 @@ Closes #
 
 - [ ] Tests ajoutés ou mis à jour (`make test`, `make test-docker` si des conteneurs sont concernés) ; suite de conformité SDK verte pour tout module touché.
 - [ ] Règles non négociables de `CLAUDE.md` respectées : aucun secret en clair, idempotence (`Check` avant toute action), aucun import interdit, aucune modification hors du répertoire d'un module ajouté.
-- [ ] ADR et documents de conception à jour si une décision, le contrat, la spec ou le cycle changent.
+- [ ] ADR (`docs/adr/`, issue « Décision » liée) et documents de conception à jour si une décision, le contrat, la spec ou le cycle changent.
 - [ ] Dette nouvelle → issue `dette-technique`.

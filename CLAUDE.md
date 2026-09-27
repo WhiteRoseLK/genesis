@@ -12,19 +12,20 @@ Ne pas tout charger d'emblée : lire le document utile à la tâche en cours.
 - `docs/06-secrets-etat.md` — secrets, redaction, état
 - `docs/07-modules-mvp.md` — modules de l'itération 1
 - `docs/08-jalons.md` — jalons et critères d'acceptation
-- `docs/09-decisions.md` — ADR
+- `docs/09-decisions.md` — index des ADR ; une ADR par fichier dans `docs/adr/`
 - `docs/10-ajouter-un-module.md` — procédure d'ajout de module
 - `docs/PROGRESS.md` — **avancement : à lire en début de session** (état des jalons, prochaine étape) ; mis à jour en fin de jalon
-- `docs/journal.md` — historique détaillé des jalons passés (à consulter au besoin, pas à charger d'emblée)
+- Suivi du jalon en cours : milestone GitHub, issue parente `jalon` et ses sous-issues (une par PR) — ADR-049
+- `docs/journal.md` — historique détaillé des jalons J0 à J8 (à consulter au besoin) ; ensuite, commentaire de clôture de l'issue parente du jalon
 - Dette technique : issues GitHub `dette-technique` (seule source de vérité)
 
 ## Méthode de travail
 - Implémenter **un jalon à la fois**, dans l'ordre du doc 08. Ne pas anticiper les jalons suivants.
 - Avant de coder un jalon : proposer un plan court (fichiers, interfaces, tests) et attendre validation.
-- Si un document est ambigu ou contradictoire : poser la question plutôt que deviner ; si une décision structurante est prise, l'ajouter en ADR dans `docs/09-decisions.md`.
+- Si un document est ambigu ou contradictoire : poser la question plutôt que deviner. Une décision structurante se débat dans une issue « Décision » (label `decision`), puis s'ajoute en `docs/adr/NNNN-titre.md` (NNNN = numéro de l'issue) dans la PR qui l'applique, avec sa ligne dans `docs/09-decisions.md` (ADR-049).
 - **Une PR atomique par sujet**, fusionnée en squash (ADR-021) : un jalon = plusieurs PR successives. Branche `<type>/<sujet>` depuis `main`, titre de PR en Conventional Commits (scope facultatif : couche du cœur, `sdk`, `proto` ou nom du module), modèle de PR rempli, `Closes #N`. Détail dans `CONTRIBUTING.md`.
 - Chaque PR : `make lint test` vert, ADR et documents de conception à jour dans la même PR. Dette nouvelle → issue `dette-technique`.
-- Fin de jalon : critères d'acceptation vérifiés un par un, `docs/PROGRESS.md` (statut, prochaine étape) et `docs/journal.md` (entrée du jalon) à jour.
+- Un jalon = un milestone GitHub, une issue parente `jalon`, une sous-issue par PR (ADR-049). Fin de jalon : critères d'acceptation vérifiés un par un, compte rendu en commentaire de clôture de l'issue parente, tableau de `docs/PROGRESS.md` à jour, milestone fermé.
 - Ne jamais fusionner une PR sans validation de l'utilisateur.
 
 ## Règles non négociables

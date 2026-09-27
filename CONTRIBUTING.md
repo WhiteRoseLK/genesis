@@ -27,7 +27,9 @@ Les règles d'architecture et les règles non négociables sont dans [`CLAUDE.md
 
 - Chaque sujet part d'une issue : **Bug**, **Évolution** ou **Dette technique** (modèles dans `.github/ISSUE_TEMPLATE/`).
 - Une issue ouverte reçoit `needs-triage`, retiré automatiquement quand un label `priorite:haute|moyenne|basse` est posé.
-- Les jalons (`docs/08-jalons.md`) sont suivis par le label `jalon`. Une limitation différée volontairement reçoit `dette-technique` : l'issue est la seule source de vérité pour la dette.
+- **Jalons** (ADR-049) : chaque jalon de `docs/08-jalons.md` a un [milestone](https://github.com/WhiteRoseLK/genesis/milestones) et une issue parente (label `jalon`) ; chaque PR prévue est une sous-issue, rattachée au milestone. Le [GitHub Project](https://github.com/users/WhiteRoseLK/projects) donne la vue tableau et roadmap.
+- **Décisions** : un choix d'architecture ou de processus se débat dans une issue **« Décision »** (label `decision`). Une fois tranché, la PR qui l'applique ajoute `docs/adr/NNNN-titre.md` (NNNN = numéro de l'issue, modèle `docs/adr/_modele.md`) et sa ligne dans `docs/09-decisions.md`, puis ferme l'issue.
+- **Dette** : une limitation différée volontairement reçoit `dette-technique` ; l'issue est la seule source de vérité pour la dette.
 
 ## Branches et PR atomiques
 
@@ -51,9 +53,9 @@ Le titre de la PR devient le commit sur `main` : il est validé par la CI et ali
 
 ## Documentation à tenir à jour dans la même PR
 
-- `docs/09-decisions.md` : une ADR pour toute décision structurante ou nouvelle dépendance lourde.
+- `docs/adr/` et l'index `docs/09-decisions.md` : une ADR pour toute décision structurante ou nouvelle dépendance lourde, issue de son issue « Décision ».
 - Documents de conception concernés (`docs/0x-*.md`) si le contrat, la spec ou le cycle changent ; `docs/10-ajouter-un-module.md` si la procédure d'ajout de module change.
-- `docs/PROGRESS.md` et `docs/journal.md` ne sont mis à jour qu'en fin de jalon : le détail de chaque changement vit dans la description de sa PR et dans le CHANGELOG.
+- `docs/PROGRESS.md` n'est mis à jour qu'en fin de jalon ; le bilan du jalon va en commentaire de clôture de son issue parente. Le détail de chaque changement vit dans la description de sa PR et dans le CHANGELOG.
 
 ## Sécurité
 
