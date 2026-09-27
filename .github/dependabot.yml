@@ -27,3 +27,10 @@ updates:
     commit-message:
       prefix: "chore"
       include: "scope"
+    # Versions refusées : chaque entrée cite sa raison et se retire quand elle
+    # ne s'applique plus.
+    ignore:
+      # grpc 1.84.x réintroduit GO-2026-6443 (CVE-2026-84445, panic serveur,
+      # atteignable via le broker) ; corrigé en 1.83.2 (utilisée) et en 1.85.
+      - dependency-name: "google.golang.org/grpc"
+        versions: ["1.84.x"]
