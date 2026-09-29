@@ -8,6 +8,8 @@ import (
 	"io"
 	"strings"
 	"testing"
+
+	ansiblev1 "github.com/WhiteRoseLK/genesis/sdk/go/gen/functions/core/ansible/v1"
 )
 
 func TestTarFilesArePrivate(t *testing.T) {
@@ -36,6 +38,27 @@ func TestTarFilesArePrivate(t *testing.T) {
 	}
 	if seen["id_target"] != "key" || seen["vars.json"] != `{"a":"b"}` {
 		t.Errorf("unexpected content: %v", seen)
+	}
+}
+
+func TestTargetFilesOmitsCertificateByDefault(t *testing.T) {
+	files := targetFiles(&ansiblev1.Target{Host: "10.0.0.5", Port: 22, User: "genesis", SshPrivateKey: "key"})
+	if _, ok := files["id_target-cert.pub"]; ok {
+		t.Errorf("id_target-cert.pub written although ssh_certificate_pem is empty (ADR-018): %v", files)
+	}
+	if string(files["id_target"]) != "key" {
+		t.Errorf("id_target = %q, want %q", files["id_target"], "key")
+	}
+}
+
+func TestTargetFilesWritesCertificateNextToTheKey(t *testing.T) {
+	const cert = "ssh-ed25519-cert-v01@openssh.com AAAA..."
+	files := targetFiles(&ansiblev1.Target{
+		Host: "10.0.0.5", Port: 3022, User: "genesis",
+		SshPrivateKey: "key", SshCertificatePem: cert,
+	})
+	if string(files["id_target-cert.pub"]) != cert {
+		t.Errorf("id_target-cert.pub = %q, want %q (ADR-018: OpenSSH looks up a certificate next to its private key by this exact name)", files["id_target-cert.pub"], cert)
 	}
 }
 

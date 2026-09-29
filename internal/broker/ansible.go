@@ -39,14 +39,8 @@ type ansibleServer struct {
 
 func (a *ansibleServer) RunPlaybook(ctx context.Context, req *ansiblev1.RunPlaybookRequest) (*ansiblev1.RunPlaybookResponse, error) {
 	target := req.GetTarget()
-	files := map[string][]byte{
-		"playbook.yml": req.GetPlaybookYaml(),
-		"id_target":    []byte(target.GetSshPrivateKey()),
-		"inventory.ini": []byte(fmt.Sprintf(
-			"target ansible_host=%s ansible_port=%d ansible_user=%s ansible_ssh_private_key_file=/work/id_target ansible_ssh_common_args='-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null'\n",
-			target.GetHost(), target.GetPort(), target.GetUser(),
-		)),
-	}
+	files := targetFiles(target)
+	files["playbook.yml"] = req.GetPlaybookYaml()
 
 	playbookCmd := "ansible-playbook -i /work/inventory.ini /work/playbook.yml"
 	var sensitive []string
@@ -87,6 +81,25 @@ func (a *ansibleServer) RunPlaybook(ctx context.Context, req *ansiblev1.RunPlayb
 		Ok:     result.ExitCode == 0,
 		Output: redactValues(result.Stdout+result.Stderr, sensitive),
 	}, nil
+}
+
+// targetFiles builds the inventory and key material for target, ready to be
+// merged with the playbook/vars files and archived by tarFiles.
+func targetFiles(target *ansiblev1.Target) map[string][]byte {
+	files := map[string][]byte{
+		"id_target": []byte(target.GetSshPrivateKey()),
+		"inventory.ini": []byte(fmt.Sprintf(
+			"target ansible_host=%s ansible_port=%d ansible_user=%s ansible_ssh_private_key_file=/work/id_target ansible_ssh_common_args='-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null'\n",
+			target.GetHost(), target.GetPort(), target.GetUser(),
+		)),
+	}
+	// ssh_certificate_pem (ADR-018): OpenSSH looks up a certificate next to
+	// its private key by convention, named "<keyfile>-cert.pub" — no extra
+	// ssh_config option needed to make the client present it.
+	if cert := target.GetSshCertificatePem(); cert != "" {
+		files["id_target-cert.pub"] = []byte(cert)
+	}
+	return files
 }
 
 // tarFiles builds an in-memory tar archive, each file as 0600.
