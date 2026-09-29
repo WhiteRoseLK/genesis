@@ -22,6 +22,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"sync"
+	"time"
 
 	"google.golang.org/grpc"
 
@@ -64,7 +65,7 @@ const (
 	agentTargetSuffix  = "-agent-target"
 	verifierSuffix     = "-verify"
 	verifyTeleportUser = "genesis-verify"
-	verifyCertTTL      = "5m"
+	verifyCertTTL      = 5 * time.Minute
 	authPort           = 3025
 	leafTTLSeconds     = int64(90 * 24 * 60 * 60) // 90 days, the same choice as modules/vault
 	joinTokenTTL       = "10m"

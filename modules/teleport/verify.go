@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"regexp"
 	"strings"
+	"time"
 
 	sdk "github.com/WhiteRoseLK/genesis/sdk/go"
 	computevmv1 "github.com/WhiteRoseLK/genesis/sdk/go/gen/functions/compute/vm/v1"
@@ -59,7 +60,7 @@ func (m *teleportModule) Verify(ctx context.Context, req *modulev1.StepRequest) 
 		return nil, fmt.Errorf("Verify(teleport): installing the agent on the test target: %w", err)
 	}
 
-	privKeyPEM, certOpenSSH, err := m.generateUserCert(ctx, ownTarget)
+	privKeyPEM, certOpenSSH, err := m.signUserCert(ctx, ownTarget, verifyTeleportUser, []string{sshUser}, verifyCertTTL)
 	if err != nil {
 		return nil, fmt.Errorf("Verify(teleport): %w", err)
 	}
@@ -107,14 +108,15 @@ func (m *teleportModule) Verify(ctx context.Context, req *modulev1.StepRequest) 
 	return &modulev1.StepResult{Status: modulev1.StepResult_STATUS_OK, State: req.GetState()}, nil
 }
 
-// generateUserCert creates (idempotently) a Teleport verification user and
-// signs a short-lived SSH certificate for it (tctl auth sign
-// --format=openssh), on teleport's own VM.
-func (m *teleportModule) generateUserCert(ctx context.Context, ownTarget connTarget) (privKeyPEM, certOpenSSH string, err error) {
+// signUserCert creates (idempotently) a Teleport user and signs a short-lived
+// SSH certificate for it (tctl auth sign --format=openssh), on teleport's own
+// VM. Shared by Verify (fixed verification user) and access.ssh/v1.SignUserKey
+// (request-derived user/logins/ttl).
+func (m *teleportModule) signUserCert(ctx context.Context, ownTarget connTarget, teleportUser string, logins []string, ttl time.Duration) (privKeyPEM, certOpenSSH string, err error) {
 	vars, err := sdk.NewState(map[string]any{
-		"verify_user": verifyTeleportUser,
-		"ssh_login":   sshUser,
-		"cert_ttl":    verifyCertTTL,
+		"verify_user": teleportUser,
+		"ssh_login":   strings.Join(logins, ","),
+		"cert_ttl":    ttl.String(),
 	})
 	if err != nil {
 		return "", "", err

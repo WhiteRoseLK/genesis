@@ -21,9 +21,11 @@ import (
 	"github.com/WhiteRoseLK/genesis/internal/broker"
 	"github.com/WhiteRoseLK/genesis/internal/modulehost"
 	"github.com/WhiteRoseLK/genesis/internal/testutil"
+	accesssshv1 "github.com/WhiteRoseLK/genesis/sdk/go/gen/functions/access/ssh/v1"
 	computevmv1 "github.com/WhiteRoseLK/genesis/sdk/go/gen/functions/compute/vm/v1"
 	ansiblev1 "github.com/WhiteRoseLK/genesis/sdk/go/gen/functions/core/ansible/v1"
 	dnsresolverv1 "github.com/WhiteRoseLK/genesis/sdk/go/gen/functions/dns/resolver/v1"
+	fleetagentv1 "github.com/WhiteRoseLK/genesis/sdk/go/gen/functions/fleet/agent/v1"
 	osbasev1 "github.com/WhiteRoseLK/genesis/sdk/go/gen/functions/os/base/v1"
 	pkiissuerv1 "github.com/WhiteRoseLK/genesis/sdk/go/gen/functions/pki/issuer/v1"
 	timentpv1 "github.com/WhiteRoseLK/genesis/sdk/go/gen/functions/time/ntp/v1"
@@ -584,5 +586,61 @@ func TestTeleportFleetAgentInstallJoinsClusterAndAllowsSSH(t *testing.T) {
 	}
 	if h.ansibleServer.calls < 5 {
 		t.Errorf("not all of Verify's playbooks were sent (ansible calls = %d)", h.ansibleServer.calls)
+	}
+}
+
+// TestTeleportAccessSSHSignUserKeyIssuesAWorkingCertificate proves, against a
+// real Teleport container, that access.ssh/v1.SignUserKey (dispensed the same
+// way a real consumer module would reach it) really returns a certificate and
+// private key that open an SSH session through the agent -- not just that
+// tctl auth sign exits zero (docs/03-module-contract.md rule 2).
+func TestTeleportAccessSSHSignUserKeyIssuesAWorkingCertificate(t *testing.T) {
+	h := launchTeleportTest(t)
+	ctx := context.Background()
+
+	fleetConn, err := h.client.DispenseFunction("fleet.agent/v1")
+	if err != nil {
+		t.Fatalf("DispenseFunction(teleport, fleet.agent/v1): %v", err)
+	}
+	fleetClient := fleetagentv1.NewFleetAgentClient(fleetConn)
+	// deployAgent (the fake ansible server) resolves the auth server through
+	// the dedicated docker network and ignores the target's own host/key --
+	// only the join token/CA pin the module computes matter here.
+	if _, err := fleetClient.Install(ctx, &fleetagentv1.InstallRequest{
+		Target: &fleetagentv1.Target{Host: "dummy", Port: 22, User: teleportTestSSHUser, SshPrivateKey: "unused"},
+	}); err != nil {
+		t.Fatalf("fleet.agent/v1.Install: %v", err)
+	}
+
+	accessConn, err := h.client.DispenseFunction("access.ssh/v1")
+	if err != nil {
+		t.Fatalf("DispenseFunction(teleport, access.ssh/v1): %v", err)
+	}
+	accessClient := accesssshv1.NewAccessSSHClient(accessConn)
+
+	if _, err := accessClient.SignUserKey(ctx, &accesssshv1.SignUserKeyRequest{}); err == nil {
+		t.Error("SignUserKey with no principals: want an error, got nil")
+	}
+
+	resp, err := accessClient.SignUserKey(ctx, &accesssshv1.SignUserKeyRequest{
+		Principals: []string{teleportTestSSHUser}, TtlSeconds: 300,
+	})
+	if err != nil {
+		t.Fatalf("SignUserKey: %v", err)
+	}
+	if resp.GetCertificateOpenssh() == "" || resp.GetPrivateKeyOpenssh() == "" {
+		t.Fatalf("SignUserKey returned an empty certificate or private key: %+v", resp)
+	}
+
+	out, err := h.ansibleServer.checkSSH(map[string]any{
+		"user_private_key_pem":     resp.GetPrivateKeyOpenssh(),
+		"user_certificate_openssh": resp.GetCertificateOpenssh(),
+		"agent_user":               teleportTestSSHUser,
+	})
+	if err != nil {
+		t.Fatalf("SSH with the certificate returned by SignUserKey failed: %v\n%s", err, out)
+	}
+	if !strings.Contains(out, "AGENT_SSH_OK") {
+		t.Errorf("unexpected output: %s", out)
 	}
 }

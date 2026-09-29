@@ -6,9 +6,17 @@
 
 // Function access.ssh/v1 (docs/03-module-contract.md): SSH access to the
 // fleet, provided by a bastion module (teleport). JumpHost exposes the
-// public entry point (proxy); SignUserKey will sign a user public key into a
-// short-lived SSH certificate -- no real consumer yet at this milestone
-// (docs/PROGRESS.md), see modules/teleport.
+// public entry point (proxy); SignUserKey signs a short-lived SSH user
+// certificate.
+//
+// public_key_openssh (request) is best-effort: Teleport's own CA (`tctl auth
+// sign`) cannot certify an externally supplied public key, only generate its
+// own keypair server-side (verified empirically against a real Teleport
+// container) -- so modules/teleport ignores it and returns
+// private_key_openssh in the response instead. A provider able to honour the
+// supplied public key (e.g. a plain OpenSSH CA module) would leave
+// private_key_openssh empty; callers must pair certificate_openssh with
+// private_key_openssh when it is set, and with their own key otherwise.
 
 package accesssshv1
 
@@ -178,8 +186,12 @@ func (x *SignUserKeyRequest) GetTtlSeconds() int64 {
 type SignUserKeyResponse struct {
 	state              protoimpl.MessageState `protogen:"open.v1"`
 	CertificateOpenssh string                 `protobuf:"bytes,1,opt,name=certificate_openssh,json=certificateOpenssh,proto3" json:"certificate_openssh,omitempty"`
-	unknownFields      protoimpl.UnknownFields
-	sizeCache          protoimpl.SizeCache
+	// private_key_openssh: set when the provider generated its own keypair
+	// (see the message above) -- empty when the provider certified the
+	// request's public_key_openssh instead.
+	PrivateKeyOpenssh string `protobuf:"bytes,2,opt,name=private_key_openssh,json=privateKeyOpenssh,proto3" json:"private_key_openssh,omitempty"`
+	unknownFields     protoimpl.UnknownFields
+	sizeCache         protoimpl.SizeCache
 }
 
 func (x *SignUserKeyResponse) Reset() {
@@ -219,6 +231,13 @@ func (x *SignUserKeyResponse) GetCertificateOpenssh() string {
 	return ""
 }
 
+func (x *SignUserKeyResponse) GetPrivateKeyOpenssh() string {
+	if x != nil {
+		return x.PrivateKeyOpenssh
+	}
+	return ""
+}
+
 var File_functions_access_ssh_v1_ssh_proto protoreflect.FileDescriptor
 
 const file_functions_access_ssh_v1_ssh_proto_rawDesc = "" +
@@ -234,9 +253,10 @@ const file_functions_access_ssh_v1_ssh_proto_rawDesc = "" +
 	"principals\x18\x02 \x03(\tR\n" +
 	"principals\x12\x1f\n" +
 	"\vttl_seconds\x18\x03 \x01(\x03R\n" +
-	"ttlSeconds\"F\n" +
+	"ttlSeconds\"v\n" +
 	"\x13SignUserKeyResponse\x12/\n" +
-	"\x13certificate_openssh\x18\x01 \x01(\tR\x12certificateOpenssh2\xc8\x01\n" +
+	"\x13certificate_openssh\x18\x01 \x01(\tR\x12certificateOpenssh\x12.\n" +
+	"\x13private_key_openssh\x18\x02 \x01(\tR\x11privateKeyOpenssh2\xc8\x01\n" +
 	"\tAccessSSH\x12Q\n" +
 	"\bJumpHost\x12\x1e.functions.access.ssh.v1.Empty\x1a%.functions.access.ssh.v1.JumpHostInfo\x12h\n" +
 	"\vSignUserKey\x12+.functions.access.ssh.v1.SignUserKeyRequest\x1a,.functions.access.ssh.v1.SignUserKeyResponseBOZMgithub.com/WhiteRoseLK/genesis/sdk/go/gen/functions/access/ssh/v1;accesssshv1b\x06proto3"
