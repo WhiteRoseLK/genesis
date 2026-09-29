@@ -6,9 +6,17 @@
 
 // Function access.ssh/v1 (docs/03-module-contract.md): SSH access to the
 // fleet, provided by a bastion module (teleport). JumpHost exposes the
-// public entry point (proxy); SignUserKey will sign a user public key into a
-// short-lived SSH certificate -- no real consumer yet at this milestone
-// (docs/PROGRESS.md), see modules/teleport.
+// public entry point (proxy); SignUserKey signs a short-lived SSH user
+// certificate.
+//
+// public_key_openssh (request) is best-effort: Teleport's own CA (`tctl auth
+// sign`) cannot certify an externally supplied public key, only generate its
+// own keypair server-side (verified empirically against a real Teleport
+// container) -- so modules/teleport ignores it and returns
+// private_key_openssh in the response instead. A provider able to honour the
+// supplied public key (e.g. a plain OpenSSH CA module) would leave
+// private_key_openssh empty; callers must pair certificate_openssh with
+// private_key_openssh when it is set, and with their own key otherwise.
 
 package accesssshv1
 
