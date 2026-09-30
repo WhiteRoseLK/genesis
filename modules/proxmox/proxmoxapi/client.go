@@ -10,6 +10,8 @@ package proxmoxapi
 
 import (
 	"context"
+	"crypto/tls"
+	"crypto/x509"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -18,6 +20,37 @@ import (
 	"strings"
 	"time"
 )
+
+// TLSOptions controls TLS verification for communicating with the Proxmox API.
+type TLSOptions struct {
+	Insecure  bool
+	CACertPEM []byte
+}
+
+// NewHTTPClient returns an *http.Client configured with the given TLS options.
+// If neither Insecure nor CACertPEM is provided, it returns http.DefaultClient.
+func NewHTTPClient(opts TLSOptions) (*http.Client, error) {
+	if !opts.Insecure && len(opts.CACertPEM) == 0 {
+		return http.DefaultClient, nil
+	}
+	tlsConfig := &tls.Config{
+		InsecureSkipVerify: opts.Insecure, //nolint:gosec // G402: operator opt-in for self-signed certificates
+	}
+	if len(opts.CACertPEM) > 0 {
+		pool := x509.NewCertPool()
+		if !pool.AppendCertsFromPEM(opts.CACertPEM) {
+			return nil, fmt.Errorf("parsing CA certificate PEM: invalid or no PEM certificates found")
+		}
+		tlsConfig.RootCAs = pool
+	}
+	transport := &http.Transport{
+		Proxy:           http.ProxyFromEnvironment,
+		TLSClientConfig: tlsConfig,
+	}
+	return &http.Client{
+		Transport: transport,
+	}, nil
+}
 
 // Client talks to the REST API of a Proxmox VE cluster.
 type Client struct {
