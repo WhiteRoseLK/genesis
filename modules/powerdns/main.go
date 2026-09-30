@@ -98,7 +98,16 @@ func (m *powerdnsModule) Validate(context.Context, *modulev1.ValidateRequest) (*
 
 func (m *powerdnsModule) Check(_ context.Context, req *modulev1.StepRequest) (*modulev1.CheckResult, error) {
 	m.brokerToken = req.GetBrokerToken()
-	return &modulev1.CheckResult{Status: modulev1.CheckResult_STATUS_COMPLIANT}, nil
+	flags := sdk.StateMap(req.GetState())
+	if boolFlag(flags, "handed_over") || boolFlag(flags, "verified") {
+		return &modulev1.CheckResult{Status: modulev1.CheckResult_STATUS_COMPLIANT}, nil
+	}
+	return &modulev1.CheckResult{Status: modulev1.CheckResult_STATUS_TODO}, nil
+}
+
+func boolFlag(flags map[string]any, key string) bool {
+	v, _ := flags[key].(bool)
+	return v
 }
 
 // dial dials the broker session at most once (Dial only succeeds once per
@@ -368,7 +377,13 @@ func (m *powerdnsModule) Handover(ctx context.Context, req *modulev1.StepRequest
 			len(ownRecords.GetRecords()), len(seedRecords.GetRecords()))
 	}
 
-	return &modulev1.StepResult{Status: modulev1.StepResult_STATUS_OK, State: req.GetState()}, nil
+	state := sdk.StateMap(req.GetState())
+	state["handed_over"] = true
+	s, err := sdk.NewState(state)
+	if err != nil {
+		return nil, err
+	}
+	return &modulev1.StepResult{Status: modulev1.StepResult_STATUS_OK, State: s}, nil
 }
 
 func recordKey(r *dnszonev1.Record) string {
@@ -472,7 +487,7 @@ func (m *powerdnsModule) Verify(ctx context.Context, req *modulev1.StepRequest) 
 
 	forward, reverse, external, err := parseResolutionOutput(resp.GetOutput())
 	if err != nil {
-		return nil, fmt.Errorf("Verify(powerdns): %w\nsortie:\n%s", err, resp.GetOutput())
+		return nil, fmt.Errorf("Verify(powerdns): %w\noutput:\n%s", err, resp.GetOutput())
 	}
 	if !strings.Contains(forward, verifyProbeIP) {
 		return nil, fmt.Errorf("Verify(powerdns): forward resolution = %q, expected to contain %q", forward, verifyProbeIP)
@@ -484,7 +499,13 @@ func (m *powerdnsModule) Verify(ctx context.Context, req *modulev1.StepRequest) 
 		return nil, fmt.Errorf("Verify(powerdns): empty resolution of an external name (recursor not working?)")
 	}
 
-	return &modulev1.StepResult{Status: modulev1.StepResult_STATUS_OK, State: req.GetState()}, nil
+	state := sdk.StateMap(req.GetState())
+	state["verified"] = true
+	s, err := sdk.NewState(state)
+	if err != nil {
+		return nil, err
+	}
+	return &modulev1.StepResult{Status: modulev1.StepResult_STATUS_OK, State: s}, nil
 }
 
 var (

@@ -133,8 +133,8 @@ func TestChronyProvisionsConfiguresAndVerifies(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Check: %v", err)
 	}
-	if checkResp.GetStatus() != modulev1.CheckResult_STATUS_COMPLIANT {
-		t.Fatalf("Check().Status = %v, want COMPLIANT", checkResp.GetStatus())
+	if checkResp.GetStatus() != modulev1.CheckResult_STATUS_TODO {
+		t.Fatalf("Check().Status = %v, want TODO (not provisioned yet)", checkResp.GetStatus())
 	}
 
 	provisionResp, err := client.Module().Provision(ctx, &modulev1.StepRequest{RunId: "test", BrokerToken: token})
@@ -182,6 +182,14 @@ func TestChronyProvisionsConfiguresAndVerifies(t *testing.T) {
 	}
 	if _, stillThere := vmServer.vms["chrony01-verify"]; stillThere {
 		t.Error("the verification VM was not deleted after Verify")
+	}
+
+	checkAfterVerify, err := client.Module().Check(ctx, &modulev1.StepRequest{RunId: "test", BrokerToken: token, State: verifyResp.GetState()})
+	if err != nil {
+		t.Fatalf("Check after verify: %v", err)
+	}
+	if checkAfterVerify.GetStatus() != modulev1.CheckResult_STATUS_COMPLIANT {
+		t.Fatalf("Check().Status after verify = %v, want COMPLIANT", checkAfterVerify.GetStatus())
 	}
 
 	destroyResp, err := client.Module().Destroy(ctx, &modulev1.StepRequest{RunId: "test", BrokerToken: token, State: configureResp.GetState()})

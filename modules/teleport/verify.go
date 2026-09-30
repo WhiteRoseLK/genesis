@@ -105,7 +105,13 @@ func (m *teleportModule) Verify(ctx context.Context, req *modulev1.StepRequest) 
 		return nil, fmt.Errorf("Verify(teleport): unexpected output, expected AGENT_SSH_OK:\n%s", resp.GetOutput())
 	}
 
-	return &modulev1.StepResult{Status: modulev1.StepResult_STATUS_OK, State: req.GetState()}, nil
+	state := sdk.StateMap(req.GetState())
+	state["verified"] = true
+	s, err := sdk.NewState(state)
+	if err != nil {
+		return nil, err
+	}
+	return &modulev1.StepResult{Status: modulev1.StepResult_STATUS_OK, State: s}, nil
 }
 
 // signUserCert creates (idempotently) a Teleport user and signs a short-lived
