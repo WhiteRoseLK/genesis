@@ -9,6 +9,8 @@
     "storage": { "type": "string" },
     "bridge": { "type": "string" },
     "image": { "type": "string" },
+    "tls_insecure": { "type": "boolean" },
+    "tls_ca_cert_ref": { "type": "string", "pattern": "^(env|file|vault)://" },
     "credentials": {
       "type": "object",
       "required": ["token_id_ref", "token_secret_ref"],

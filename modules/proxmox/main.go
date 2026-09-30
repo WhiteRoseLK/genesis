@@ -18,7 +18,9 @@ import (
 	_ "embed"
 	"encoding/json"
 	"fmt"
+	"os"
 	"strconv"
+	"strings"
 	"sync"
 	"time"
 
@@ -37,12 +39,15 @@ import (
 var manifestYAML []byte
 
 type proxmoxConfig struct {
-	Endpoint    string `json:"endpoint"`
-	Node        string `json:"node"`
-	Storage     string `json:"storage"`
-	Bridge      string `json:"bridge"`
-	Image       string `json:"image"`
-	Credentials struct {
+	Endpoint     string `json:"endpoint"`
+	Node         string `json:"node"`
+	Storage      string `json:"storage"`
+	Bridge       string `json:"bridge"`
+	Image        string `json:"image"`
+	TLSInsecure  bool   `json:"tls_insecure"`
+	TLSCACert    string `json:"tls_ca_cert"`
+	TLSCACertRef string `json:"tls_ca_cert_ref"`
+	Credentials  struct {
 		TokenID     string `json:"token_id"`
 		TokenSecret string `json:"token_secret"`
 	} `json:"credentials"`
@@ -51,7 +56,7 @@ type proxmoxConfig struct {
 func parseConfig(s *structpb.Struct) (*proxmoxConfig, error) {
 	raw, err := json.Marshal(s.AsMap())
 	if err != nil {
-		return nil, fmt.Errorf("encodage de la config: %w", err)
+		return nil, fmt.Errorf("encoding the config: %w", err)
 	}
 	var cfg proxmoxConfig
 	if err := json.Unmarshal(raw, &cfg); err != nil {
@@ -100,7 +105,35 @@ func (m *proxmoxModule) ensureClient(cfgStruct *structpb.Struct) (*proxmoxapi.Cl
 	if err != nil {
 		return nil, nil, err
 	}
-	m.client = proxmoxapi.New(cfg.Endpoint, cfg.Credentials.TokenID, cfg.Credentials.TokenSecret, nil)
+
+	caPEM := []byte(cfg.TLSCACert)
+	if len(caPEM) == 0 && cfg.TLSCACertRef != "" {
+		if strings.HasPrefix(cfg.TLSCACertRef, "file://") {
+			path := strings.TrimPrefix(cfg.TLSCACertRef, "file://")
+			data, err := os.ReadFile(path)
+			if err != nil {
+				return nil, nil, fmt.Errorf("reading CA cert file %s: %w", path, err)
+			}
+			caPEM = data
+		} else if strings.HasPrefix(cfg.TLSCACertRef, "env://") {
+			name := strings.TrimPrefix(cfg.TLSCACertRef, "env://")
+			val, ok := os.LookupEnv(name)
+			if !ok {
+				return nil, nil, fmt.Errorf("CA cert environment variable %s is not set", name)
+			}
+			caPEM = []byte(val)
+		}
+	}
+
+	httpClient, err := proxmoxapi.NewHTTPClient(proxmoxapi.TLSOptions{
+		Insecure:  cfg.TLSInsecure,
+		CACertPEM: caPEM,
+	})
+	if err != nil {
+		return nil, nil, fmt.Errorf("configuring Proxmox TLS client: %w", err)
+	}
+
+	m.client = proxmoxapi.New(cfg.Endpoint, cfg.Credentials.TokenID, cfg.Credentials.TokenSecret, httpClient)
 	m.config = cfg
 	return m.client, m.config, nil
 }

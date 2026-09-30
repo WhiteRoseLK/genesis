@@ -5,6 +5,7 @@ package proxmoxapi
 import (
 	"context"
 	"encoding/json"
+	"encoding/pem"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -198,4 +199,75 @@ func TestDeleteVM(t *testing.T) {
 	if gotMethod != http.MethodDelete {
 		t.Errorf("method = %q, want DELETE", gotMethod)
 	}
+}
+
+func TestNewHTTPClient(t *testing.T) {
+	t.Run("default options return DefaultClient", func(t *testing.T) {
+		hc, err := NewHTTPClient(TLSOptions{})
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if hc != http.DefaultClient {
+			t.Errorf("got %v, want http.DefaultClient", hc)
+		}
+	})
+
+	t.Run("invalid CA cert PEM returns error", func(t *testing.T) {
+		_, err := NewHTTPClient(TLSOptions{CACertPEM: []byte("not a valid pem certificate")})
+		if err == nil {
+			t.Fatal("expected error for invalid PEM, got nil")
+		}
+	})
+
+	t.Run("insecure skip verify connects to TLS server", func(t *testing.T) {
+		srv := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			writeData(t, w, map[string]string{"version": "8.1.3"})
+		}))
+		t.Cleanup(srv.Close)
+
+		// Without Insecure, default client fails certificate verification
+		defaultClient := New(srv.URL, "genesis@pve!token", "secret", nil)
+		if _, err := defaultClient.Version(context.Background()); err == nil {
+			t.Fatal("expected certificate verification failure with default client, got nil")
+		}
+
+		// With Insecure: true, client succeeds
+		insecureHC, err := NewHTTPClient(TLSOptions{Insecure: true})
+		if err != nil {
+			t.Fatalf("NewHTTPClient: %v", err)
+		}
+		insecureClient := New(srv.URL, "genesis@pve!token", "secret", insecureHC)
+		v, err := insecureClient.Version(context.Background())
+		if err != nil {
+			t.Fatalf("Version with Insecure: true failed: %v", err)
+		}
+		if v != "8.1.3" {
+			t.Errorf("Version = %q, want 8.1.3", v)
+		}
+	})
+
+	t.Run("custom CA certificate connects to TLS server", func(t *testing.T) {
+		srv := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			writeData(t, w, map[string]string{"version": "8.1.3"})
+		}))
+		t.Cleanup(srv.Close)
+
+		caPEM := pem.EncodeToMemory(&pem.Block{
+			Type:  "CERTIFICATE",
+			Bytes: srv.Certificate().Raw,
+		})
+
+		caHC, err := NewHTTPClient(TLSOptions{CACertPEM: caPEM})
+		if err != nil {
+			t.Fatalf("NewHTTPClient: %v", err)
+		}
+		caClient := New(srv.URL, "genesis@pve!token", "secret", caHC)
+		v, err := caClient.Version(context.Background())
+		if err != nil {
+			t.Fatalf("Version with custom CA failed: %v", err)
+		}
+		if v != "8.1.3" {
+			t.Errorf("Version = %q, want 8.1.3", v)
+		}
+	})
 }
