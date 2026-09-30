@@ -59,7 +59,7 @@ func teleportTestImage(t *testing.T) string {
 		teleportImageRef, teleportImageErr = buildTeleportImage()
 	})
 	if teleportImageErr != nil {
-		t.Fatalf("image de test teleport: %v", teleportImageErr)
+		t.Fatalf("teleport test image: %v", teleportImageErr)
 	}
 	return teleportImageRef
 }
@@ -86,7 +86,7 @@ func buildTeleportImage() (string, error) {
 	}
 	defer func() { _ = os.RemoveAll(buildDir) }()
 	if err := extractTeleportBinaries(archive, buildDir, "teleport", "tctl"); err != nil {
-		return "", fmt.Errorf("extraction de %s: %w", archive, err)
+		return "", fmt.Errorf("extracting %s: %w", archive, err)
 	}
 	if err := os.WriteFile(filepath.Join(buildDir, "Dockerfile"), []byte(dockerfile), 0o644); err != nil {
 		return "", err
