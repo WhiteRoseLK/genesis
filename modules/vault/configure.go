@@ -374,7 +374,13 @@ func (m *vaultModule) Handover(ctx context.Context, req *modulev1.StepRequest) (
 		return nil, fmt.Errorf("Handover(vault): revoking the root token: %w", err)
 	}
 
-	return &modulev1.StepResult{Status: modulev1.StepResult_STATUS_OK, State: req.GetState()}, nil
+	state := sdk.StateMap(req.GetState())
+	state["handed_over"] = true
+	s, err := sdk.NewState(state)
+	if err != nil {
+		return nil, err
+	}
+	return &modulev1.StepResult{Status: modulev1.StepResult_STATUS_OK, State: s}, nil
 }
 
 func (m *vaultModule) currentAPI() *vaultClient {
@@ -449,5 +455,10 @@ func (m *vaultModule) Verify(ctx context.Context, req *modulev1.StepRequest) (*m
 		return nil, fmt.Errorf("Verify(vault): unexpected output, expected a valid chain + KV_VALUE=ok:\n%s", resp.GetOutput())
 	}
 
-	return &modulev1.StepResult{Status: modulev1.StepResult_STATUS_OK, State: req.GetState()}, nil
+	state["verified"] = true
+	s, err := sdk.NewState(state)
+	if err != nil {
+		return nil, err
+	}
+	return &modulev1.StepResult{Status: modulev1.StepResult_STATUS_OK, State: s}, nil
 }

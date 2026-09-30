@@ -128,7 +128,16 @@ func (m *vaultModule) Validate(context.Context, *modulev1.ValidateRequest) (*mod
 
 func (m *vaultModule) Check(_ context.Context, req *modulev1.StepRequest) (*modulev1.CheckResult, error) {
 	m.brokerToken = req.GetBrokerToken()
-	return &modulev1.CheckResult{Status: modulev1.CheckResult_STATUS_COMPLIANT}, nil
+	flags := sdk.StateMap(req.GetState())
+	if boolFlag(flags, "handed_over") || boolFlag(flags, "verified") {
+		return &modulev1.CheckResult{Status: modulev1.CheckResult_STATUS_COMPLIANT}, nil
+	}
+	return &modulev1.CheckResult{Status: modulev1.CheckResult_STATUS_TODO}, nil
+}
+
+func boolFlag(flags map[string]any, key string) bool {
+	v, _ := flags[key].(bool)
+	return v
 }
 
 func (m *vaultModule) dial() error {

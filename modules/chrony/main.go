@@ -82,7 +82,16 @@ func (m *chronyModule) Validate(context.Context, *modulev1.ValidateRequest) (*mo
 
 func (m *chronyModule) Check(_ context.Context, req *modulev1.StepRequest) (*modulev1.CheckResult, error) {
 	m.brokerToken = req.GetBrokerToken()
+	flags := sdk.StateMap(req.GetState())
+	if !boolFlag(flags, "verified") {
+		return &modulev1.CheckResult{Status: modulev1.CheckResult_STATUS_TODO}, nil
+	}
 	return &modulev1.CheckResult{Status: modulev1.CheckResult_STATUS_COMPLIANT}, nil
+}
+
+func boolFlag(flags map[string]any, key string) bool {
+	v, _ := flags[key].(bool)
+	return v
 }
 
 // dial dials the broker session at most once (Dial only succeeds once per
@@ -324,13 +333,19 @@ func (m *chronyModule) Verify(ctx context.Context, req *modulev1.StepRequest) (*
 
 	offsetMs, err := parseOffsetMs(resp.GetOutput())
 	if err != nil {
-		return nil, fmt.Errorf("Verify(chrony): %w\nsortie:\n%s", err, resp.GetOutput())
+		return nil, fmt.Errorf("Verify(chrony): %w\noutput:\n%s", err, resp.GetOutput())
 	}
 	if offsetMs >= maxOffsetMs {
 		return nil, fmt.Errorf("Verify(chrony): offset of %.3f ms >= %.0f ms", offsetMs, maxOffsetMs)
 	}
 
-	return &modulev1.StepResult{Status: modulev1.StepResult_STATUS_OK, State: req.GetState()}, nil
+	state := sdk.StateMap(req.GetState())
+	state["verified"] = true
+	s, err := sdk.NewState(state)
+	if err != nil {
+		return nil, err
+	}
+	return &modulev1.StepResult{Status: modulev1.StepResult_STATUS_OK, State: s}, nil
 }
 
 // parseOffsetMs extracts the "System time" line from the output of `chronyc

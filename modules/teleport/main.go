@@ -133,7 +133,16 @@ func (m *teleportModule) Validate(context.Context, *modulev1.ValidateRequest) (*
 
 func (m *teleportModule) Check(_ context.Context, req *modulev1.StepRequest) (*modulev1.CheckResult, error) {
 	m.brokerToken = req.GetBrokerToken()
+	flags := sdk.StateMap(req.GetState())
+	if !boolFlag(flags, "verified") {
+		return &modulev1.CheckResult{Status: modulev1.CheckResult_STATUS_TODO}, nil
+	}
 	return &modulev1.CheckResult{Status: modulev1.CheckResult_STATUS_COMPLIANT}, nil
+}
+
+func boolFlag(flags map[string]any, key string) bool {
+	v, _ := flags[key].(bool)
+	return v
 }
 
 // dial dials the broker session at most once -- the same precaution as
