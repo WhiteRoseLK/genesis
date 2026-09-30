@@ -287,7 +287,7 @@ func (m *powerdnsModule) Configure(ctx context.Context, req *modulev1.StepReques
 
 	ntpEndpoint, err := m.timeNTPClient.Endpoint(ctx, &timentpv1.Empty{})
 	if err != nil {
-		return nil, fmt.Errorf("lecture de time.ntp/v1: %w", err)
+		return nil, fmt.Errorf("reading time.ntp/v1: %w", err)
 	}
 	if _, err := m.osBaseClient.SetNTP(ctx, &osbasev1.SetNTPRequest{Target: target.osBase(), Servers: []string{ntpEndpoint.GetAddress()}}); err != nil {
 		return nil, fmt.Errorf("SetNTP: %w", err)
@@ -295,7 +295,7 @@ func (m *powerdnsModule) Configure(ctx context.Context, req *modulev1.StepReques
 
 	resolverEndpoint, err := m.dnsResolverClient.Endpoint(ctx, &dnsresolverv1.Empty{})
 	if err != nil {
-		return nil, fmt.Errorf("lecture de dns.resolver/v1: %w", err)
+		return nil, fmt.Errorf("reading dns.resolver/v1: %w", err)
 	}
 	if _, err := m.osBaseClient.SetResolver(ctx, &osbasev1.SetResolverRequest{Target: target.osBase(), Nameservers: []string{resolverEndpoint.GetAddress()}, Domain: dom}); err != nil {
 		return nil, fmt.Errorf("SetResolver: %w", err)
@@ -350,7 +350,7 @@ func (m *powerdnsModule) Handover(ctx context.Context, req *modulev1.StepRequest
 
 	seedRecords, err := m.dnsZoneSeedClient.ListRecords(ctx, &dnszonev1.Zone{Zone: dom})
 	if err != nil {
-		return nil, fmt.Errorf("lecture de dns.zone/v1@seed: %w", err)
+		return nil, fmt.Errorf("reading dns.zone/v1@seed: %w", err)
 	}
 
 	for _, r := range seedRecords.GetRecords() {

@@ -28,7 +28,7 @@ func Load(stateDir string) (*State, error) {
 		return nil, fmt.Errorf("%s: %w", stateDir, ErrNotInitialized)
 	}
 	if err != nil {
-		return nil, fmt.Errorf("lecture de %s: %w", path, err)
+		return nil, fmt.Errorf("reading %s: %w", path, err)
 	}
 	var s State
 	if err := json.Unmarshal(raw, &s); err != nil {

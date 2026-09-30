@@ -47,14 +47,14 @@ func (m *vaultModule) Configure(ctx context.Context, req *modulev1.StepRequest) 
 
 	ntpEndpoint, err := m.timeNTPClient.Endpoint(ctx, &timentpv1.Empty{})
 	if err != nil {
-		return nil, fmt.Errorf("lecture de time.ntp/v1: %w", err)
+		return nil, fmt.Errorf("reading time.ntp/v1: %w", err)
 	}
 	if _, err := m.osBaseClient.SetNTP(ctx, &osbasev1.SetNTPRequest{Target: target.osBase(), Servers: []string{ntpEndpoint.GetAddress()}}); err != nil {
 		return nil, fmt.Errorf("SetNTP: %w", err)
 	}
 	resolverEndpoint, err := m.dnsResolverClient.Endpoint(ctx, &dnsresolverv1.Empty{})
 	if err != nil {
-		return nil, fmt.Errorf("lecture de dns.resolver/v1: %w", err)
+		return nil, fmt.Errorf("reading dns.resolver/v1: %w", err)
 	}
 	if _, err := m.osBaseClient.SetResolver(ctx, &osbasev1.SetResolverRequest{Target: target.osBase(), Nameservers: []string{resolverEndpoint.GetAddress()}}); err != nil {
 		return nil, fmt.Errorf("SetResolver: %w", err)
@@ -62,7 +62,7 @@ func (m *vaultModule) Configure(ctx context.Context, req *modulev1.StepRequest) 
 
 	rootChain, err := m.pkiSeedClient.CAChain(ctx, &pkiissuerv1.Empty{})
 	if err != nil {
-		return nil, fmt.Errorf("lecture de pki.issuer/v1@seed.CAChain: %w", err)
+		return nil, fmt.Errorf("reading pki.issuer/v1@seed.CAChain: %w", err)
 	}
 	m.mu.Lock()
 	m.rootCAPEM = rootChain.GetChainPem()

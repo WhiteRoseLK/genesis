@@ -26,7 +26,7 @@ func newValidateCmd() *cobra.Command {
 			return err
 		}
 		out := cmd.OutOrStdout()
-		if _, err := fmt.Fprintf(out, "%s: structure valide.\n", file); err != nil {
+		if _, err := fmt.Fprintf(out, "%s: valid structure.\n", file); err != nil {
 			return err
 		}
 		_, err = fmt.Fprintln(out, "module resolution and per-module validation: not implemented yet (see docs/08-milestones.md).")

@@ -37,14 +37,14 @@ func (m *teleportModule) Configure(ctx context.Context, req *modulev1.StepReques
 
 	ntpEndpoint, err := m.timeNTPClient.Endpoint(ctx, &timentpv1.Empty{})
 	if err != nil {
-		return nil, fmt.Errorf("lecture de time.ntp/v1: %w", err)
+		return nil, fmt.Errorf("reading time.ntp/v1: %w", err)
 	}
 	if _, err := m.osBaseClient.SetNTP(ctx, &osbasev1.SetNTPRequest{Target: target.osBase(), Servers: []string{ntpEndpoint.GetAddress()}}); err != nil {
 		return nil, fmt.Errorf("SetNTP: %w", err)
 	}
 	resolverEndpoint, err := m.dnsResolverClient.Endpoint(ctx, &dnsresolverv1.Empty{})
 	if err != nil {
-		return nil, fmt.Errorf("lecture de dns.resolver/v1: %w", err)
+		return nil, fmt.Errorf("reading dns.resolver/v1: %w", err)
 	}
 	if _, err := m.osBaseClient.SetResolver(ctx, &osbasev1.SetResolverRequest{Target: target.osBase(), Nameservers: []string{resolverEndpoint.GetAddress()}}); err != nil {
 		return nil, fmt.Errorf("SetResolver: %w", err)
@@ -58,7 +58,7 @@ func (m *teleportModule) Configure(ctx context.Context, req *modulev1.StepReques
 	}
 	caChain, err := m.pkiClient.CAChain(ctx, &pkiissuerv1.Empty{})
 	if err != nil {
-		return nil, fmt.Errorf("lecture de pki.issuer/v1.CAChain: %w", err)
+		return nil, fmt.Errorf("reading pki.issuer/v1.CAChain: %w", err)
 	}
 
 	output, err := m.deployTeleport(ctx, target, clusterName, tlsCert, caChain.GetChainPem())

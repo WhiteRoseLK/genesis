@@ -102,7 +102,7 @@ func confirm(cmd *cobra.Command) (bool, error) {
 	}
 	line, err := bufio.NewReader(cmd.InOrStdin()).ReadString('\n')
 	if err != nil && !errors.Is(err, io.EOF) {
-		return false, fmt.Errorf("lecture de la confirmation: %w", err)
+		return false, fmt.Errorf("reading confirmation: %w", err)
 	}
 	answer := strings.ToLower(strings.TrimSpace(line))
 	return answer == "y" || answer == "yes", nil

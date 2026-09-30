@@ -133,7 +133,7 @@ func (c *pdnsClient) patchRRset(ctx context.Context, zone string, rrset pdnsRRse
 func (c *pdnsClient) listRRsets(ctx context.Context, zone string) ([]pdnsRRset, error) {
 	status, body, err := c.request(ctx, http.MethodGet, "/api/v1/servers/localhost/zones/"+url.PathEscape(fqdn(zone)), nil)
 	if err != nil {
-		return nil, fmt.Errorf("lecture de la zone %q: %w", zone, err)
+		return nil, fmt.Errorf("reading zone %q: %w", zone, err)
 	}
 	if status != http.StatusOK {
 		return nil, fmt.Errorf("reading zone %q: PowerDNS answered %d: %s", zone, status, body)

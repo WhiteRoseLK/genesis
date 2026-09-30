@@ -212,7 +212,7 @@ func (s *computeVMServer) EnsureVM(ctx context.Context, req *computevmv1.EnsureV
 		Gateway:      req.GetGateway(),
 		Tags:         []string{"genesis-env=" + req.GetEnv()},
 	}); err != nil {
-		return nil, fmt.Errorf("configuration cloud-init de %q: %w", req.GetName(), err)
+		return nil, fmt.Errorf("cloud-init configuration of %q: %w", req.GetName(), err)
 	}
 
 	if err := client.StartVM(ctx, cfg.Node, newID); err != nil {

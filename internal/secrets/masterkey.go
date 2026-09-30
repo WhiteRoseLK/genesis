@@ -76,7 +76,7 @@ func (p FileMasterKeyProvider) readIfExists() (*age.X25519Identity, error) {
 		return nil, nil
 	}
 	if err != nil {
-		return nil, fmt.Errorf("lecture de %s: %w", p.path(), err)
+		return nil, fmt.Errorf("reading %s: %w", p.path(), err)
 	}
 	identity, err := age.ParseX25519Identity(trimNewline(string(raw)))
 	if err != nil {

@@ -20,7 +20,7 @@ import (
 func Load(path string) (*Environment, error) {
 	raw, err := os.ReadFile(path)
 	if err != nil {
-		return nil, fmt.Errorf("lecture de %s: %w", path, err)
+		return nil, fmt.Errorf("reading %s: %w", path, err)
 	}
 
 	var generic any
@@ -32,11 +32,11 @@ func Load(path string) (*Environment, error) {
 	// through a JSON round trip from the result of the YAML decode.
 	jsonBytes, err := json.Marshal(generic)
 	if err != nil {
-		return nil, fmt.Errorf("%s: conversion JSON: %w", path, err)
+		return nil, fmt.Errorf("%s: JSON conversion: %w", path, err)
 	}
 	var doc any
 	if err := json.Unmarshal(jsonBytes, &doc); err != nil {
-		return nil, fmt.Errorf("%s: conversion JSON: %w", path, err)
+		return nil, fmt.Errorf("%s: JSON conversion: %w", path, err)
 	}
 
 	var errs []error

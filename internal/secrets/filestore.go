@@ -80,7 +80,7 @@ func (s *FileStore) Put(_ context.Context, ref Ref, value Secret, meta Meta) err
 
 	ciphertext, err := s.encrypt(value.ExposeSecret())
 	if err != nil {
-		return fmt.Errorf("chiffrement de %s: %w", ref, err)
+		return fmt.Errorf("encrypting %s: %w", ref, err)
 	}
 	if err := atomicfile.Write(s.secretPath(ref), ciphertext, 0o600); err != nil {
 		return fmt.Errorf("writing %s: %w", ref, err)
@@ -108,7 +108,7 @@ func (s *FileStore) Get(_ context.Context, ref Ref) (Secret, error) {
 		return Secret{}, fmt.Errorf("secret %s: not found", ref)
 	}
 	if err != nil {
-		return Secret{}, fmt.Errorf("lecture de %s: %w", ref, err)
+		return Secret{}, fmt.Errorf("reading %s: %w", ref, err)
 	}
 	plaintext, err := s.decrypt(ciphertext)
 	if err != nil {
@@ -166,7 +166,7 @@ func (s *FileStore) List(_ context.Context, prefix string) ([]Entry, error) {
 		}
 		raw, err := fs.ReadFile(fsys, p)
 		if err != nil {
-			return fmt.Errorf("lecture de %s: %w", p, err)
+			return fmt.Errorf("reading %s: %w", p, err)
 		}
 		var meta Meta
 		if err := json.Unmarshal(raw, &meta); err != nil {

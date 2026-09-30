@@ -32,7 +32,7 @@ func Load(path string) (*Lock, error) {
 		return &Lock{Modules: map[string]Entry{}}, nil
 	}
 	if err != nil {
-		return nil, fmt.Errorf("lecture de %s: %w", path, err)
+		return nil, fmt.Errorf("reading %s: %w", path, err)
 	}
 	var l Lock
 	if err := yaml.Unmarshal(raw, &l); err != nil {
