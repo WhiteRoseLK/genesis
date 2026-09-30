@@ -53,7 +53,7 @@ func resolveRef(ref string) (string, error) {
 		path := strings.TrimPrefix(ref, "file://")
 		data, err := os.ReadFile(path)
 		if err != nil {
-			return "", fmt.Errorf("lecture de %s: %w", path, err)
+			return "", fmt.Errorf("reading %s: %w", path, err)
 		}
 		return strings.TrimSpace(string(data)), nil
 	case strings.HasPrefix(ref, "vault://"):

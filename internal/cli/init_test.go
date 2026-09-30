@@ -49,7 +49,7 @@ func TestInitIsIdempotent(t *testing.T) {
 	}
 	keyBefore, err := os.ReadFile(filepath.Join(stateDir, "master.key"))
 	if err != nil {
-		t.Fatalf("lecture de master.key: %v", err)
+		t.Fatalf("reading master.key: %v", err)
 	}
 
 	out, err := runCLI(t, "init", "--state-dir", stateDir)

@@ -21,7 +21,7 @@ func Fingerprint(binaryPath string) (string, error) {
 
 	h := sha256.New()
 	if _, err := io.Copy(h, f); err != nil {
-		return "", fmt.Errorf("lecture de %s: %w", binaryPath, err)
+		return "", fmt.Errorf("reading %s: %w", binaryPath, err)
 	}
 	return hex.EncodeToString(h.Sum(nil)), nil
 }

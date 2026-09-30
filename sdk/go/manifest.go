@@ -82,7 +82,7 @@ type ResourceDecl struct {
 func LoadManifest(path string) (*ManifestFile, error) {
 	raw, err := os.ReadFile(path)
 	if err != nil {
-		return nil, fmt.Errorf("lecture de %s: %w", path, err)
+		return nil, fmt.Errorf("reading %s: %w", path, err)
 	}
 	m, err := ParseManifest(raw)
 	if err != nil {

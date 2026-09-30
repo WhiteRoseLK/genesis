@@ -63,7 +63,7 @@ func Discover(searchPaths []string) ([]Installed, error) {
 			continue
 		}
 		if err != nil {
-			return nil, fmt.Errorf("lecture de %s: %w", root, err)
+			return nil, fmt.Errorf("reading %s: %w", root, err)
 		}
 		for _, nameEntry := range names {
 			if !nameEntry.IsDir() {
@@ -72,7 +72,7 @@ func Discover(searchPaths []string) ([]Installed, error) {
 			nameDir := filepath.Join(root, nameEntry.Name())
 			versions, err := os.ReadDir(nameDir)
 			if err != nil {
-				return nil, fmt.Errorf("lecture de %s: %w", nameDir, err)
+				return nil, fmt.Errorf("reading %s: %w", nameDir, err)
 			}
 			for _, versionEntry := range versions {
 				if !versionEntry.IsDir() {

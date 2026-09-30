@@ -205,7 +205,7 @@ func dirExists(path string) bool {
 func copyFile(src, dst string) error {
 	in, err := os.Open(src)
 	if err != nil {
-		return fmt.Errorf("lecture de %s: %w", src, err)
+		return fmt.Errorf("reading %s: %w", src, err)
 	}
 	defer func() { _ = in.Close() }()
 
