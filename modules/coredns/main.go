@@ -5,12 +5,10 @@
 // The zone is regenerated (BIND file rewritten, container restarted) on every
 // UpsertRecord/DeleteRecord.
 //
-// Accepted scope for this milestone: the records live in memory in the module
-// process, not in the core's state (docs/03-module-contract.md §4 rule 6
-// targets above all persistence across restarts for lifecycle state;
-// UpsertRecord/DeleteRecord are function calls, with no StepRequest.state to
-// go through). A kill+restart of the core would therefore lose the accumulated
-// zone — noted as debt, docs/PROGRESS.md.
+// Container connection state (container_id, container_ip) is preserved in
+// StepResult.state across lifecycle steps, allowing Check to restore the
+// container identity on restart so Endpoint and SeedDown/Destroy target the
+// right instance.
 package main
 
 import (
@@ -65,15 +63,36 @@ func (m *coreDNSModule) Validate(context.Context, *modulev1.ValidateRequest) (*m
 // §5); the session token is captured so that the function handlers
 // (UpsertRecord...) can reach core.container/v1.
 func (m *coreDNSModule) Check(_ context.Context, req *modulev1.StepRequest) (*modulev1.CheckResult, error) {
-	m.brokerToken = req.GetBrokerToken()
+	_ = m.dialWithToken(req.GetBrokerToken())
 	flags := sdk.StateMap(req.GetState())
+	if cid, ok := flags["container_id"].(string); ok && cid != "" {
+		m.zoneServer.mu.Lock()
+		if m.zoneServer.containerID == "" {
+			m.zoneServer.containerID = cid
+			if ip, ok := flags["container_ip"].(string); ok {
+				m.zoneServer.ip = ip
+			}
+		}
+		m.zoneServer.mu.Unlock()
+	}
 	if boolFlag(flags, "seeded") || boolFlag(flags, "retired") {
 		return &modulev1.CheckResult{Status: modulev1.CheckResult_STATUS_COMPLIANT}, nil
 	}
 	return &modulev1.CheckResult{Status: modulev1.CheckResult_STATUS_TODO}, nil
 }
 
-func (m *coreDNSModule) SeedUp(_ context.Context, req *modulev1.StepRequest) (*modulev1.StepResult, error) {
+func (m *coreDNSModule) SeedUp(ctx context.Context, req *modulev1.StepRequest) (*modulev1.StepResult, error) {
+	if err := m.dialWithToken(req.GetBrokerToken()); err != nil {
+		return nil, err
+	}
+	m.mu.Lock()
+	hasClient := m.containerClient != nil
+	m.mu.Unlock()
+	if hasClient {
+		if err := m.zoneServer.reload(ctx); err != nil {
+			return nil, err
+		}
+	}
 	return m.setFlag(req, "seeded")
 }
 
@@ -82,6 +101,9 @@ func (m *coreDNSModule) SeedUp(_ context.Context, req *modulev1.StepRequest) (*m
 // is proven from a consumer's point of view in
 // internal/modulehost/coredns_test.go, once records are present.
 func (m *coreDNSModule) Verify(_ context.Context, req *modulev1.StepRequest) (*modulev1.StepResult, error) {
+	if err := m.dialWithToken(req.GetBrokerToken()); err != nil {
+		return nil, err
+	}
 	return m.setFlag(req, "verified")
 }
 
@@ -90,15 +112,44 @@ func (m *coreDNSModule) Verify(_ context.Context, req *modulev1.StepRequest) (*m
 // (docs/08-milestones.md, M6: "after the handover, stopping coredns has no
 // impact").
 func (m *coreDNSModule) SeedDown(ctx context.Context, req *modulev1.StepRequest) (*modulev1.StepResult, error) {
+	if err := m.dialWithToken(req.GetBrokerToken()); err != nil {
+		return nil, err
+	}
+	flags := sdk.StateMap(req.GetState())
+	if cid, ok := flags["container_id"].(string); ok && cid != "" {
+		m.zoneServer.mu.Lock()
+		if m.zoneServer.containerID == "" {
+			m.zoneServer.containerID = cid
+		}
+		m.zoneServer.mu.Unlock()
+	}
 	if err := m.zoneServer.stopContainer(ctx); err != nil {
 		return nil, err
 	}
-	return m.setFlag(req, "retired")
+	delete(flags, "container_id")
+	delete(flags, "container_ip")
+	flags["retired"] = true
+	s, err := sdk.NewState(flags)
+	if err != nil {
+		return nil, err
+	}
+	return &modulev1.StepResult{Status: modulev1.StepResult_STATUS_OK, State: s}, nil
 }
 
 // Destroy: the same cleanup as SeedDown, for a seed removal outside a handover
 // (e.g. `genesis destroy` with no target module installed).
 func (m *coreDNSModule) Destroy(ctx context.Context, req *modulev1.StepRequest) (*modulev1.StepResult, error) {
+	if err := m.dialWithToken(req.GetBrokerToken()); err != nil {
+		return nil, err
+	}
+	flags := sdk.StateMap(req.GetState())
+	if cid, ok := flags["container_id"].(string); ok && cid != "" {
+		m.zoneServer.mu.Lock()
+		if m.zoneServer.containerID == "" {
+			m.zoneServer.containerID = cid
+		}
+		m.zoneServer.mu.Unlock()
+	}
 	if err := m.zoneServer.stopContainer(ctx); err != nil {
 		return nil, err
 	}
@@ -112,6 +163,12 @@ func (m *coreDNSModule) Destroy(ctx context.Context, req *modulev1.StepRequest) 
 func (m *coreDNSModule) setFlag(req *modulev1.StepRequest, flag string) (*modulev1.StepResult, error) {
 	flags := sdk.StateMap(req.GetState())
 	flags[flag] = true
+	m.zoneServer.mu.Lock()
+	if m.zoneServer.containerID != "" {
+		flags["container_id"] = m.zoneServer.containerID
+		flags["container_ip"] = m.zoneServer.ip
+	}
+	m.zoneServer.mu.Unlock()
 	s, err := sdk.NewState(flags)
 	if err != nil {
 		return nil, err
@@ -124,9 +181,33 @@ func boolFlag(flags map[string]any, key string) bool {
 	return v
 }
 
-// containers dials the broker session at most once (Dial only succeeds once
-// per token) and caches the client — the same precaution as modules/base-os
-// and modules/fake-compute.
+// dialWithToken redials the broker session with the token provided by the
+// incoming request.
+func (m *coreDNSModule) dialWithToken(token string) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if token == "" {
+		if m.containerClient != nil {
+			return nil
+		}
+		return nil
+	}
+	if m.brokerToken == token && m.containerClient != nil {
+		return nil
+	}
+	if m.broker == nil {
+		return nil
+	}
+	conn, err := m.broker.Dial(token)
+	if err != nil {
+		return fmt.Errorf("connecting to core.container/v1: %w", err)
+	}
+	m.brokerToken = token
+	m.containerClient = containerv1.NewContainerClient(conn)
+	return nil
+}
+
+// containers dials the broker session if not already dialed.
 func (m *coreDNSModule) containers() (containerv1.ContainerClient, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
