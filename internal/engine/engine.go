@@ -182,6 +182,103 @@ func (e *Engine) Run(ctx context.Context, resolved *resolver.Resolved, plan *pla
 	return e.retireSeed(ctx, runID, resolved, plan, clients, st)
 }
 
+// Destroy deletes the target resources created by the modules in reverse plan
+// order (docs/02-architecture.md: genesis destroy).
+func (e *Engine) Destroy(ctx context.Context, resolved *resolver.Resolved, plan *planner.Plan) error {
+	st, err := state.Load(e.StateDir)
+	if err != nil {
+		return err
+	}
+	if st.Modules == nil {
+		st.Modules = map[string]state.ModuleState{}
+	}
+
+	clients := map[string]*modulehost.Client{}
+	defer func() {
+		for _, c := range clients {
+			c.Close()
+		}
+	}()
+
+	providers := map[string]map[string]providerConn{}
+
+	for _, name := range plan.Order {
+		m := resolved.Modules[name]
+		client, err := modulehost.Launch(m.Installed.BinaryPath, m.Manifest)
+		if err != nil {
+			return fmt.Errorf("launching module %q: %w", name, err)
+		}
+		clients[name] = client
+
+		for _, p := range m.Manifest.Provides {
+			conn, err := client.DispenseFunction(p.Function)
+			if err != nil {
+				return fmt.Errorf("connecting to function %q of module %q: %w", p.Function, name, err)
+			}
+			if p.Fleet {
+				e.Registry.AddFleetProvider(p.Function, conn)
+				continue
+			}
+			register, ok := broker.ForwarderFor(p.Function)
+			if !ok {
+				return fmt.Errorf("function %q (module %q): function type unknown to the core", p.Function, name)
+			}
+			for _, phase := range p.Phases {
+				e.Registry.SetModuleProvider(p.Function+"@"+phase, conn, register)
+			}
+			if providers[p.Function] == nil {
+				providers[p.Function] = map[string]providerConn{}
+			}
+			providers[p.Function][name] = providerConn{conn: conn, register: register}
+		}
+	}
+
+	for function, byModule := range providers {
+		phase := "target"
+		if _, ok := resolved.ProviderFor(function, "target"); !ok {
+			phase = "seed"
+		}
+		providerName, ok := resolved.ProviderFor(function, phase)
+		if !ok {
+			continue
+		}
+		if pc, ok := byModule[providerName]; ok {
+			e.Registry.SetModuleProvider(function, pc.conn, pc.register)
+		}
+	}
+
+	runID, err := newRunID()
+	if err != nil {
+		return err
+	}
+
+	for i := len(plan.Order) - 1; i >= 0; i-- {
+		name := plan.Order[i]
+		m := resolved.Modules[name]
+		client := clients[m.Name]
+
+		req, err := e.buildStepRequest(runID, m, client, st)
+		if err != nil {
+			return err
+		}
+
+		result, err := client.Module().Destroy(ctx, req)
+		if err != nil {
+			return modulehost.WrapModuleError("destroy", err)
+		}
+		if result.GetStatus() != modulev1.StepResult_STATUS_OK {
+			return fmt.Errorf("module %q, step destroy: failed (%s)", m.Name, diagnosticsString(result.GetDiagnostics()))
+		}
+		delete(st.Modules, m.Name)
+		if err := state.Save(e.StateDir, st); err != nil {
+			return err
+		}
+		e.audit(m.Name, "destroy", "ok")
+	}
+
+	return nil
+}
+
 func (e *Engine) runModule(
 	ctx context.Context,
 	runID string,
