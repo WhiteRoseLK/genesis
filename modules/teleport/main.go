@@ -8,12 +8,9 @@
 // powerdns, vault…) calls it from Configure to install the Teleport agent --
 // this is what makes Teleport active across the whole fleet as soon as it is
 // in the spec, without any existing module knowing about it specifically.
-//
-// Accepted scope for this milestone: fleet.agent/v1.Install installs and
-// enrols the agent but does NOT disable the native sshd -- the core does not
-// switch its core.ansible/v1 runners to the agent yet (deferred Repoint, an
-// explicit decision, docs/PROGRESS.md), which would break every later
-// core.ansible/v1 call on the VM concerned (e.g. vault's Handover).
+// fleet.agent/v1.Install installs and enrols the agent, and disables the
+// native sshd once confirmed running -- callers switch to the Teleport agent
+// on port 3022 with an OpenSSH user certificate (docs/09-decisions.md ADR-018).
 package main
 
 import (
