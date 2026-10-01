@@ -1,5 +1,40 @@
 # Changelog
 
+## [0.2.1](https://github.com/WhiteRoseLK/genesis/compare/v0.2.0...v0.2.1) (2026-10-01)
+
+
+### Features
+
+* **cli:** implement validate, status and destroy commands ([#77](https://github.com/WhiteRoseLK/genesis/issues/77)) ([6d92130](https://github.com/WhiteRoseLK/genesis/commit/6d921301023816683ee1e43d6d09ccec509bdaad))
+* **dns:** persist connection parameters in coredns and powerdns step state and redial broker ([#82](https://github.com/WhiteRoseLK/genesis/issues/82)) ([8418480](https://github.com/WhiteRoseLK/genesis/commit/8418480d1905d7d1f1219b668c474a512754d8a8)), closes [#10](https://github.com/WhiteRoseLK/genesis/issues/10)
+* **modules:** chrony/powerdns/vault remember Teleport enrolment and switch their own core.ansible/v1 calls ([#78](https://github.com/WhiteRoseLK/genesis/issues/78)) ([f746f47](https://github.com/WhiteRoseLK/genesis/commit/f746f4731b3dccba6c46ce5b11cbdd7b87eec862))
+* **modules:** teleport implements access.ssh/v1.SignUserKey ([#69](https://github.com/WhiteRoseLK/genesis/issues/69)) ([8d5885e](https://github.com/WhiteRoseLK/genesis/commit/8d5885e4d3cdf10dc980ce4f6391ffad32655082))
+* **modules:** teleport turns off sshd once enrolment is confirmed, Verify restores "direct SSH refused" ([#79](https://github.com/WhiteRoseLK/genesis/issues/79)) ([232b372](https://github.com/WhiteRoseLK/genesis/commit/232b372476f2bd640fafdd74e22439cf5de287f1)), closes [#16](https://github.com/WhiteRoseLK/genesis/issues/16)
+* **proxmox:** add tls_insecure and custom CA support in schema and REST client ([#74](https://github.com/WhiteRoseLK/genesis/issues/74)) ([56a2a12](https://github.com/WhiteRoseLK/genesis/commit/56a2a127994b407d24c0dd888fa58e41b2b4337b))
+* **secrets:** switch file store to read-only after migration and route core.secrets/v1 ([#80](https://github.com/WhiteRoseLK/genesis/issues/80)) ([dc31c32](https://github.com/WhiteRoseLK/genesis/commit/dc31c326263fac031b98e0b19a377de7ddaee23e)), closes [#27](https://github.com/WhiteRoseLK/genesis/issues/27)
+* **teleport:** persist ownTarget and caPin in step state and redial broker on each call ([#81](https://github.com/WhiteRoseLK/genesis/issues/81)) ([2643ff5](https://github.com/WhiteRoseLK/genesis/commit/2643ff5462139033039335ad6d2870e9855e83b2)), closes [#26](https://github.com/WhiteRoseLK/genesis/issues/26)
+* **vault:** implement secrets.kv/v1.List ([#76](https://github.com/WhiteRoseLK/genesis/issues/76)) ([f1f1c31](https://github.com/WhiteRoseLK/genesis/commit/f1f1c319b6de31b5d4deca63255c124a19b8373e))
+
+
+### Bug Fixes
+
+* **broker:** write the SSH certificate next to the private key when supplied ([#68](https://github.com/WhiteRoseLK/genesis/issues/68)) ([2409438](https://github.com/WhiteRoseLK/genesis/commit/2409438de300e42a9b9df3e4aaa450f673bf4aec))
+* **modules:** Check inspects state rather than unconditionally returning COMPLIANT ([#75](https://github.com/WhiteRoseLK/genesis/issues/75)) ([0a869b9](https://github.com/WhiteRoseLK/genesis/commit/0a869b96f70c9465a82bc6589538efdabd7159ea))
+
+
+### Refactoring
+
+* switch the core code to English ([#56](https://github.com/WhiteRoseLK/genesis/issues/56)) ([53973eb](https://github.com/WhiteRoseLK/genesis/commit/53973eb1b42f954a4cb0f119bde8590b625b8f64))
+* switch the modules and tests to English ([#57](https://github.com/WhiteRoseLK/genesis/issues/57)) ([fcd5607](https://github.com/WhiteRoseLK/genesis/commit/fcd560771fb1a957849a7f7f97877cd3d7112d2d))
+
+
+### Documentation
+
+* add a code of conduct (Contributor Covenant 2.1) ([#53](https://github.com/WhiteRoseLK/genesis/issues/53)) ([ead8d40](https://github.com/WhiteRoseLK/genesis/commit/ead8d405ce33e9dc3bb92832a3c94a487d3710a2))
+* jalons suivis sur GitHub, ADR en fichiers numérotés par issue ([#50](https://github.com/WhiteRoseLK/genesis/issues/50)) ([8807d60](https://github.com/WhiteRoseLK/genesis/commit/8807d60455dc6db61b0a4f14b05435a3d5d41a45)), closes [#49](https://github.com/WhiteRoseLK/genesis/issues/49)
+* README plus accueillant (bandeau, schémas, exemple, feuille de route) ([#42](https://github.com/WhiteRoseLK/genesis/issues/42)) ([9f59a50](https://github.com/WhiteRoseLK/genesis/commit/9f59a503f233a0d38fe55393e2b2424f2130951e))
+* switch the documentation and repository metadata to English ([#55](https://github.com/WhiteRoseLK/genesis/issues/55)) ([c8dad54](https://github.com/WhiteRoseLK/genesis/commit/c8dad5467f7839a95b0724c8cdc28fe2f6193f0e)), closes [#54](https://github.com/WhiteRoseLK/genesis/issues/54)
+
 ## [0.2.0](https://github.com/WhiteRoseLK/genesis/compare/v0.1.0...v0.2.0) (2026-09-27)
 
 

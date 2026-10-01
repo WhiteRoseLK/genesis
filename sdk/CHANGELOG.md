@@ -1,5 +1,22 @@
 # Changelog
 
+## [0.2.1](https://github.com/WhiteRoseLK/genesis/compare/sdk/v0.2.0...sdk/v0.2.1) (2026-10-01)
+
+
+### Features
+
+* **modules:** teleport implements access.ssh/v1.SignUserKey ([#69](https://github.com/WhiteRoseLK/genesis/issues/69)) ([8d5885e](https://github.com/WhiteRoseLK/genesis/commit/8d5885e4d3cdf10dc980ce4f6391ffad32655082))
+
+
+### Refactoring
+
+* switch the core code to English ([#56](https://github.com/WhiteRoseLK/genesis/issues/56)) ([53973eb](https://github.com/WhiteRoseLK/genesis/commit/53973eb1b42f954a4cb0f119bde8590b625b8f64))
+
+
+### Documentation
+
+* switch the documentation and repository metadata to English ([#55](https://github.com/WhiteRoseLK/genesis/issues/55)) ([c8dad54](https://github.com/WhiteRoseLK/genesis/commit/c8dad5467f7839a95b0724c8cdc28fe2f6193f0e)), closes [#54](https://github.com/WhiteRoseLK/genesis/issues/54)
+
 ## [0.2.0](https://github.com/WhiteRoseLK/genesis/compare/sdk/v0.1.0...sdk/v0.2.0) (2026-09-27)
 
 
