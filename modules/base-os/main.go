@@ -67,6 +67,10 @@ func (m *baseOSModule) Check(_ context.Context, req *modulev1.StepRequest) (*mod
 	return &modulev1.CheckResult{Status: modulev1.CheckResult_STATUS_COMPLIANT}, nil
 }
 
+func (m *baseOSModule) Destroy(_ context.Context, req *modulev1.StepRequest) (*modulev1.StepResult, error) {
+	return &modulev1.StepResult{Status: modulev1.StepResult_STATUS_OK, State: req.GetState()}, nil
+}
+
 // dialAnsible dials the broker session at most once: Dial can only succeed
 // once per token (the connection info is sent only once on the core side), but
 // the resulting gRPC connection supports many calls — it is cached and reused

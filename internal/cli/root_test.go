@@ -32,14 +32,12 @@ func TestHelpListsDocumentedCommands(t *testing.T) {
 	}
 }
 
-// TestStubCommandsFail checks that the commands still at the stub stage (later
-// milestones) return an explicit error rather than a silent success. `init`,
-// `validate`, `secrets`, `modules`, `plan` and `apply` are really implemented
-// (M1/M2/M3/M4) and tested elsewhere.
-func TestStubCommandsFail(t *testing.T) {
+// TestCommandsRequirePrerequisites checks that commands return an explicit error
+// when run without required prerequisites (e.g. missing state or spec).
+func TestCommandsRequirePrerequisites(t *testing.T) {
 	cases := [][]string{
-		{"status"},
-		{"destroy", "-f", "env.yaml"},
+		{"status", "--state-dir", t.TempDir()},
+		{"destroy", "-f", "nonexistent.yaml", "--auto-approve"},
 	}
 
 	for _, args := range cases {
@@ -51,7 +49,7 @@ func TestStubCommandsFail(t *testing.T) {
 			root.SetArgs(args)
 
 			if err := root.Execute(); err == nil {
-				t.Fatalf("genesis %s: unexpected success, although the command is not implemented", strings.Join(args, " "))
+				t.Fatalf("genesis %s: unexpected success, expected error", strings.Join(args, " "))
 			}
 		})
 	}
