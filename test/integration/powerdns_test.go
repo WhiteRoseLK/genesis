@@ -17,6 +17,7 @@ import (
 
 	"github.com/WhiteRoseLK/genesis/internal/broker"
 	"github.com/WhiteRoseLK/genesis/internal/modulehost"
+	sdk "github.com/WhiteRoseLK/genesis/sdk/go"
 	computevmv1 "github.com/WhiteRoseLK/genesis/sdk/go/gen/functions/compute/vm/v1"
 	ansiblev1 "github.com/WhiteRoseLK/genesis/sdk/go/gen/functions/core/ansible/v1"
 	dnsresolverv1 "github.com/WhiteRoseLK/genesis/sdk/go/gen/functions/dns/resolver/v1"
@@ -337,9 +338,21 @@ func TestPowerDNSLifecycle(t *testing.T) {
 		t.Errorf("os.base calls = %v, want SetNTP(10.10.0.9) then SetResolver(10.10.0.8)", calls)
 	}
 
+	cfgState := sdk.StateMap(configureResp.GetState())
+	if !cfgState["configured"].(bool) {
+		t.Error("configureResp missing configured=true")
+	}
+	if cfgState["vm_ip"] != "127.0.0.1" {
+		t.Errorf("configureResp vm_ip = %v, want 127.0.0.1", cfgState["vm_ip"])
+	}
+
 	handoverResp, err := client.Module().Handover(ctx, &modulev1.StepRequest{RunId: "test", BrokerToken: token, State: configureResp.GetState()})
 	if err != nil {
 		t.Fatalf("Handover: %v", err)
+	}
+	hoState := sdk.StateMap(handoverResp.GetState())
+	if !hoState["handed_over"].(bool) || !hoState["configured"].(bool) {
+		t.Errorf("handoverResp state = %+v, want handed_over and configured", hoState)
 	}
 	pdnsAPI.mu.Lock()
 	got := pdnsAPI.zones["lab.internal."]["infra01.lab.internal."]["A"]
@@ -383,5 +396,8 @@ func TestPowerDNSLifecycle(t *testing.T) {
 	}
 	if _, stillThere := vmServer.vms["powerdns01"]; stillThere {
 		t.Error("the powerdns01 VM was not deleted by Destroy")
+	}
+	if len(sdk.StateMap(destroyResp.GetState())) != 0 {
+		t.Errorf("Destroy returned non-empty state: %+v", sdk.StateMap(destroyResp.GetState()))
 	}
 }

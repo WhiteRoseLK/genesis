@@ -5,10 +5,10 @@
 // its own VM (compute.vm/v1); it takes over the zone from coredns at handover
 // time (Handover reads dns.zone/v1@seed, recreates everything, compares).
 //
-// Accepted scope for this milestone: like modules/coredns, the PowerDNS API
-// connection parameters (address, key) live in memory in the module process,
-// populated by Configure — a restart of the core mid-lifecycle would lose them
-// (the same debt as coredns, docs/PROGRESS.md).
+// The PowerDNS API connection parameters (address, vm name, domain) are
+// persisted in StepResult.state across lifecycle steps, allowing Check to
+// restore the API client on restart by reading the API key reference from
+// core.secrets/v1 without storing clear secrets in state (ADR-0020, doc 06).
 package main
 
 import (
@@ -99,10 +99,11 @@ func (m *powerdnsModule) Validate(context.Context, *modulev1.ValidateRequest) (*
 	return &modulev1.Diagnostics{}, nil
 }
 
-func (m *powerdnsModule) Check(_ context.Context, req *modulev1.StepRequest) (*modulev1.CheckResult, error) {
-	m.brokerToken = req.GetBrokerToken()
+func (m *powerdnsModule) Check(ctx context.Context, req *modulev1.StepRequest) (*modulev1.CheckResult, error) {
+	_ = m.dialWithToken(req.GetBrokerToken())
 	flags := sdk.StateMap(req.GetState())
-	if boolFlag(flags, "handed_over") || boolFlag(flags, "verified") {
+	if boolFlag(flags, "configured") || boolFlag(flags, "handed_over") || boolFlag(flags, "verified") {
+		m.restoreZoneServer(ctx, flags)
 		return &modulev1.CheckResult{Status: modulev1.CheckResult_STATUS_COMPLIANT}, nil
 	}
 	return &modulev1.CheckResult{Status: modulev1.CheckResult_STATUS_TODO}, nil
@@ -113,25 +114,29 @@ func boolFlag(flags map[string]any, key string) bool {
 	return v
 }
 
-// dial dials the broker session at most once (Dial only succeeds once per
-// token) and builds all the typed clients on the same connection — the same
-// precaution as modules/chrony. dns.zone/v1@seed resolves to the active seed
-// provider (coredns) through the registry's qualified key (internal/engine),
-// dns.resolver/v1 and the others through their active key
-// (docs/05-bootstrap-lifecycle.md).
-func (m *powerdnsModule) dial() error {
+// dialWithToken redials the broker session with the token provided by the
+// incoming request, re-instantiating all typed clients. This ensures dynamic
+// repoints of capabilities (such as PKI or secrets) are immediately observed.
+func (m *powerdnsModule) dialWithToken(token string) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	if m.vmClient != nil {
+	if token == "" {
+		if m.vmClient != nil {
+			return nil
+		}
+		return fmt.Errorf("powerdns: no broker session available")
+	}
+	if m.brokerToken == token && m.vmClient != nil {
 		return nil
 	}
-	if m.broker == nil || m.brokerToken == "" {
-		return fmt.Errorf("powerdns: no broker session (Check has not been called yet)")
+	if m.broker == nil {
+		return nil
 	}
-	conn, err := m.broker.Dial(m.brokerToken)
+	conn, err := m.broker.Dial(token)
 	if err != nil {
 		return fmt.Errorf("connecting to the required functions: %w", err)
 	}
+	m.brokerToken = token
 	m.vmClient = computevmv1.NewComputeVMClient(conn)
 	m.osBaseClient = osbasev1.NewBaseClient(conn)
 	m.ansibleClient = ansiblev1.NewAnsibleClient(conn)
@@ -142,6 +147,43 @@ func (m *powerdnsModule) dial() error {
 	m.fleetAgentClient = fleetagentv1.NewFleetAgentClient(conn)
 	m.accessSSHClient = accesssshv1.NewAccessSSHClient(conn)
 	return nil
+}
+
+// restoreZoneServer reconstructs the zoneServer connection parameters
+// (vmIP, domain, and HTTP API client) from persisted state and core.secrets/v1,
+// surviving process and core restarts.
+func (m *powerdnsModule) restoreZoneServer(ctx context.Context, state map[string]any) {
+	m.zoneServer.mu.Lock()
+	defer m.zoneServer.mu.Unlock()
+
+	vmIP, _ := state["vm_ip"].(string)
+	dom, _ := state["domain"].(string)
+	vmName, _ := state["vm_name"].(string)
+	if vmIP == "" || vmName == "" {
+		return
+	}
+	m.zoneServer.vmIP = vmIP
+	m.zoneServer.domain = dom
+
+	if m.zoneServer.client != nil {
+		return
+	}
+
+	m.mu.Lock()
+	secClient := m.secretsClient
+	m.mu.Unlock()
+	if secClient != nil {
+		ref := fmt.Sprintf(apiKeyRefFmt, vmName)
+		resp, err := secClient.Get(ctx, &secretsv1.GetRequest{Ref: ref})
+		if err == nil && resp.GetValue() != "" {
+			m.zoneServer.client = newPDNSClient(fmt.Sprintf("http://%s:%d", vmIP, pdnsAPIPort), resp.GetValue())
+		}
+	}
+}
+
+// dial ensures typed clients are initialized.
+func (m *powerdnsModule) dial() error {
+	return m.dialWithToken("")
 }
 
 // installFleetAgents calls fleet.agent/v1.Install(target)
@@ -219,6 +261,9 @@ func (m *powerdnsModule) apiKeySecret(ctx context.Context, name string) (string,
 // Provision creates (or finds again, EnsureVM is idempotent) powerdns's
 // dedicated VM.
 func (m *powerdnsModule) Provision(ctx context.Context, req *modulev1.StepRequest) (*modulev1.StepResult, error) {
+	if err := m.dialWithToken(req.GetBrokerToken()); err != nil {
+		return nil, err
+	}
 	if err := m.dial(); err != nil {
 		return nil, err
 	}
@@ -312,6 +357,9 @@ func (t connTarget) osBase() *osbasev1.Target {
 // this point of milestone M6, unlike chrony, which had no provider yet), then
 // wires the HTTP API client.
 func (m *powerdnsModule) Configure(ctx context.Context, req *modulev1.StepRequest) (*modulev1.StepResult, error) {
+	if err := m.dialWithToken(req.GetBrokerToken()); err != nil {
+		return nil, err
+	}
 	if err := m.dial(); err != nil {
 		return nil, err
 	}
@@ -376,6 +424,10 @@ func (m *powerdnsModule) Configure(ctx context.Context, req *modulev1.StepReques
 			modState["admin_method"] = "teleport"
 		}
 	}
+	modState["configured"] = true
+	modState["vm_name"] = name
+	modState["vm_ip"] = target.Host
+	modState["domain"] = dom
 
 	m.zoneServer.mu.Lock()
 	m.zoneServer.client = newPDNSClient(fmt.Sprintf("http://%s:%d", target.Host, pdnsAPIPort), apiKey)
@@ -395,6 +447,9 @@ func (m *powerdnsModule) Configure(ctx context.Context, req *modulev1.StepReques
 // (docs/07-mvp-modules.md: "reads the zone back through
 // dns.zone@seed.ListRecords, recreates everything, compares").
 func (m *powerdnsModule) Handover(ctx context.Context, req *modulev1.StepRequest) (*modulev1.StepResult, error) {
+	if err := m.dialWithToken(req.GetBrokerToken()); err != nil {
+		return nil, err
+	}
 	if err := m.dial(); err != nil {
 		return nil, err
 	}
@@ -463,6 +518,9 @@ func recordsEqual(a, b []*dnszonev1.Record) bool {
 // resolution, plus an external name through the recursor
 // (docs/07-mvp-modules.md, docs/03-module-contract.md rule 2).
 func (m *powerdnsModule) Verify(ctx context.Context, req *modulev1.StepRequest) (*modulev1.StepResult, error) {
+	if err := m.dialWithToken(req.GetBrokerToken()); err != nil {
+		return nil, err
+	}
 	if err := m.dial(); err != nil {
 		return nil, err
 	}
@@ -568,6 +626,9 @@ func parseResolutionOutput(output string) (forward, reverse, external string, er
 }
 
 func (m *powerdnsModule) Destroy(ctx context.Context, req *modulev1.StepRequest) (*modulev1.StepResult, error) {
+	if err := m.dialWithToken(req.GetBrokerToken()); err != nil {
+		return nil, err
+	}
 	if err := m.dial(); err != nil {
 		return nil, err
 	}
@@ -575,7 +636,18 @@ func (m *powerdnsModule) Destroy(ctx context.Context, req *modulev1.StepRequest)
 	if _, err := m.vmClient.DeleteVM(ctx, &computevmv1.DeleteVMRequest{Name: name}); err != nil {
 		return nil, fmt.Errorf("DeleteVM(%q): %w", name, err)
 	}
-	return &modulev1.StepResult{Status: modulev1.StepResult_STATUS_OK, State: req.GetState()}, nil
+
+	m.zoneServer.mu.Lock()
+	m.zoneServer.client = nil
+	m.zoneServer.vmIP = ""
+	m.zoneServer.domain = ""
+	m.zoneServer.mu.Unlock()
+
+	s, err := sdk.NewState(map[string]any{})
+	if err != nil {
+		return nil, err
+	}
+	return &modulev1.StepResult{Status: modulev1.StepResult_STATUS_OK, State: s}, nil
 }
 
 // powerdnsZoneServer implements dns.zone/v1 by driving the PowerDNS REST API
