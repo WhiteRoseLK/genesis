@@ -24,6 +24,7 @@ import (
 	"google.golang.org/grpc/status"
 
 	sdk "github.com/WhiteRoseLK/genesis/sdk/go"
+	accesssshv1 "github.com/WhiteRoseLK/genesis/sdk/go/gen/functions/access/ssh/v1"
 	computevmv1 "github.com/WhiteRoseLK/genesis/sdk/go/gen/functions/compute/vm/v1"
 	ansiblev1 "github.com/WhiteRoseLK/genesis/sdk/go/gen/functions/core/ansible/v1"
 	secretsv1 "github.com/WhiteRoseLK/genesis/sdk/go/gen/functions/core/secrets/v1"
@@ -61,6 +62,7 @@ const (
 	verifierSuffix     = "-verify"
 	unsealShares       = 5
 	unsealThreshold    = 3
+	teleportAgentPort  = 3022
 )
 
 // genesisPolicy allows the application KV (doc 03, manifest example) and
@@ -109,6 +111,7 @@ type vaultModule struct {
 	dnsResolverClient dnsresolverv1.DnsResolverClient
 	pkiSeedClient     pkiissuerv1.PkiIssuerClient
 	fleetAgentClient  fleetagentv1.FleetAgentClient
+	accessSSHClient   accesssshv1.AccessSSHClient
 
 	// Active once Configure has passed (docs/PROGRESS.md: debt, in memory
 	// only).
@@ -164,6 +167,7 @@ func (m *vaultModule) dial() error {
 	m.dnsResolverClient = dnsresolverv1.NewDnsResolverClient(conn)
 	m.pkiSeedClient = pkiissuerv1.NewPkiIssuerClient(conn)
 	m.fleetAgentClient = fleetagentv1.NewFleetAgentClient(conn)
+	m.accessSSHClient = accesssshv1.NewAccessSSHClient(conn)
 	return nil
 }
 
@@ -171,15 +175,18 @@ func (m *vaultModule) dial() error {
 // (docs/09-decisions.md ADR-017): fanned out to every installed "fleet" module
 // (e.g. teleport), a silent no-op if none is present (fleet.agent/v1 is an
 // optional requires — Unimplemented is then the broker's normal answer, not an
-// error), the same method as modules/chrony and modules/powerdns.
-func (m *vaultModule) installFleetAgents(ctx context.Context, target connTarget) error {
+// error), the same method as modules/chrony and modules/powerdns. It returns true when an agent is enrolled.
+func (m *vaultModule) installFleetAgents(ctx context.Context, target connTarget) (bool, error) {
 	_, err := m.fleetAgentClient.Install(ctx, &fleetagentv1.InstallRequest{
 		Target: &fleetagentv1.Target{Host: target.Host, Port: target.Port, User: target.User, SshPrivateKey: target.PrivateKey},
 	})
-	if err != nil && status.Code(err) != codes.Unimplemented {
-		return fmt.Errorf("fleet.agent/v1.Install: %w", err)
+	if err != nil {
+		if status.Code(err) == codes.Unimplemented {
+			return false, nil
+		}
+		return false, fmt.Errorf("fleet.agent/v1.Install: %w", err)
 	}
-	return nil
+	return true, nil
 }
 
 func vmName(req *modulev1.StepRequest) string {
@@ -228,22 +235,44 @@ func (m *vaultModule) putSecret(ctx context.Context, ref, value, kind string, re
 }
 
 type connTarget struct {
-	Host       string
-	Port       int32
-	User       string
-	PrivateKey string
+	Host           string
+	Port           int32
+	User           string
+	PrivateKey     string
+	CertificatePem string
 }
 
 func (t connTarget) ansible() *ansiblev1.Target {
-	return &ansiblev1.Target{Host: t.Host, Port: t.Port, User: t.User, SshPrivateKey: t.PrivateKey}
+	return &ansiblev1.Target{
+		Host:              t.Host,
+		Port:              t.Port,
+		User:              t.User,
+		SshPrivateKey:     t.PrivateKey,
+		SshCertificatePem: t.CertificatePem,
+	}
 }
 
 func (t connTarget) osBase() *osbasev1.Target {
 	return &osbasev1.Target{Host: t.Host, Port: t.Port, User: t.User, SshPrivateKey: t.PrivateKey}
 }
 
-func targetFromState(req *modulev1.StepRequest, pair sshKeyPair) connTarget {
+func (m *vaultModule) targetFromState(ctx context.Context, req *modulev1.StepRequest, pair sshKeyPair) (connTarget, error) {
 	state := sdk.StateMap(req.GetState())
+	if state["admin_method"] == "teleport" {
+		certResp, err := m.accessSSHClient.SignUserKey(ctx, &accesssshv1.SignUserKeyRequest{
+			Principals: []string{sshUser},
+		})
+		if err != nil {
+			return connTarget{}, fmt.Errorf("signing SSH user certificate: %w", err)
+		}
+		return connTarget{
+			Host:           fmt.Sprint(state["vm_ip"]),
+			Port:           teleportAgentPort,
+			User:           sshUser,
+			PrivateKey:     certResp.GetPrivateKeyOpenssh(),
+			CertificatePem: certResp.GetCertificateOpenssh(),
+		}, nil
+	}
 	var port int64
 	switch v := state["vm_ssh_port"].(type) {
 	case int64:
@@ -251,7 +280,7 @@ func targetFromState(req *modulev1.StepRequest, pair sshKeyPair) connTarget {
 	case float64:
 		port = int64(v)
 	}
-	return connTarget{Host: fmt.Sprint(state["vm_ip"]), Port: int32(port), User: sshUser, PrivateKey: pair.PrivateKeyOpenSSH}
+	return connTarget{Host: fmt.Sprint(state["vm_ip"]), Port: int32(port), User: sshUser, PrivateKey: pair.PrivateKeyOpenSSH}, nil
 }
 
 // Provision creates (or finds again, EnsureVM is idempotent) vault's dedicated

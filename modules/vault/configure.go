@@ -43,7 +43,10 @@ func (m *vaultModule) Configure(ctx context.Context, req *modulev1.StepRequest) 
 	if err != nil {
 		return nil, err
 	}
-	target := targetFromState(req, pair)
+	target, err := m.targetFromState(ctx, req, pair)
+	if err != nil {
+		return nil, err
+	}
 
 	ntpEndpoint, err := m.timeNTPClient.Endpoint(ctx, &timentpv1.Empty{})
 	if err != nil {
@@ -119,11 +122,22 @@ func (m *vaultModule) Configure(ctx context.Context, req *modulev1.StepRequest) 
 	m.approleToken = approleToken
 	m.mu.Unlock()
 
-	if err := m.installFleetAgents(ctx, target); err != nil {
-		return nil, err
+	modState := sdk.StateMap(req.GetState())
+	if modState["admin_method"] != "teleport" {
+		enrolled, err := m.installFleetAgents(ctx, target)
+		if err != nil {
+			return nil, err
+		}
+		if enrolled {
+			modState["admin_method"] = "teleport"
+		}
 	}
 
-	return &modulev1.StepResult{Status: modulev1.StepResult_STATUS_OK, State: req.GetState()}, nil
+	s, err := sdk.NewState(modState)
+	if err != nil {
+		return nil, err
+	}
+	return &modulev1.StepResult{Status: modulev1.StepResult_STATUS_OK, State: s}, nil
 }
 
 // deployVault installs/configures Vault through ansible and places the
@@ -339,7 +353,10 @@ func (m *vaultModule) Handover(ctx context.Context, req *modulev1.StepRequest) (
 	if err != nil {
 		return nil, err
 	}
-	target := targetFromState(req, pair)
+	target, err := m.targetFromState(ctx, req, pair)
+	if err != nil {
+		return nil, err
+	}
 
 	api := m.currentAPI()
 	rootToken, err := m.getSecret(ctx, rootTokenRef)

@@ -22,6 +22,7 @@ import (
 	"google.golang.org/grpc/status"
 
 	sdk "github.com/WhiteRoseLK/genesis/sdk/go"
+	accesssshv1 "github.com/WhiteRoseLK/genesis/sdk/go/gen/functions/access/ssh/v1"
 	computevmv1 "github.com/WhiteRoseLK/genesis/sdk/go/gen/functions/compute/vm/v1"
 	ansiblev1 "github.com/WhiteRoseLK/genesis/sdk/go/gen/functions/core/ansible/v1"
 	secretsv1 "github.com/WhiteRoseLK/genesis/sdk/go/gen/functions/core/secrets/v1"
@@ -49,11 +50,12 @@ var installChronyPlaybook []byte
 var checkOffsetPlaybook []byte
 
 const (
-	defaultVMName  = "chrony01"
-	sshUser        = "genesis"
-	sshKeyRefFmt   = "chrony/%s/ssh-key"
-	verifierSuffix = "-verify"
-	maxOffsetMs    = 100.0
+	defaultVMName     = "chrony01"
+	sshUser           = "genesis"
+	sshKeyRefFmt      = "chrony/%s/ssh-key"
+	verifierSuffix    = "-verify"
+	maxOffsetMs       = 100.0
+	teleportAgentPort = 3022
 )
 
 type chronyModule struct {
@@ -67,6 +69,7 @@ type chronyModule struct {
 	ansibleClient    ansiblev1.AnsibleClient
 	secretsClient    secretsv1.SecretsClient
 	fleetAgentClient fleetagentv1.FleetAgentClient
+	accessSSHClient  accesssshv1.AccessSSHClient
 	ntpEndpoint      *timentpv1.EndpointInfo
 }
 
@@ -114,6 +117,7 @@ func (m *chronyModule) dial() error {
 	m.ansibleClient = ansiblev1.NewAnsibleClient(conn)
 	m.secretsClient = secretsv1.NewSecretsClient(conn)
 	m.fleetAgentClient = fleetagentv1.NewFleetAgentClient(conn)
+	m.accessSSHClient = accesssshv1.NewAccessSSHClient(conn)
 	return nil
 }
 
@@ -121,15 +125,18 @@ func (m *chronyModule) dial() error {
 // (docs/09-decisions.md ADR-017): fanned out to every installed "fleet" module
 // (e.g. teleport), a silent no-op if none is present (fleet.agent/v1 is an
 // optional requires — Unimplemented is then the broker's normal answer, not an
-// error).
-func (m *chronyModule) installFleetAgents(ctx context.Context, target *ansiblev1.Target) error {
+// error). It returns true when an agent is enrolled.
+func (m *chronyModule) installFleetAgents(ctx context.Context, target *ansiblev1.Target) (bool, error) {
 	_, err := m.fleetAgentClient.Install(ctx, &fleetagentv1.InstallRequest{
 		Target: &fleetagentv1.Target{Host: target.GetHost(), Port: target.GetPort(), User: target.GetUser(), SshPrivateKey: target.GetSshPrivateKey()},
 	})
-	if err != nil && status.Code(err) != codes.Unimplemented {
-		return fmt.Errorf("fleet.agent/v1.Install: %w", err)
+	if err != nil {
+		if status.Code(err) == codes.Unimplemented {
+			return false, nil
+		}
+		return false, fmt.Errorf("fleet.agent/v1.Install: %w", err)
 	}
-	return nil
+	return true, nil
 }
 
 func vmName(req *modulev1.StepRequest) string {
@@ -214,8 +221,23 @@ func (m *chronyModule) Provision(ctx context.Context, req *modulev1.StepRequest)
 	return &modulev1.StepResult{Status: modulev1.StepResult_STATUS_OK, State: s}, nil
 }
 
-func targetFromState(req *modulev1.StepRequest, pair sshKeyPair) (*ansiblev1.Target, error) {
+func (m *chronyModule) targetFromState(ctx context.Context, req *modulev1.StepRequest, pair sshKeyPair) (*ansiblev1.Target, error) {
 	state := sdk.StateMap(req.GetState())
+	if state["admin_method"] == "teleport" {
+		certResp, err := m.accessSSHClient.SignUserKey(ctx, &accesssshv1.SignUserKeyRequest{
+			Principals: []string{sshUser},
+		})
+		if err != nil {
+			return nil, fmt.Errorf("signing SSH user certificate: %w", err)
+		}
+		return &ansiblev1.Target{
+			Host:              fmt.Sprint(state["vm_ip"]),
+			Port:              teleportAgentPort,
+			User:              sshUser,
+			SshPrivateKey:     certResp.GetPrivateKeyOpenssh(),
+			SshCertificatePem: certResp.GetCertificateOpenssh(),
+		}, nil
+	}
 	port, _ := state["vm_ssh_port"].(int64)
 	if port == 0 {
 		if f, ok := state["vm_ssh_port"].(float64); ok {
@@ -244,7 +266,7 @@ func (m *chronyModule) Configure(ctx context.Context, req *modulev1.StepRequest)
 	if err != nil {
 		return nil, err
 	}
-	target, err := targetFromState(req, pair)
+	target, err := m.targetFromState(ctx, req, pair)
 	if err != nil {
 		return nil, err
 	}
@@ -267,15 +289,26 @@ func (m *chronyModule) Configure(ctx context.Context, req *modulev1.StepRequest)
 	if !resp.GetOk() {
 		return nil, fmt.Errorf("Configure(chrony) failed:\n%s", resp.GetOutput())
 	}
-	if err := m.installFleetAgents(ctx, target); err != nil {
-		return nil, err
+	modState := sdk.StateMap(req.GetState())
+	if modState["admin_method"] != "teleport" {
+		enrolled, err := m.installFleetAgents(ctx, target)
+		if err != nil {
+			return nil, err
+		}
+		if enrolled {
+			modState["admin_method"] = "teleport"
+		}
 	}
 
 	m.mu.Lock()
 	m.ntpEndpoint = &timentpv1.EndpointInfo{Address: target.GetHost(), Port: 123}
 	m.mu.Unlock()
 
-	return &modulev1.StepResult{Status: modulev1.StepResult_STATUS_OK, State: req.GetState()}, nil
+	s, err := sdk.NewState(modState)
+	if err != nil {
+		return nil, err
+	}
+	return &modulev1.StepResult{Status: modulev1.StepResult_STATUS_OK, State: s}, nil
 }
 
 var systemTimeRe = regexp.MustCompile(`System time\s*:\s*([-\d.]+) seconds`)

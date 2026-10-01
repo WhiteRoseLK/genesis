@@ -25,6 +25,7 @@ import (
 	"google.golang.org/grpc/status"
 
 	sdk "github.com/WhiteRoseLK/genesis/sdk/go"
+	accesssshv1 "github.com/WhiteRoseLK/genesis/sdk/go/gen/functions/access/ssh/v1"
 	computevmv1 "github.com/WhiteRoseLK/genesis/sdk/go/gen/functions/compute/vm/v1"
 	ansiblev1 "github.com/WhiteRoseLK/genesis/sdk/go/gen/functions/core/ansible/v1"
 	secretsv1 "github.com/WhiteRoseLK/genesis/sdk/go/gen/functions/core/secrets/v1"
@@ -46,17 +47,18 @@ var installPowerDNSPlaybook []byte
 var checkResolutionPlaybook []byte
 
 const (
-	defaultVMName    = "powerdns01"
-	defaultDomain    = "lab.internal"
-	sshUser          = "genesis"
-	sshKeyRefFmt     = "powerdns/%s/ssh-key"
-	apiKeyRefFmt     = "powerdns/%s/api-key"
-	verifierSuffix   = "-verify"
-	pdnsAPIPort      = 8081
-	verifyProbeName  = "verify-probe"
-	verifyProbeIP    = "10.255.255.1"
-	verifyReverseIP1 = "1"
-	verifyReverseZ   = "255.255.10.in-addr.arpa"
+	defaultVMName     = "powerdns01"
+	defaultDomain     = "lab.internal"
+	sshUser           = "genesis"
+	sshKeyRefFmt      = "powerdns/%s/ssh-key"
+	apiKeyRefFmt      = "powerdns/%s/api-key"
+	verifierSuffix    = "-verify"
+	pdnsAPIPort       = 8081
+	verifyProbeName   = "verify-probe"
+	verifyProbeIP     = "10.255.255.1"
+	verifyReverseIP1  = "1"
+	verifyReverseZ    = "255.255.10.in-addr.arpa"
+	teleportAgentPort = 3022
 )
 
 // sshKeyPair mirrors the JSON value of the core's GENERATOR_SSH_KEYPAIR
@@ -82,6 +84,7 @@ type powerdnsModule struct {
 	dnsResolverClient dnsresolverv1.DnsResolverClient
 	dnsZoneSeedClient dnszonev1.DnsZoneClient
 	fleetAgentClient  fleetagentv1.FleetAgentClient
+	accessSSHClient   accesssshv1.AccessSSHClient
 
 	zoneServer *powerdnsZoneServer
 }
@@ -137,6 +140,7 @@ func (m *powerdnsModule) dial() error {
 	m.dnsResolverClient = dnsresolverv1.NewDnsResolverClient(conn)
 	m.dnsZoneSeedClient = dnszonev1.NewDnsZoneClient(conn)
 	m.fleetAgentClient = fleetagentv1.NewFleetAgentClient(conn)
+	m.accessSSHClient = accesssshv1.NewAccessSSHClient(conn)
 	return nil
 }
 
@@ -144,15 +148,18 @@ func (m *powerdnsModule) dial() error {
 // (docs/09-decisions.md ADR-017): fanned out to every installed "fleet" module
 // (e.g. teleport), a silent no-op if none is present (fleet.agent/v1 is an
 // optional requires — Unimplemented is then the broker's normal answer, not an
-// error), the same method as modules/chrony.
-func (m *powerdnsModule) installFleetAgents(ctx context.Context, target connTarget) error {
+// error), the same method as modules/chrony. It returns true when an agent is enrolled.
+func (m *powerdnsModule) installFleetAgents(ctx context.Context, target connTarget) (bool, error) {
 	_, err := m.fleetAgentClient.Install(ctx, &fleetagentv1.InstallRequest{
 		Target: &fleetagentv1.Target{Host: target.Host, Port: target.Port, User: target.User, SshPrivateKey: target.PrivateKey},
 	})
-	if err != nil && status.Code(err) != codes.Unimplemented {
-		return fmt.Errorf("fleet.agent/v1.Install: %w", err)
+	if err != nil {
+		if status.Code(err) == codes.Unimplemented {
+			return false, nil
+		}
+		return false, fmt.Errorf("fleet.agent/v1.Install: %w", err)
 	}
-	return nil
+	return true, nil
 }
 
 func vmName(req *modulev1.StepRequest) string {
@@ -247,14 +254,30 @@ func (m *powerdnsModule) Provision(ctx context.Context, req *modulev1.StepReques
 // protobuf type of the function that consumes them (ansiblev1.Target and
 // osbasev1.Target carry the same fields but are distinct types).
 type connTarget struct {
-	Host       string
-	Port       int32
-	User       string
-	PrivateKey string
+	Host           string
+	Port           int32
+	User           string
+	PrivateKey     string
+	CertificatePem string
 }
 
-func targetFromState(req *modulev1.StepRequest, pair sshKeyPair) connTarget {
+func (m *powerdnsModule) targetFromState(ctx context.Context, req *modulev1.StepRequest, pair sshKeyPair) (connTarget, error) {
 	state := sdk.StateMap(req.GetState())
+	if state["admin_method"] == "teleport" {
+		certResp, err := m.accessSSHClient.SignUserKey(ctx, &accesssshv1.SignUserKeyRequest{
+			Principals: []string{sshUser},
+		})
+		if err != nil {
+			return connTarget{}, fmt.Errorf("signing SSH user certificate: %w", err)
+		}
+		return connTarget{
+			Host:           fmt.Sprint(state["vm_ip"]),
+			Port:           teleportAgentPort,
+			User:           sshUser,
+			PrivateKey:     certResp.GetPrivateKeyOpenssh(),
+			CertificatePem: certResp.GetCertificateOpenssh(),
+		}, nil
+	}
 	var port int64
 	switch v := state["vm_ssh_port"].(type) {
 	case int64:
@@ -267,11 +290,17 @@ func targetFromState(req *modulev1.StepRequest, pair sshKeyPair) connTarget {
 		Port:       int32(port),
 		User:       sshUser,
 		PrivateKey: pair.PrivateKeyOpenSSH,
-	}
+	}, nil
 }
 
 func (t connTarget) ansible() *ansiblev1.Target {
-	return &ansiblev1.Target{Host: t.Host, Port: t.Port, User: t.User, SshPrivateKey: t.PrivateKey}
+	return &ansiblev1.Target{
+		Host:              t.Host,
+		Port:              t.Port,
+		User:              t.User,
+		SshPrivateKey:     t.PrivateKey,
+		SshCertificatePem: t.CertificatePem,
+	}
 }
 
 func (t connTarget) osBase() *osbasev1.Target {
@@ -292,7 +321,10 @@ func (m *powerdnsModule) Configure(ctx context.Context, req *modulev1.StepReques
 	if err != nil {
 		return nil, err
 	}
-	target := targetFromState(req, pair)
+	target, err := m.targetFromState(ctx, req, pair)
+	if err != nil {
+		return nil, err
+	}
 
 	ntpEndpoint, err := m.timeNTPClient.Endpoint(ctx, &timentpv1.Empty{})
 	if err != nil {
@@ -334,8 +366,15 @@ func (m *powerdnsModule) Configure(ctx context.Context, req *modulev1.StepReques
 	if !resp.GetOk() {
 		return nil, fmt.Errorf("Configure(powerdns) failed:\n%s", resp.GetOutput())
 	}
-	if err := m.installFleetAgents(ctx, target); err != nil {
-		return nil, err
+	modState := sdk.StateMap(req.GetState())
+	if modState["admin_method"] != "teleport" {
+		enrolled, err := m.installFleetAgents(ctx, target)
+		if err != nil {
+			return nil, err
+		}
+		if enrolled {
+			modState["admin_method"] = "teleport"
+		}
 	}
 
 	m.zoneServer.mu.Lock()
@@ -344,7 +383,11 @@ func (m *powerdnsModule) Configure(ctx context.Context, req *modulev1.StepReques
 	m.zoneServer.domain = dom
 	m.zoneServer.mu.Unlock()
 
-	return &modulev1.StepResult{Status: modulev1.StepResult_STATUS_OK, State: req.GetState()}, nil
+	s, err := sdk.NewState(modState)
+	if err != nil {
+		return nil, err
+	}
+	return &modulev1.StepResult{Status: modulev1.StepResult_STATUS_OK, State: s}, nil
 }
 
 // Handover reads dns.zone/v1@seed (coredns) back and recreates each record
