@@ -133,4 +133,3 @@ func (s *vaultKVServer) List(ctx context.Context, req *secretskvv1.ListRequest) 
 	}
 	return &secretskvv1.ListResponse{Refs: keys}, nil
 }
-
