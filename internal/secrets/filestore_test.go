@@ -4,6 +4,7 @@ package secrets
 
 import (
 	"context"
+	"errors"
 	"testing"
 
 	"filippo.io/age"
@@ -123,5 +124,71 @@ func TestRefValidationRejectsTraversal(t *testing.T) {
 		if err := store.Put(ctx, bad, NewSecret("x"), Meta{}); err == nil {
 			t.Errorf("Put(%q): unexpected success, invalid reference accepted", bad)
 		}
+	}
+}
+
+func TestFileStoreReadOnly(t *testing.T) {
+	store := newTestStore(t)
+	ctx := context.Background()
+
+	// Write a recovery secret before switching to read-only.
+	recoveryRef := Ref("ca/root-key")
+	if err := store.Put(ctx, recoveryRef, NewSecret("root-key-content"), Meta{Kind: "private-key", Recovery: true}); err != nil {
+		t.Fatalf("Put recovery secret: %v", err)
+	}
+
+	store.SetReadOnly(true)
+	if !store.ReadOnly() {
+		t.Errorf("ReadOnly = false, want true")
+	}
+
+	// 1. Reading existing secret must succeed.
+	got, err := store.Get(ctx, recoveryRef)
+	if err != nil {
+		t.Fatalf("Get recovery secret in read-only mode: %v", err)
+	}
+	if got.ExposeSecret() != "root-key-content" {
+		t.Errorf("value = %q, want %q", got.ExposeSecret(), "root-key-content")
+	}
+
+	// 2. Reading metadata must succeed.
+	meta, err := store.GetMeta(ctx, recoveryRef)
+	if err != nil {
+		t.Fatalf("GetMeta in read-only mode: %v", err)
+	}
+	if !meta.Recovery {
+		t.Errorf("Recovery = false, want true")
+	}
+
+	// 3. Ensure on already-existing secret must succeed (idempotent read).
+	calls := 0
+	err = store.Ensure(ctx, recoveryRef, func() (Secret, error) {
+		calls++
+		return NewSecret("regenerated"), nil
+	}, Meta{Kind: "private-key", Recovery: true})
+	if err != nil {
+		t.Fatalf("Ensure on existing secret in read-only mode: %v", err)
+	}
+	if calls != 0 {
+		t.Errorf("generator called %d times on existing secret", calls)
+	}
+
+	// 4. Put must fail with ErrReadOnly.
+	newRef := Ref("app/new-secret")
+	if err := store.Put(ctx, newRef, NewSecret("val"), Meta{Kind: "password"}); !errors.Is(err, ErrReadOnly) {
+		t.Errorf("Put in read-only mode = %v, want %v", err, ErrReadOnly)
+	}
+
+	// 5. Ensure on missing secret must fail with ErrReadOnly without generating.
+	genCalled := false
+	err = store.Ensure(ctx, newRef, func() (Secret, error) {
+		genCalled = true
+		return NewSecret("val"), nil
+	}, Meta{Kind: "password"})
+	if !errors.Is(err, ErrReadOnly) {
+		t.Errorf("Ensure on missing secret in read-only mode = %v, want %v", err, ErrReadOnly)
+	}
+	if genCalled {
+		t.Errorf("generator was called for missing secret in read-only mode")
 	}
 }

@@ -69,14 +69,32 @@ type Engine struct {
 	// file->vault migration (docs/06-secrets-state.md) — only the core can
 	// list ALL entries, a module only accesses its own.
 	Secrets secrets.Store
+	Router  *secrets.Router
 }
 
 // New builds an engine: a broker registry with core.secrets/v1 already
-// registered (a native function, never a module).
+// registered (a native function, never a module). If secretsStore is a FileStore,
+// it is wrapped in a Router so core.secrets/v1 can dynamically route between
+// the file backend and secrets.kv/v1 (docs/05-bootstrap-lifecycle.md, ADR-020).
 func New(stateDir string, secretsStore secrets.Store) *Engine {
 	registry := broker.NewRegistry()
+	var router *secrets.Router
+	if r, ok := secretsStore.(*secrets.Router); ok {
+		router = r
+	} else if fs, ok := secretsStore.(*secrets.FileStore); ok {
+		router = secrets.NewRouter(fs)
+		secretsStore = router
+	}
 	registry.SetNative("core.secrets/v1", broker.NativeSecrets(secretsStore))
-	return &Engine{Registry: registry, StateDir: stateDir, Logger: slog.Default(), Secrets: secretsStore}
+	return &Engine{Registry: registry, StateDir: stateDir, Logger: slog.Default(), Secrets: secretsStore, Router: router}
+}
+
+func (e *Engine) fileStore() (*secrets.FileStore, bool) {
+	if e.Router != nil {
+		return e.Router.FileStore(), true
+	}
+	fs, ok := e.Secrets.(*secrets.FileStore)
+	return fs, ok
 }
 
 // Run executes plan in order, holding the state lock (two concurrent
@@ -96,6 +114,11 @@ func (e *Engine) Run(ctx context.Context, resolved *resolver.Resolved, plan *pla
 	}
 	if st.Modules == nil {
 		st.Modules = map[string]state.ModuleState{}
+	}
+	if st.SecretsBackend == "vault" || st.SeedRetired {
+		if fs, ok := e.fileStore(); ok {
+			fs.SetReadOnly(true)
+		}
 	}
 
 	clients := map[string]*modulehost.Client{}
@@ -121,6 +144,9 @@ func (e *Engine) Run(ctx context.Context, resolved *resolver.Resolved, plan *pla
 			conn, err := client.DispenseFunction(p.Function)
 			if err != nil {
 				return fmt.Errorf("connecting to function %q of module %q: %w", p.Function, name, err)
+			}
+			if p.Function == "secrets.kv/v1" && st.SecretsBackend == "vault" && e.Router != nil {
+				e.Router.SwitchToVault(secretskvv1.NewSecretsKVClient(conn))
 			}
 			if p.Fleet {
 				// "Fleet" function (ADR-017): every accumulated connection
@@ -191,6 +217,11 @@ func (e *Engine) Destroy(ctx context.Context, resolved *resolver.Resolved, plan 
 	}
 	if st.Modules == nil {
 		st.Modules = map[string]state.ModuleState{}
+	}
+	if st.SecretsBackend == "vault" || st.SeedRetired {
+		if fs, ok := e.fileStore(); ok {
+			fs.SetReadOnly(true)
+		}
 	}
 
 	clients := map[string]*modulehost.Client{}
@@ -407,6 +438,9 @@ func (e *Engine) retireSeed(ctx context.Context, runID string, resolved *resolve
 	if err := state.Save(e.StateDir, st); err != nil {
 		return fmt.Errorf("persisting the seed retirement: %w", err)
 	}
+	if fs, ok := e.fileStore(); ok {
+		fs.SetReadOnly(true)
+	}
 	e.audit("seed", "seed.retire", "seed retired")
 	return nil
 }
@@ -529,6 +563,11 @@ func (e *Engine) migrateSecretsIfNeeded(ctx context.Context, resolved *resolver.
 	st.SecretsBackend = "vault"
 	if err := state.Save(e.StateDir, st); err != nil {
 		return fmt.Errorf("persisting the secret backend after migration: %w", err)
+	}
+	if e.Router != nil {
+		e.Router.SwitchToVault(kv)
+	} else if fs, ok := e.fileStore(); ok {
+		fs.SetReadOnly(true)
 	}
 	e.audit(m.Name, "secrets.migrate", fmt.Sprintf("%d entry(ies) migrated to vault", migrated))
 	return nil
