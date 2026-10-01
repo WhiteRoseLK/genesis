@@ -20,6 +20,8 @@ requires:
     - function: core.secrets/v1
     - function: fleet.agent/v1
       optional: true
+    - function: access.ssh/v1
+      optional: true
 
 config_schema: schema.json
 
