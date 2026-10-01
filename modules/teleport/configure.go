@@ -24,7 +24,7 @@ var caPinRe = regexp.MustCompile(`sha256:[0-9a-f]{64}`)
 // Teleport's internal CA (tctl status), reused by fleet.agent/v1.Install for
 // each enrolment (docs/09-decisions.md ADR-017/018).
 func (m *teleportModule) Configure(ctx context.Context, req *modulev1.StepRequest) (*modulev1.StepResult, error) {
-	if err := m.dial(); err != nil {
+	if err := m.dialWithToken(req.GetBrokerToken()); err != nil {
 		return nil, err
 	}
 	name := vmName(req)
@@ -77,7 +77,17 @@ func (m *teleportModule) Configure(ctx context.Context, req *modulev1.StepReques
 	m.caPin = caPin
 	m.mu.Unlock()
 
-	return &modulev1.StepResult{Status: modulev1.StepResult_STATUS_OK, State: req.GetState()}, nil
+	state := sdk.StateMap(req.GetState())
+	state["own_target_host"] = target.Host
+	state["own_target_port"] = int64(target.Port)
+	state["own_target_user"] = target.User
+	state["cluster_name"] = clusterName
+	state["ca_pin"] = caPin
+	s, err := sdk.NewState(state)
+	if err != nil {
+		return nil, err
+	}
+	return &modulev1.StepResult{Status: modulev1.StepResult_STATUS_OK, State: s}, nil
 }
 
 // deployTeleport installs/configures Teleport through ansible and places the

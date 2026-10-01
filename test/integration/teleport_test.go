@@ -21,6 +21,7 @@ import (
 	"github.com/WhiteRoseLK/genesis/internal/broker"
 	"github.com/WhiteRoseLK/genesis/internal/modulehost"
 	"github.com/WhiteRoseLK/genesis/internal/testutil"
+	sdk "github.com/WhiteRoseLK/genesis/sdk/go"
 	accesssshv1 "github.com/WhiteRoseLK/genesis/sdk/go/gen/functions/access/ssh/v1"
 	computevmv1 "github.com/WhiteRoseLK/genesis/sdk/go/gen/functions/compute/vm/v1"
 	ansiblev1 "github.com/WhiteRoseLK/genesis/sdk/go/gen/functions/core/ansible/v1"
@@ -563,6 +564,16 @@ func TestTeleportConfiguresAuthProxy(t *testing.T) {
 	h := launchTeleportTest(t)
 	if h.ansibleServer.calls < 1 {
 		t.Error("install_teleport.yml was never sent")
+	}
+	st := sdk.StateMap(h.configured.GetState())
+	if st["ca_pin"] == "" {
+		t.Error("ca_pin was not saved in Configure state")
+	}
+	if st["cluster_name"] == "" {
+		t.Error("cluster_name was not saved in Configure state")
+	}
+	if st["own_target_host"] == "" {
+		t.Error("own_target_host was not saved in Configure state")
 	}
 }
 

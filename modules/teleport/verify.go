@@ -28,7 +28,7 @@ var (
 // direct SSH access to the native sshd on port 22 is refused
 // (docs/07-mvp-modules.md, ADR-018).
 func (m *teleportModule) Verify(ctx context.Context, req *modulev1.StepRequest) (*modulev1.StepResult, error) {
-	if err := m.dial(); err != nil {
+	if err := m.dialWithToken(req.GetBrokerToken()); err != nil {
 		return nil, err
 	}
 	name := vmName(req)

@@ -128,10 +128,26 @@ func (m *teleportModule) Validate(context.Context, *modulev1.ValidateRequest) (*
 	return &modulev1.Diagnostics{}, nil
 }
 
-func (m *teleportModule) Check(_ context.Context, req *modulev1.StepRequest) (*modulev1.CheckResult, error) {
-	m.brokerToken = req.GetBrokerToken()
-	flags := sdk.StateMap(req.GetState())
-	if !boolFlag(flags, "verified") {
+func (m *teleportModule) Check(ctx context.Context, req *modulev1.StepRequest) (*modulev1.CheckResult, error) {
+	if req.GetBrokerToken() != "" && m.broker != nil {
+		_ = m.dialWithToken(req.GetBrokerToken())
+	}
+	state := sdk.StateMap(req.GetState())
+	if pin, ok := state["ca_pin"].(string); ok && pin != "" {
+		m.mu.Lock()
+		m.caPin = pin
+		if cn, ok := state["cluster_name"].(string); ok {
+			m.clusterName = cn
+		}
+		m.mu.Unlock()
+		name := vmName(req)
+		if pair, err := m.sshKeyPair(ctx, name); err == nil {
+			m.mu.Lock()
+			m.ownTarget = targetFromState(req, pair)
+			m.mu.Unlock()
+		}
+	}
+	if !boolFlag(state, "verified") {
 		return &modulev1.CheckResult{Status: modulev1.CheckResult_STATUS_TODO}, nil
 	}
 	return &modulev1.CheckResult{Status: modulev1.CheckResult_STATUS_COMPLIANT}, nil
@@ -142,21 +158,32 @@ func boolFlag(flags map[string]any, key string) bool {
 	return v
 }
 
-// dial dials the broker session at most once -- the same precaution as
-// modules/vault and modules/powerdns.
-func (m *teleportModule) dial() error {
+// dialWithToken dials the broker session with token, or the cached token if
+// token is empty. If a new token is provided, it redials so that repoints are
+// immediately observed (the test-b/test-f pattern, docs/PROGRESS.md debt #26).
+func (m *teleportModule) dialWithToken(token string) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	if m.vmClient != nil {
+	if token == "" {
+		token = m.brokerToken
+	}
+	if token == "" {
+		if m.vmClient != nil {
+			return nil
+		}
+		return fmt.Errorf("teleport: no broker session available")
+	}
+	if m.brokerToken == token && m.vmClient != nil {
 		return nil
 	}
-	if m.broker == nil || m.brokerToken == "" {
-		return fmt.Errorf("teleport: no broker session (Check has not been called yet)")
+	if m.broker == nil {
+		return fmt.Errorf("teleport: broker client not set")
 	}
-	conn, err := m.broker.Dial(m.brokerToken)
+	conn, err := m.broker.Dial(token)
 	if err != nil {
 		return fmt.Errorf("connecting to the required functions: %w", err)
 	}
+	m.brokerToken = token
 	m.vmClient = computevmv1.NewComputeVMClient(conn)
 	m.osBaseClient = osbasev1.NewBaseClient(conn)
 	m.ansibleClient = ansiblev1.NewAnsibleClient(conn)
@@ -165,6 +192,10 @@ func (m *teleportModule) dial() error {
 	m.dnsResolverClient = dnsresolverv1.NewDnsResolverClient(conn)
 	m.pkiClient = pkiissuerv1.NewPkiIssuerClient(conn)
 	return nil
+}
+
+func (m *teleportModule) dial() error {
+	return m.dialWithToken("")
 }
 
 func vmName(req *modulev1.StepRequest) string {
@@ -186,6 +217,9 @@ func clusterNameFromConfig(req *modulev1.StepRequest) string {
 }
 
 func (m *teleportModule) sshKeyPair(ctx context.Context, name string) (sshKeyPair, error) {
+	if m.secretsClient == nil {
+		return sshKeyPair{}, fmt.Errorf("secrets client not connected")
+	}
 	ref := fmt.Sprintf(sshKeyRefFmt, name)
 	if _, err := m.secretsClient.Ensure(ctx, &secretsv1.EnsureRequest{
 		Ref: ref, Generator: secretsv1.Generator_GENERATOR_SSH_KEYPAIR,
@@ -206,20 +240,36 @@ func (m *teleportModule) sshKeyPair(ctx context.Context, name string) (sshKeyPai
 
 func targetFromState(req *modulev1.StepRequest, pair sshKeyPair) connTarget {
 	state := sdk.StateMap(req.GetState())
+	host := fmt.Sprint(state["vm_ip"])
+	if h, ok := state["own_target_host"].(string); ok && h != "" {
+		host = h
+	}
+	user := sshUser
+	if u, ok := state["own_target_user"].(string); ok && u != "" {
+		user = u
+	}
 	var port int64
-	switch v := state["vm_ssh_port"].(type) {
+	portVal := state["own_target_port"]
+	if portVal == nil {
+		portVal = state["vm_ssh_port"]
+	}
+	switch v := portVal.(type) {
 	case int64:
 		port = v
 	case float64:
 		port = int64(v)
+	case int:
+		port = int64(v)
+	case int32:
+		port = int64(v)
 	}
-	return connTarget{Host: fmt.Sprint(state["vm_ip"]), Port: int32(port), User: sshUser, PrivateKey: pair.PrivateKeyOpenSSH}
+	return connTarget{Host: host, Port: int32(port), User: user, PrivateKey: pair.PrivateKeyOpenSSH}
 }
 
 // Provision creates (or finds again, EnsureVM is idempotent) teleport's
 // dedicated Auth+Proxy VM.
 func (m *teleportModule) Provision(ctx context.Context, req *modulev1.StepRequest) (*modulev1.StepResult, error) {
-	if err := m.dial(); err != nil {
+	if err := m.dialWithToken(req.GetBrokerToken()); err != nil {
 		return nil, err
 	}
 	name := vmName(req)
@@ -246,7 +296,7 @@ func (m *teleportModule) Provision(ctx context.Context, req *modulev1.StepReques
 }
 
 func (m *teleportModule) Destroy(ctx context.Context, req *modulev1.StepRequest) (*modulev1.StepResult, error) {
-	if err := m.dial(); err != nil {
+	if err := m.dialWithToken(req.GetBrokerToken()); err != nil {
 		return nil, err
 	}
 	name := vmName(req)
