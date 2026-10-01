@@ -122,10 +122,14 @@ func (s *vaultKVServer) Write(ctx context.Context, req *secretskvv1.WriteRequest
 	return &secretskvv1.WriteResponse{}, nil
 }
 
-func (s *vaultKVServer) List(context.Context, *secretskvv1.ListRequest) (*secretskvv1.ListResponse, error) {
-	// KV v2 LIST needs the (non-standard) LIST HTTP method; not consumed by
-	// the core yet (the migration writes/reads by known ref, never lists
-	// vault's content) — an explicit stub rather than an implementation that
-	// cannot be verified (docs/PROGRESS.md, the same method as SignSSH).
-	return nil, status.Error(codes.Unimplemented, "List: no real consumer yet (docs/PROGRESS.md)")
+func (s *vaultKVServer) List(ctx context.Context, req *secretskvv1.ListRequest) (*secretskvv1.ListResponse, error) {
+	api, token, err := s.module.ready()
+	if err != nil {
+		return nil, err
+	}
+	keys, err := api.kvList(ctx, token, kvMount, req.GetPrefix())
+	if err != nil {
+		return nil, fmt.Errorf("List(%q): %w", req.GetPrefix(), err)
+	}
+	return &secretskvv1.ListResponse{Refs: keys}, nil
 }

@@ -75,6 +75,9 @@ path "genesis/data/*" {
 path "genesis/metadata/*" {
   capabilities = ["read", "list"]
 }
+path "genesis/metadata" {
+  capabilities = ["list"]
+}
 path "pki_int/issue/*" {
   capabilities = ["create", "update"]
 }

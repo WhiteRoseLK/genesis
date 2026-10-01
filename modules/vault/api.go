@@ -12,6 +12,8 @@ import (
 	"io"
 	"net"
 	"net/http"
+	"sort"
+	"strings"
 	"time"
 )
 
@@ -430,6 +432,61 @@ func (c *vaultClient) kvRead(ctx context.Context, token, mount, path string) (va
 	}
 	value, ok := d["value"].(string)
 	return value, ok, nil
+}
+
+func (c *vaultClient) kvList(ctx context.Context, token, mount, prefix string) ([]string, error) {
+	cleanPrefix := strings.Trim(prefix, "/")
+	keys, err := c.kvListRecursive(ctx, token, mount, cleanPrefix)
+	if err != nil {
+		return nil, err
+	}
+	sort.Strings(keys)
+	return keys, nil
+}
+
+func (c *vaultClient) kvListRecursive(ctx context.Context, token, mount, dir string) ([]string, error) {
+	path := "/v1/" + mount + "/metadata/"
+	if dir != "" {
+		path += dir
+	}
+	path += "?list=true"
+	status, parsed, err := c.request(ctx, http.MethodGet, path, token, nil)
+	if err != nil {
+		return nil, err
+	}
+	if status == http.StatusNotFound {
+		return nil, nil
+	}
+	if status != http.StatusOK {
+		return nil, fmt.Errorf("KV list %q: status %d: %v", dir, status, parsed)
+	}
+	d := dataField(parsed)
+	if d == nil {
+		return nil, nil
+	}
+	keysRaw, _ := d["keys"].([]any)
+	var allKeys []string
+	for _, k := range keysRaw {
+		key, ok := k.(string)
+		if !ok {
+			continue
+		}
+		fullKey := key
+		if dir != "" {
+			fullKey = dir + "/" + key
+		}
+		if strings.HasSuffix(key, "/") {
+			subDir := strings.TrimSuffix(fullKey, "/")
+			subKeys, err := c.kvListRecursive(ctx, token, mount, subDir)
+			if err != nil {
+				return nil, err
+			}
+			allKeys = append(allKeys, subKeys...)
+		} else {
+			allKeys = append(allKeys, fullKey)
+		}
+	}
+	return allKeys, nil
 }
 
 func joinStrings(ss []string, sep string) string {

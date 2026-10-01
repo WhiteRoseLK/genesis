@@ -16,6 +16,7 @@ import (
 	"net/http"
 	"os"
 	"os/exec"
+	"slices"
 	"strconv"
 	"strings"
 	"sync"
@@ -33,6 +34,7 @@ import (
 	dnsresolverv1 "github.com/WhiteRoseLK/genesis/sdk/go/gen/functions/dns/resolver/v1"
 	osbasev1 "github.com/WhiteRoseLK/genesis/sdk/go/gen/functions/os/base/v1"
 	pkiissuerv1 "github.com/WhiteRoseLK/genesis/sdk/go/gen/functions/pki/issuer/v1"
+	secretskvv1 "github.com/WhiteRoseLK/genesis/sdk/go/gen/functions/secrets/kv/v1"
 	timentpv1 "github.com/WhiteRoseLK/genesis/sdk/go/gen/functions/time/ntp/v1"
 	modulev1 "github.com/WhiteRoseLK/genesis/sdk/go/gen/module/v1"
 )
@@ -430,6 +432,51 @@ func TestVaultVerifyPassesFromThirdPartyVM(t *testing.T) {
 	}
 	if h.ansibleServer.calls < 2 {
 		t.Errorf("check_vault.yml was not sent (ansible calls = %d)", h.ansibleServer.calls)
+	}
+}
+
+// TestVaultSecretsKVReadWriteList verifies Read, Write and List on secrets.kv/v1
+// through Vault's AppRole credentials.
+func TestVaultSecretsKVReadWriteList(t *testing.T) {
+	h := launchVaultTest(t)
+	ctx := context.Background()
+
+	connKV, err := h.client.DispenseFunction("secrets.kv/v1")
+	if err != nil {
+		t.Fatalf("DispenseFunction(vault, secrets.kv/v1): %v", err)
+	}
+	kv := secretskvv1.NewSecretsKVClient(connKV)
+
+	if _, err := kv.Write(ctx, &secretskvv1.WriteRequest{Ref: "top-secret", Value: "val1"}); err != nil {
+		t.Fatalf("kv.Write(top-secret): %v", err)
+	}
+	if _, err := kv.Write(ctx, &secretskvv1.WriteRequest{Ref: "sub/secret-two", Value: "val2"}); err != nil {
+		t.Fatalf("kv.Write(sub/secret-two): %v", err)
+	}
+
+	r1, err := kv.Read(ctx, &secretskvv1.ReadRequest{Ref: "top-secret"})
+	if err != nil || !r1.GetFound() || r1.GetValue() != "val1" {
+		t.Fatalf("kv.Read(top-secret) = (%v, %v), want (val1, true)", r1, err)
+	}
+	r2, err := kv.Read(ctx, &secretskvv1.ReadRequest{Ref: "sub/secret-two"})
+	if err != nil || !r2.GetFound() || r2.GetValue() != "val2" {
+		t.Fatalf("kv.Read(sub/secret-two) = (%v, %v), want (val2, true)", r2, err)
+	}
+
+	listAll, err := kv.List(ctx, &secretskvv1.ListRequest{Prefix: ""})
+	if err != nil {
+		t.Fatalf("kv.List(''): %v", err)
+	}
+	if !slices.Contains(listAll.GetRefs(), "top-secret") || !slices.Contains(listAll.GetRefs(), "sub/secret-two") {
+		t.Errorf("kv.List('') = %v, want to contain top-secret and sub/secret-two", listAll.GetRefs())
+	}
+
+	listSub, err := kv.List(ctx, &secretskvv1.ListRequest{Prefix: "sub"})
+	if err != nil {
+		t.Fatalf("kv.List('sub'): %v", err)
+	}
+	if !slices.Contains(listSub.GetRefs(), "sub/secret-two") {
+		t.Errorf("kv.List('sub') = %v, want to contain sub/secret-two", listSub.GetRefs())
 	}
 }
 
