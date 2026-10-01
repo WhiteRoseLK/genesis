@@ -21,18 +21,36 @@ import (
 	"github.com/WhiteRoseLK/genesis/internal/atomicfile"
 )
 
+// ErrReadOnly is returned by FileStore write operations when the store has been
+// switched to read-only mode after migration to vault or seed retirement
+// (docs/05-bootstrap-lifecycle.md, ADR-020).
+var ErrReadOnly = errors.New("file secret store is read-only (secrets have migrated to vault; writes must go to secrets.kv/v1)")
+
 // FileStore is the `file` backend of iteration 1 (docs/06-secrets-state.md):
 // one age-encrypted file per secret, plaintext metadata without the value,
 // under state_dir/secrets/.
 type FileStore struct {
 	Identity *age.X25519Identity
 	stateDir string
+	readOnly bool
 }
 
 // NewFileStore builds a FileStore rooted at stateDir, encrypting with the
 // identity master key.
 func NewFileStore(stateDir string, identity *age.X25519Identity) *FileStore {
 	return &FileStore{Identity: identity, stateDir: stateDir}
+}
+
+// SetReadOnly switches the store to read-only mode (docs/05-bootstrap-lifecycle.md,
+// phase 4): any subsequent write (Put, or Ensure on a missing secret) is refused
+// with ErrReadOnly.
+func (s *FileStore) SetReadOnly(ro bool) {
+	s.readOnly = ro
+}
+
+// ReadOnly reports whether the FileStore is currently in read-only mode.
+func (s *FileStore) ReadOnly() bool {
+	return s.readOnly
 }
 
 var _ Store = (*FileStore)(nil)
@@ -63,6 +81,10 @@ func (s *FileStore) Ensure(ctx context.Context, ref Ref, gen Generator, meta Met
 		return fmt.Errorf("checking %s: %w", s.secretPath(ref), err)
 	}
 
+	if s.readOnly {
+		return ErrReadOnly
+	}
+
 	value, err := gen()
 	if err != nil {
 		return fmt.Errorf("generating secret %s: %w", ref, err)
@@ -73,6 +95,9 @@ func (s *FileStore) Ensure(ctx context.Context, ref Ref, gen Generator, meta Met
 func (s *FileStore) Put(_ context.Context, ref Ref, value Secret, meta Meta) error {
 	if err := ref.Validate(); err != nil {
 		return err
+	}
+	if s.readOnly {
+		return ErrReadOnly
 	}
 	if err := os.MkdirAll(filepath.Dir(s.secretPath(ref)), 0o700); err != nil {
 		return fmt.Errorf("creating the directory for %s: %w", ref, err)

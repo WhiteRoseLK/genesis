@@ -5,6 +5,7 @@ package engine
 import (
 	"bytes"
 	"context"
+	"errors"
 	"log/slog"
 	"strings"
 	"testing"
@@ -70,6 +71,30 @@ func TestMigratesSecretsToKVCapability(t *testing.T) {
 		t.Errorf("SecretsBackend = %q, want \"vault\" after migration", st.SecretsBackend)
 	}
 
+	// Verify FileStore has switched to read-only after migration (docs/05-bootstrap-lifecycle.md).
+	fs, ok := store.(*secrets.FileStore)
+	if !ok {
+		t.Fatalf("store is not a *secrets.FileStore")
+	}
+	if !fs.ReadOnly() {
+		t.Errorf("FileStore.ReadOnly() = false, want true after migration to vault")
+	}
+	if err := fs.Put(ctx, secrets.Ref("forbidden/key"), secrets.NewSecret("v"), secrets.Meta{}); !errors.Is(err, secrets.ErrReadOnly) {
+		t.Errorf("fs.Put in read-only mode = %v, want %v", err, secrets.ErrReadOnly)
+	}
+	if err := fs.Ensure(ctx, secrets.Ref("forbidden/missing"), secrets.GeneratePassword(), secrets.Meta{}); !errors.Is(err, secrets.ErrReadOnly) {
+		t.Errorf("fs.Ensure in read-only mode = %v, want %v", err, secrets.ErrReadOnly)
+	}
+
+	// Recovery secret that stayed in FileStore is still readable:
+	recVal, err := fs.Get(ctx, secrets.Ref("ca/root-key"))
+	if err != nil {
+		t.Fatalf("fs.Get recovery secret: %v", err)
+	}
+	if recVal.ExposeSecret() == "" {
+		t.Fatalf("empty recovery secret returned")
+	}
+
 	// Second run: idempotent, does not trigger the migration again.
 	var secondLog bytes.Buffer
 	e2 := New(stateDir, store)
@@ -79,6 +104,10 @@ func TestMigratesSecretsToKVCapability(t *testing.T) {
 	}
 	if strings.Contains(secondLog.String(), "step=secrets.migrate") {
 		t.Errorf("the migration was replayed although SecretsBackend is already \"vault\":\n%s", secondLog.String())
+	}
+
+	if !fs.ReadOnly() {
+		t.Errorf("FileStore.ReadOnly() = false after second run, want true")
 	}
 }
 

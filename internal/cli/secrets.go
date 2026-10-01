@@ -8,6 +8,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/WhiteRoseLK/genesis/internal/secrets"
+	"github.com/WhiteRoseLK/genesis/internal/state"
 )
 
 func newSecretsCmd() *cobra.Command {
@@ -23,7 +24,8 @@ func newSecretsCmd() *cobra.Command {
 }
 
 // openSecretsStore loads the existing master key (fails if `genesis init` has
-// not been run) and builds the `file` store.
+// not been run) and builds the `file` store. If the state indicates that secrets
+// have migrated to vault or the seed is retired, the file store is marked read-only.
 func openSecretsStore(cmd *cobra.Command) (*secrets.FileStore, error) {
 	stateDir, err := cmd.Flags().GetString("state-dir")
 	if err != nil {
@@ -34,7 +36,11 @@ func openSecretsStore(cmd *cobra.Command) (*secrets.FileStore, error) {
 	if err != nil {
 		return nil, err
 	}
-	return secrets.NewFileStore(stateDir, identity), nil
+	store := secrets.NewFileStore(stateDir, identity)
+	if st, err := state.Load(stateDir); err == nil && (st.SecretsBackend == "vault" || st.SeedRetired) {
+		store.SetReadOnly(true)
+	}
+	return store, nil
 }
 
 func newSecretsListCmd() *cobra.Command {
