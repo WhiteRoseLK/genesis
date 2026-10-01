@@ -5,7 +5,6 @@
 package cli
 
 import (
-	"fmt"
 	"os"
 
 	"github.com/spf13/cobra"
@@ -48,10 +47,4 @@ func NewRootCmd() *cobra.Command {
 	)
 
 	return root
-}
-
-// notImplemented returns an explicit error for a command whose implementation
-// is planned for a later milestone (docs/08-milestones.md).
-func notImplemented(cmd *cobra.Command, milestone string) error {
-	return fmt.Errorf("command %q: not implemented yet (planned for %s, see docs/08-milestones.md)", cmd.CommandPath(), milestone)
 }
