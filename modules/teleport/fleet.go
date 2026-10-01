@@ -16,9 +16,8 @@ var joinTokenRe = regexp.MustCompile(`[a-f0-9]{32}`)
 
 // teleportFleetServer implements fleet.agent/v1 (ADR-017): Install generates a
 // short-lived enrolment token (tctl tokens add, on teleport's own VM) then
-// installs/enrols the SSH agent on the target VM -- the target's native sshd
-// is deliberately NOT disabled at this milestone (deferred Repoint, see the
-// package comment in main.go).
+// installs/enrols the SSH agent on the target VM and disables the native sshd
+// once enrolment is confirmed running ("direct SSH refused", docs/07-mvp-modules.md).
 type teleportFleetServer struct {
 	fleetagentv1.UnimplementedFleetAgentServer
 	module *teleportModule

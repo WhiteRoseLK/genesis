@@ -24,10 +24,9 @@ var (
 
 // Verify proves, from a disposable third-party VM, a real SSH connection
 // through the Teleport agent installed on a second disposable VM
-// (docs/03-module-contract.md rule 2: a consumer's point of view). The
-// target's native sshd is not disabled at this milestone (deferred Repoint,
-// main.go): Verify therefore only tests the connection through the agent, not
-// that direct access is refused.
+// (docs/03-module-contract.md rule 2: a consumer's point of view) AND that
+// direct SSH access to the native sshd on port 22 is refused
+// (docs/07-mvp-modules.md, ADR-018).
 func (m *teleportModule) Verify(ctx context.Context, req *modulev1.StepRequest) (*modulev1.StepResult, error) {
 	if err := m.dial(); err != nil {
 		return nil, err
@@ -88,6 +87,8 @@ func (m *teleportModule) Verify(ctx context.Context, req *modulev1.StepRequest) 
 		"user_certificate_openssh": certOpenSSH,
 		"agent_host":               agentVM.GetIp(),
 		"agent_user":               sshUser,
+		"direct_private_key_pem":   agentPair.PrivateKeyOpenSSH,
+		"direct_port":              agentVM.GetSshPort(),
 	})
 	if err != nil {
 		return nil, err
@@ -101,8 +102,8 @@ func (m *teleportModule) Verify(ctx context.Context, req *modulev1.StepRequest) 
 	if !resp.GetOk() {
 		return nil, fmt.Errorf("Verify(teleport) failed:\n%s", resp.GetOutput())
 	}
-	if !strings.Contains(resp.GetOutput(), "AGENT_SSH_OK") {
-		return nil, fmt.Errorf("Verify(teleport): unexpected output, expected AGENT_SSH_OK:\n%s", resp.GetOutput())
+	if !strings.Contains(resp.GetOutput(), "AGENT_SSH_OK") || !strings.Contains(resp.GetOutput(), "DIRECT_SSH_REFUSED_OK") {
+		return nil, fmt.Errorf("Verify(teleport): unexpected output, expected AGENT_SSH_OK and DIRECT_SSH_REFUSED_OK:\n%s", resp.GetOutput())
 	}
 
 	state := sdk.StateMap(req.GetState())

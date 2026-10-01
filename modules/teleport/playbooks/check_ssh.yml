@@ -1,7 +1,8 @@
 # Verify (teleport module): from a disposable third-party VM, proves a real SSH
 # connection through the Teleport agent (port 3022, certificate signed by the
 # internal CA through tctl auth sign --format=openssh, docs/09-decisions.md
-# ADR-018: standard SSH, not a proprietary protocol).
+# ADR-018: standard SSH, not a proprietary protocol) AND proves that direct SSH
+# to the native sshd on port 22 is refused (docs/07-mvp-modules.md).
 - hosts: target
   gather_facts: false
   become: true
@@ -26,3 +27,23 @@
         {{ agent_user }}@{{ agent_host }} echo AGENT_SSH_OK
       register: agent_ssh
       changed_when: false
+
+    - name: place the direct service private key
+      ansible.builtin.copy:
+        content: "{{ direct_private_key_pem }}"
+        dest: /tmp/genesis-direct-key
+        mode: "0600"
+
+    - name: verify direct SSH connection is refused
+      ansible.builtin.command: >
+        ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null
+        -o BatchMode=yes -o ConnectTimeout=5
+        -i /tmp/genesis-direct-key -p {{ direct_port | default(22) }}
+        {{ agent_user }}@{{ agent_host }} echo DIRECT_SSH_UNEXPECTED
+      register: direct_ssh
+      failed_when: direct_ssh.rc == 0
+      changed_when: false
+
+    - name: direct ssh confirmed refused
+      ansible.builtin.debug:
+        msg: "DIRECT_SSH_REFUSED_OK"

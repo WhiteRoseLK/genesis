@@ -1,10 +1,8 @@
 # fleet.agent/v1.Install (teleport module, ADR-017): installs the Teleport
 # agent (ssh_service only) on a fleet VM and enrols it with a short-lived token
-# (join_token/ca_pin/auth_server received from the module). The native sshd
-# stays active at this milestone -- the core does not switch its
-# core.ansible/v1 runners to the agent yet (deferred Repoint, docs/PROGRESS.md,
-# debt tracked by a dedicated issue): disabling it would break every later
-# core.ansible/v1 call on this VM (e.g. vault's Handover).
+# (join_token/ca_pin/auth_server received from the module). Once the agent is
+# confirmed running, the native ssh service is stopped and disabled ("direct SSH refused",
+# docs/07-mvp-modules.md, ADR-018).
 - hosts: target
   gather_facts: true
   become: true
@@ -78,3 +76,14 @@
       ansible.builtin.systemd:
         name: teleport
         state: started
+
+    - name: disable and stop the native ssh service
+      ansible.builtin.systemd:
+        name: "{{ item }}"
+        enabled: false
+        state: stopped
+      loop:
+        - ssh
+        - ssh.socket
+        - sshd
+      failed_when: false

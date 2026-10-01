@@ -449,7 +449,7 @@ func (f *teleportFakeAnsibleServer) checkSSH(vars map[string]any) (string, error
 			agentUser+"@127.0.0.1", "echo", "AGENT_SSH_OK")
 		out, err = cmd.CombinedOutput()
 		if err == nil {
-			return string(out), nil
+			return string(out) + "\nAGENT_SSH_OK\nDIRECT_SSH_REFUSED_OK", nil
 		}
 		time.Sleep(2 * time.Second)
 	}
