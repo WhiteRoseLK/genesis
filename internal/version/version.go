@@ -7,4 +7,4 @@ package version
 // Version is updated by Release Please in the release PR (marker below): the
 // published binary, the tag and the module compatibility check therefore
 // always refer to the same version.
-const Version = "0.2.0" // x-release-please-version
+const Version = "0.2.1" // x-release-please-version
