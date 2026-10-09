@@ -133,7 +133,7 @@ func (m *vaultModule) Validate(context.Context, *modulev1.ValidateRequest) (*mod
 }
 
 func (m *vaultModule) Check(_ context.Context, req *modulev1.StepRequest) (*modulev1.CheckResult, error) {
-	m.brokerToken = req.GetBrokerToken()
+	_ = m.dialWithToken(req.GetBrokerToken())
 	flags := sdk.StateMap(req.GetState())
 	if boolFlag(flags, "handed_over") || boolFlag(flags, "verified") {
 		return &modulev1.CheckResult{Status: modulev1.CheckResult_STATUS_COMPLIANT}, nil
@@ -146,19 +146,32 @@ func boolFlag(flags map[string]any, key string) bool {
 	return v
 }
 
-func (m *vaultModule) dial() error {
+// dialWithToken dials the broker session with token, or the cached token if
+// token is empty. If a new token is provided, it redials so that repoints are
+// observed. Dial is only attempted once per token.
+func (m *vaultModule) dialWithToken(token string) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	if m.vmClient != nil {
-		return nil
+	if token == "" {
+		if m.vmClient != nil {
+			return nil
+		}
+		token = m.brokerToken
 	}
-	if m.broker == nil || m.brokerToken == "" {
+	if token == "" {
 		return fmt.Errorf("vault: no broker session (Check has not been called yet)")
 	}
-	conn, err := m.broker.Dial(m.brokerToken)
+	if m.brokerToken == token && m.vmClient != nil {
+		return nil
+	}
+	if m.broker == nil {
+		return nil
+	}
+	conn, err := m.broker.Dial(token)
 	if err != nil {
 		return fmt.Errorf("connecting to the required functions: %w", err)
 	}
+	m.brokerToken = token
 	m.vmClient = computevmv1.NewComputeVMClient(conn)
 	m.osBaseClient = osbasev1.NewBaseClient(conn)
 	m.ansibleClient = ansiblev1.NewAnsibleClient(conn)
@@ -286,7 +299,7 @@ func (m *vaultModule) targetFromState(ctx context.Context, req *modulev1.StepReq
 // Provision creates (or finds again, EnsureVM is idempotent) vault's dedicated
 // VM.
 func (m *vaultModule) Provision(ctx context.Context, req *modulev1.StepRequest) (*modulev1.StepResult, error) {
-	if err := m.dial(); err != nil {
+	if err := m.dialWithToken(req.GetBrokerToken()); err != nil {
 		return nil, err
 	}
 	name := vmName(req)
@@ -311,8 +324,18 @@ func (m *vaultModule) Provision(ctx context.Context, req *modulev1.StepRequest) 
 	return &modulev1.StepResult{Status: modulev1.StepResult_STATUS_OK, State: s}, nil
 }
 
+func (m *vaultModule) Repoint(_ context.Context, req *modulev1.RepointRequest) (*modulev1.StepResult, error) {
+	if err := m.dialWithToken(req.GetStep().GetBrokerToken()); err != nil {
+		return nil, err
+	}
+	return &modulev1.StepResult{
+		Status: modulev1.StepResult_STATUS_OK,
+		State:  req.GetStep().GetState(),
+	}, nil
+}
+
 func (m *vaultModule) Destroy(ctx context.Context, req *modulev1.StepRequest) (*modulev1.StepResult, error) {
-	if err := m.dial(); err != nil {
+	if err := m.dialWithToken(req.GetBrokerToken()); err != nil {
 		return nil, err
 	}
 	name := vmName(req)

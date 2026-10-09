@@ -63,33 +63,62 @@ func (m *baseOSModule) Validate(context.Context, *modulev1.ValidateRequest) (*mo
 // core.ansible/v1, which its function handlers then reuse
 // (docs/02-architecture.md: the broker routes per caller, not per function).
 func (m *baseOSModule) Check(_ context.Context, req *modulev1.StepRequest) (*modulev1.CheckResult, error) {
-	m.brokerToken = req.GetBrokerToken()
+	_ = m.dialWithToken(req.GetBrokerToken())
 	return &modulev1.CheckResult{Status: modulev1.CheckResult_STATUS_COMPLIANT}, nil
 }
 
+func (m *baseOSModule) Repoint(_ context.Context, req *modulev1.RepointRequest) (*modulev1.StepResult, error) {
+	if err := m.dialWithToken(req.GetStep().GetBrokerToken()); err != nil {
+		return nil, err
+	}
+	return &modulev1.StepResult{
+		Status: modulev1.StepResult_STATUS_OK,
+		State:  req.GetStep().GetState(),
+	}, nil
+}
+
 func (m *baseOSModule) Destroy(_ context.Context, req *modulev1.StepRequest) (*modulev1.StepResult, error) {
+	_ = m.dialWithToken(req.GetBrokerToken())
 	return &modulev1.StepResult{Status: modulev1.StepResult_STATUS_OK, State: req.GetState()}, nil
 }
 
-// dialAnsible dials the broker session at most once: Dial can only succeed
-// once per token (the connection info is sent only once on the core side), but
-// the resulting gRPC connection supports many calls — it is cached and reused
-// by TrustCA/SetResolver/SetNTP.
-func (m *baseOSModule) dialAnsible() (ansiblev1.AnsibleClient, error) {
+// dialWithToken dials the broker session with token, or the cached token if
+// token is empty. If a new token is provided, it redials so that repoints are
+// observed. Dial is only attempted once per token.
+func (m *baseOSModule) dialWithToken(token string) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
-	if m.ansibleClient != nil {
-		return m.ansibleClient, nil
+	if token == "" {
+		if m.ansibleClient != nil {
+			return nil
+		}
+		token = m.brokerToken
 	}
-	if m.broker == nil || m.brokerToken == "" {
-		return nil, fmt.Errorf("base-os: no broker session (Check has not been called on this module yet)")
+	if token == "" {
+		return fmt.Errorf("base-os: no broker session (Check has not been called on this module yet)")
 	}
-	conn, err := m.broker.Dial(m.brokerToken)
+	if m.brokerToken == token && m.ansibleClient != nil {
+		return nil
+	}
+	if m.broker == nil {
+		return nil
+	}
+	conn, err := m.broker.Dial(token)
 	if err != nil {
-		return nil, fmt.Errorf("connecting to core.ansible/v1: %w", err)
+		return fmt.Errorf("connecting to core.ansible/v1: %w", err)
 	}
+	m.brokerToken = token
 	m.ansibleClient = ansiblev1.NewAnsibleClient(conn)
+	return nil
+}
+
+func (m *baseOSModule) dialAnsible() (ansiblev1.AnsibleClient, error) {
+	if err := m.dialWithToken(""); err != nil {
+		return nil, err
+	}
+	m.mu.Lock()
+	defer m.mu.Unlock()
 	return m.ansibleClient, nil
 }
 

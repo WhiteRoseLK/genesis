@@ -136,6 +136,16 @@ func (m *coreDNSModule) SeedDown(ctx context.Context, req *modulev1.StepRequest)
 	return &modulev1.StepResult{Status: modulev1.StepResult_STATUS_OK, State: s}, nil
 }
 
+func (m *coreDNSModule) Repoint(_ context.Context, req *modulev1.RepointRequest) (*modulev1.StepResult, error) {
+	if err := m.dialWithToken(req.GetStep().GetBrokerToken()); err != nil {
+		return nil, err
+	}
+	return &modulev1.StepResult{
+		Status: modulev1.StepResult_STATUS_OK,
+		State:  req.GetStep().GetState(),
+	}, nil
+}
+
 // Destroy: the same cleanup as SeedDown, for a seed removal outside a handover
 // (e.g. `genesis destroy` with no target module installed).
 func (m *coreDNSModule) Destroy(ctx context.Context, req *modulev1.StepRequest) (*modulev1.StepResult, error) {

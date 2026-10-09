@@ -35,7 +35,7 @@ const (
 // (signed by step-ca) and KV v2, enables AppRole — all the administration work
 // needs the root token, never exposed beyond this step (revoked in Handover).
 func (m *vaultModule) Configure(ctx context.Context, req *modulev1.StepRequest) (*modulev1.StepResult, error) {
-	if err := m.dial(); err != nil {
+	if err := m.dialWithToken(req.GetBrokerToken()); err != nil {
 		return nil, err
 	}
 	name := vmName(req)
@@ -345,7 +345,7 @@ func (m *vaultModule) ensureAppRole(ctx context.Context, api *vaultClient, rootT
 // active) instead of step-ca's, redeploys it, then revokes the root token (doc
 // 07: "reissues its own certificate... revokes the root token").
 func (m *vaultModule) Handover(ctx context.Context, req *modulev1.StepRequest) (*modulev1.StepResult, error) {
-	if err := m.dial(); err != nil {
+	if err := m.dialWithToken(req.GetBrokerToken()); err != nil {
 		return nil, err
 	}
 	name := vmName(req)
@@ -410,7 +410,7 @@ func (m *vaultModule) currentAPI() *vaultClient {
 // validation and a KV read through the AppRole — not the root token
 // (docs/03-module-contract.md rule 2, docs/07-mvp-modules.md).
 func (m *vaultModule) Verify(ctx context.Context, req *modulev1.StepRequest) (*modulev1.StepResult, error) {
-	if err := m.dial(); err != nil {
+	if err := m.dialWithToken(req.GetBrokerToken()); err != nil {
 		return nil, err
 	}
 	name := vmName(req)

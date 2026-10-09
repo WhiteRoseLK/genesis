@@ -18,12 +18,8 @@
 // stays active: its own services keep using it. It is only stopped at the
 // end of Run (retireSeed, ADR-020), once every seed function has been taken
 // over by the target and every target Verify is green. The proto's
-// explicit Repoint(RepointRequest) is not yet triggered by the core towards
-// consumer modules: in this MVP, no module consumes dns.zone/v1,
-// dns.resolver/v1 or time.ntp/v1 without the phase suffix after its own
-// Check (the only consumer sensitive to the handover, powerdns, explicitly
-// reads dns.zone/v1@seed) — Repoint will have to be wired as soon as such a
-// consumer exists (debt, docs/PROGRESS.md).
+// explicit Repoint(RepointRequest) is triggered by the core towards active
+// consumer modules after handover (docs/03-module-contract.md §5, docs/05).
 package engine
 
 import (
@@ -39,6 +35,8 @@ import (
 	"strings"
 
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/types/known/structpb"
 
 	"github.com/WhiteRoseLK/genesis/internal/broker"
@@ -339,7 +337,7 @@ func (e *Engine) runModule(
 		e.audit(m.Name, "check", "compliant, no action")
 		// A fresh registry on every Run: without this repoint, a module
 		// built later in this Run would still consume the seed.
-		e.repoint(resolved, m, providers)
+		e.repointRegistry(resolved, m, providers)
 		return nil
 	}
 
@@ -380,8 +378,7 @@ func (e *Engine) runModule(
 			return err
 		}
 	}
-	e.repoint(resolved, m, providers)
-	return nil
+	return e.repoint(ctx, runID, resolved, m, providers, clients, st)
 }
 
 // retireSeed stops the seed at the end of Run (docs/05-bootstrap-lifecycle.md,
@@ -489,11 +486,11 @@ func handoverSeedModules(resolved *resolver.Resolved, m *resolver.Module) []stri
 	return out
 }
 
-// repoint makes m the new active provider (key without the @phase suffix)
+// repointRegistry makes m the new active provider (key without the @phase suffix)
 // of each of its target functions that has just been taken over from a seed
 // provider — it reuses the connection already dispensed at launch, with no
 // re-dispensing.
-func (e *Engine) repoint(resolved *resolver.Resolved, m *resolver.Module, providers map[string]map[string]providerConn) {
+func (e *Engine) repointRegistry(resolved *resolver.Resolved, m *resolver.Module, providers map[string]map[string]providerConn) {
 	for _, p := range m.Manifest.Provides {
 		if !slices.Contains(p.Phases, "target") {
 			continue
@@ -505,6 +502,72 @@ func (e *Engine) repoint(resolved *resolver.Resolved, m *resolver.Module, provid
 			e.Registry.SetModuleProvider(p.Function, pc.conn, pc.register)
 		}
 	}
+}
+
+// repoint updates the active provider in the registry and triggers an explicit
+// Repoint(RepointRequest) towards active consumer modules that have already been
+// executed (docs/03-module-contract.md §5: Handover + Repoint consumers + Verify).
+func (e *Engine) repoint(
+	ctx context.Context,
+	runID string,
+	resolved *resolver.Resolved,
+	m *resolver.Module,
+	providers map[string]map[string]providerConn,
+	clients map[string]*modulehost.Client,
+	st *state.State,
+) error {
+	e.repointRegistry(resolved, m, providers)
+
+	for _, p := range m.Manifest.Provides {
+		if !slices.Contains(p.Phases, "target") {
+			continue
+		}
+		if _, ok := resolved.ProviderFor(p.Function, "seed"); !ok {
+			continue
+		}
+		for _, consumerName := range resolved.ConsumersFor(p.Function) {
+			if consumerName == m.Name {
+				continue
+			}
+			consumerClient, ok := clients[consumerName]
+			if !ok {
+				continue
+			}
+			if _, hasState := st.Modules[consumerName]; !hasState {
+				// Only repoint consumers that have already run. Modules scheduled
+				// later in the plan naturally pick up the new active provider.
+				continue
+			}
+			consumerMod := resolved.Modules[consumerName]
+			if consumerMod == nil {
+				continue
+			}
+			req, err := e.buildStepRequest(runID, consumerMod, consumerClient, st)
+			if err != nil {
+				return fmt.Errorf("building repoint request for %q: %w", consumerName, err)
+			}
+			result, err := consumerClient.Module().Repoint(ctx, &modulev1.RepointRequest{
+				Step:     req,
+				Function: p.Function,
+			})
+			if err != nil {
+				if status.Code(err) == codes.Unimplemented {
+					continue
+				}
+				return modulehost.WrapModuleError("repoint", err)
+			}
+			if result.GetStatus() != modulev1.StepResult_STATUS_OK {
+				return fmt.Errorf("module %q, step repoint (%s): failed (%s)", consumerName, p.Function, diagnosticsString(result.GetDiagnostics()))
+			}
+			if result.GetState() != nil {
+				if err := e.saveModuleState(consumerName, result.GetState(), st); err != nil {
+					return err
+				}
+			}
+			e.audit(consumerName, "repoint", p.Function)
+		}
+	}
+	return nil
 }
 
 // migrateSecretsIfNeeded implements docs/06-secrets-state.md: "file → vault

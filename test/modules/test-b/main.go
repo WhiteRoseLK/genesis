@@ -68,6 +68,17 @@ func (m *testBModule) Verify(ctx context.Context, req *modulev1.StepRequest) (*m
 	return setFlag(req, "verified")
 }
 
+func (m *testBModule) Repoint(_ context.Context, req *modulev1.RepointRequest) (*modulev1.StepResult, error) {
+	flags := sdk.StateMap(req.GetStep().GetState())
+	flags["repointed"] = true
+	flags["repointed_function"] = req.GetFunction()
+	s, err := sdk.NewState(flags)
+	if err != nil {
+		return nil, err
+	}
+	return &modulev1.StepResult{Status: modulev1.StepResult_STATUS_OK, State: s}, nil
+}
+
 func (m *testBModule) Destroy(_ context.Context, req *modulev1.StepRequest) (*modulev1.StepResult, error) {
 	s, err := sdk.NewState(map[string]any{})
 	if err != nil {

@@ -84,7 +84,7 @@ func (m *chronyModule) Validate(context.Context, *modulev1.ValidateRequest) (*mo
 }
 
 func (m *chronyModule) Check(_ context.Context, req *modulev1.StepRequest) (*modulev1.CheckResult, error) {
-	m.brokerToken = req.GetBrokerToken()
+	_ = m.dialWithToken(req.GetBrokerToken())
 	flags := sdk.StateMap(req.GetState())
 	if !boolFlag(flags, "verified") {
 		return &modulev1.CheckResult{Status: modulev1.CheckResult_STATUS_TODO}, nil
@@ -97,22 +97,32 @@ func boolFlag(flags map[string]any, key string) bool {
 	return v
 }
 
-// dial dials the broker session at most once (Dial only succeeds once per
-// token) and builds the three typed clients on the same gRPC connection — the
-// same precaution as modules/base-os and modules/fake-compute.
-func (m *chronyModule) dial() error {
+// dialWithToken dials the broker session with token, or the cached token if
+// token is empty. If a new token is provided, it redials so that repoints are
+// observed. Dial is only attempted once per token.
+func (m *chronyModule) dialWithToken(token string) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	if m.vmClient != nil {
-		return nil
+	if token == "" {
+		if m.vmClient != nil {
+			return nil
+		}
+		token = m.brokerToken
 	}
-	if m.broker == nil || m.brokerToken == "" {
+	if token == "" {
 		return fmt.Errorf("chrony: no broker session (Check has not been called yet)")
 	}
-	conn, err := m.broker.Dial(m.brokerToken)
+	if m.brokerToken == token && m.vmClient != nil {
+		return nil
+	}
+	if m.broker == nil {
+		return nil
+	}
+	conn, err := m.broker.Dial(token)
 	if err != nil {
 		return fmt.Errorf("connecting to the required functions: %w", err)
 	}
+	m.brokerToken = token
 	m.vmClient = computevmv1.NewComputeVMClient(conn)
 	m.ansibleClient = ansiblev1.NewAnsibleClient(conn)
 	m.secretsClient = secretsv1.NewSecretsClient(conn)
@@ -190,7 +200,7 @@ func (m *chronyModule) sshKeyPair(ctx context.Context, name string) (sshKeyPair,
 // Provision creates (or finds again, EnsureVM is idempotent) chrony's
 // dedicated VM and keeps its name and SSH key reference in the state.
 func (m *chronyModule) Provision(ctx context.Context, req *modulev1.StepRequest) (*modulev1.StepResult, error) {
-	if err := m.dial(); err != nil {
+	if err := m.dialWithToken(req.GetBrokerToken()); err != nil {
 		return nil, err
 	}
 	name := vmName(req)
@@ -258,7 +268,7 @@ func (m *chronyModule) targetFromState(ctx context.Context, req *modulev1.StepRe
 // Configure installs and configures chronyd as a server on chrony's VM
 // (docs/07-mvp-modules.md).
 func (m *chronyModule) Configure(ctx context.Context, req *modulev1.StepRequest) (*modulev1.StepResult, error) {
-	if err := m.dial(); err != nil {
+	if err := m.dialWithToken(req.GetBrokerToken()); err != nil {
 		return nil, err
 	}
 	name := vmName(req)
@@ -317,7 +327,7 @@ var systemTimeRe = regexp.MustCompile(`System time\s*:\s*([-\d.]+) seconds`)
 // pointed at the chrony server (docs/03-module-contract.md rule 2: a test from
 // a consumer's point of view, not the state of a process).
 func (m *chronyModule) Verify(ctx context.Context, req *modulev1.StepRequest) (*modulev1.StepResult, error) {
-	if err := m.dial(); err != nil {
+	if err := m.dialWithToken(req.GetBrokerToken()); err != nil {
 		return nil, err
 	}
 	name := vmName(req)
@@ -407,8 +417,18 @@ func toAnySlice(ss []string) []any {
 	return out
 }
 
+func (m *chronyModule) Repoint(_ context.Context, req *modulev1.RepointRequest) (*modulev1.StepResult, error) {
+	if err := m.dialWithToken(req.GetStep().GetBrokerToken()); err != nil {
+		return nil, err
+	}
+	return &modulev1.StepResult{
+		Status: modulev1.StepResult_STATUS_OK,
+		State:  req.GetStep().GetState(),
+	}, nil
+}
+
 func (m *chronyModule) Destroy(ctx context.Context, req *modulev1.StepRequest) (*modulev1.StepResult, error) {
-	if err := m.dial(); err != nil {
+	if err := m.dialWithToken(req.GetBrokerToken()); err != nil {
 		return nil, err
 	}
 	name := vmName(req)
