@@ -8,7 +8,7 @@ GO_MODULES := $(shell find . -name go.mod -not -path './.git/*' -exec dirname {}
 
 # Development tools, pinned versions (installed by `make tools` into .bin/,
 # which takes precedence over the PATH).
-GOLANGCI_LINT_VERSION   := v2.13.2
+GOLANGCI_LINT_VERSION   := v2.14.0
 BUF_VERSION             := v1.73.0
 PROTOC_GEN_GO_VERSION   := v1.36.12
 PROTOC_GEN_GRPC_VERSION := v1.6.2
