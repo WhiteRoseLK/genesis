@@ -14,6 +14,7 @@
   <a href="#-how-it-works">How it works</a> ·
   <a href="#-what-a-spec-looks-like">Example</a> ·
   <a href="#-getting-started">Getting started</a> ·
+  <a href="docs/user-guide.md">User guide</a> ·
   <a href="#%EF%B8%8F-roadmap">Roadmap</a> ·
   <a href="#-documentation">Documentation</a>
 </p>
@@ -132,12 +133,12 @@ go run ./cmd/genesis plan -f spec.yaml       # selected modules and build order
 | Command | Role | Status |
 |---|---|---|
 | `genesis init` | Seed prerequisites, local state, master key | ✅ |
-| `genesis validate` | Spec structure (module resolution still to be wired in) | ✅ |
+| `genesis validate` | Spec structure and capability resolution | ✅ |
 | `genesis plan` | Build order, automatically added modules | ✅ |
 | `genesis apply` | Seed → build → handover → retirement | ✅ |
 | `genesis modules list · install · verify · scaffold` | Management of installed modules | ✅ |
 | `genesis secrets list · get` | Generated secrets (metadata, then the value on request) | ✅ |
-| `genesis status`, `genesis destroy` | State per module; deletion of the environment | 🚧 |
+| `genesis status`, `genesis destroy` | State per module; deletion of the environment | ✅ |
 
 ### Writing a module
 
@@ -180,6 +181,7 @@ Beyond iteration 1: air-gapped mode, monitoring, software forge, building the hy
 
 </details>
 
+- **User guide**: [docs/user-guide.md](docs/user-guide.md)
 - **Progress**: [docs/PROGRESS.md](docs/PROGRESS.md) · detailed history: [docs/journal.md](docs/journal.md)
 - **Technical debt**: [`tech-debt` issues](https://github.com/WhiteRoseLK/genesis/issues?q=is%3Aissue+is%3Aopen+label%3Atech-debt)
 - **Release notes**: [CHANGELOG.md](CHANGELOG.md)
