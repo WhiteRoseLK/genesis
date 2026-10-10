@@ -3,7 +3,7 @@ name: teleport
 version: 0.1.0
 description: "Target \"fleet\" bastion (docs/07-mvp-modules.md): access.ssh/v1 and fleet.agent/v1 (ADR-017), Teleport Auth+Proxy on its own VM, SSH agent installed on every fleet VM through fleet.agent/v1.Install"
 layer: services
-core: ">=0.1.0 <0.3.0"
+core: ">=0.1.0"
 protocol: 1
 
 capabilities: []

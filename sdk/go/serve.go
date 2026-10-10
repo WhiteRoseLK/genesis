@@ -13,10 +13,13 @@ import (
 	modulev1 "github.com/WhiteRoseLK/genesis/sdk/go/gen/module/v1"
 )
 
+// ProtocolVersion is the module lifecycle protocol version (docs/03-module-contract.md §2).
+const ProtocolVersion int32 = 1
+
 // Handshake is the go-plugin handshake shared by the core (client, see
 // internal/modulehost) and every module (server, through Serve) — docs/03 §2.
 var Handshake = plugin.HandshakeConfig{
-	ProtocolVersion:  1,
+	ProtocolVersion:  uint(ProtocolVersion),
 	MagicCookieKey:   "GENESIS_MODULE",
 	MagicCookieValue: "genesis-module-v1",
 }

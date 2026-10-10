@@ -3,7 +3,7 @@ name: fake-compute
 version: 0.1.0
 description: "provides compute.vm/v1 through real SSH containers on the seed, to test the core and the service modules without a hypervisor (docs/07-mvp-modules.md)"
 layer: platform
-core: ">=0.1.0 <0.3.0"
+core: ">=0.1.0"
 protocol: 1
 
 capabilities: [compute]

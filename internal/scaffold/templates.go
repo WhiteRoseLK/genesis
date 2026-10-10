@@ -23,7 +23,7 @@ name: {{.Name}}
 version: 0.1.0
 description: "TODO: describe {{.Name}}"
 layer: foundation
-core: ">=0.1.0 <0.3.0"
+core: ">=0.1.0"
 protocol: 1
 
 capabilities: []

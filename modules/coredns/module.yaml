@@ -3,7 +3,7 @@ name: coredns
 version: 0.1.0
 description: "Seed DNS (docs/07-mvp-modules.md): dns.zone/v1 and dns.resolver/v1 in the seed phase, zone regenerated on every UpsertRecord"
 layer: foundation
-core: ">=0.1.0 <0.3.0"
+core: ">=0.1.0"
 protocol: 1
 
 capabilities: []
