@@ -216,7 +216,11 @@ func (s *computeVMServer) EnsureVM(ctx context.Context, req *computevmv1.EnsureV
 		if err != nil {
 			return nil, err
 		}
-		return &computevmv1.VM{Id: strconv.Itoa(existing.VMID), Name: existing.Name, Ip: req.GetIp(), Status: status.Status, SshPort: sshPort}, nil
+		vmIP := req.GetIp()
+		if idx := strings.IndexByte(vmIP, '/'); idx != -1 {
+			vmIP = vmIP[:idx]
+		}
+		return &computevmv1.VM{Id: strconv.Itoa(existing.VMID), Name: existing.Name, Ip: vmIP, Status: status.Status, SshPort: sshPort}, nil
 	}
 
 	template, err := client.FindTemplateByName(ctx, cfg.Node, cfg.Image)
@@ -256,7 +260,11 @@ func (s *computeVMServer) EnsureVM(ctx context.Context, req *computevmv1.EnsureV
 	if err != nil {
 		return nil, err
 	}
-	return &computevmv1.VM{Id: strconv.Itoa(newID), Name: req.GetName(), Ip: req.GetIp(), Status: status.Status, SshPort: sshPort}, nil
+	vmIP := req.GetIp()
+	if idx := strings.IndexByte(vmIP, '/'); idx != -1 {
+		vmIP = vmIP[:idx]
+	}
+	return &computevmv1.VM{Id: strconv.Itoa(newID), Name: req.GetName(), Ip: vmIP, Status: status.Status, SshPort: sshPort}, nil
 }
 
 // sshPort: a Proxmox VM is a real VM, SSH listens on the standard port

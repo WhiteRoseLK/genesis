@@ -40,6 +40,7 @@ import (
 	"google.golang.org/protobuf/types/known/structpb"
 
 	"github.com/WhiteRoseLK/genesis/internal/broker"
+	"github.com/WhiteRoseLK/genesis/internal/ipam"
 	"github.com/WhiteRoseLK/genesis/internal/modulehost"
 	"github.com/WhiteRoseLK/genesis/internal/planner"
 	"github.com/WhiteRoseLK/genesis/internal/resolver"
@@ -66,8 +67,9 @@ type Engine struct {
 	// Secrets: direct access (not only through core.secrets/v1) for the
 	// file->vault migration (docs/06-secrets-state.md) — only the core can
 	// list ALL entries, a module only accesses its own.
-	Secrets secrets.Store
-	Router  *secrets.Router
+	Secrets   secrets.Store
+	Router    *secrets.Router
+	Allocator broker.Allocator
 }
 
 // New builds an engine: a broker registry with core.secrets/v1 already
@@ -113,10 +115,30 @@ func (e *Engine) Run(ctx context.Context, resolved *resolver.Resolved, plan *pla
 	if st.Modules == nil {
 		st.Modules = map[string]state.ModuleState{}
 	}
+	if st.AllocatedIPs == nil {
+		st.AllocatedIPs = map[string]string{}
+	}
 	if st.SecretsBackend == "vault" || st.SeedRetired {
 		if fs, ok := e.fileStore(); ok {
 			fs.SetReadOnly(true)
 		}
+	}
+
+	alloc := e.Allocator
+	if alloc == nil && resolved.Network.Pool != "" {
+		ipamAlloc, err := ipam.New(resolved.Network.Pool, ipam.Options{
+			Gateway:   resolved.Network.Gateway,
+			Reserved:  []string{resolved.Network.Gateway, resolved.Seed.Address},
+			Allocated: st.AllocatedIPs,
+			OnChange: func(allocated map[string]string) error {
+				st.AllocatedIPs = allocated
+				return state.Save(e.StateDir, st)
+			},
+		})
+		if err != nil {
+			return fmt.Errorf("initializing IPAM for network pool %q: %w", resolved.Network.Pool, err)
+		}
+		alloc = ipamAlloc
 	}
 
 	clients := map[string]*modulehost.Client{}
@@ -157,6 +179,11 @@ func (e *Engine) Run(ctx context.Context, resolved *resolver.Resolved, plan *pla
 			register, ok := broker.ForwarderFor(p.Function)
 			if !ok {
 				return fmt.Errorf("function %q (module %q): function type unknown to the core", p.Function, name)
+			}
+			if p.Function == "compute.vm/v1" && alloc != nil {
+				register = func(s *grpc.Server, conn *grpc.ClientConn) {
+					broker.ForwardComputeVMWithAllocator(s, conn, alloc)
+				}
 			}
 			// Phase-qualified key: lets a target module explicitly
 			// consume ANOTHER module's @seed function during its handover
@@ -216,10 +243,30 @@ func (e *Engine) Destroy(ctx context.Context, resolved *resolver.Resolved, plan 
 	if st.Modules == nil {
 		st.Modules = map[string]state.ModuleState{}
 	}
+	if st.AllocatedIPs == nil {
+		st.AllocatedIPs = map[string]string{}
+	}
 	if st.SecretsBackend == "vault" || st.SeedRetired {
 		if fs, ok := e.fileStore(); ok {
 			fs.SetReadOnly(true)
 		}
+	}
+
+	alloc := e.Allocator
+	if alloc == nil && resolved.Network.Pool != "" {
+		ipamAlloc, err := ipam.New(resolved.Network.Pool, ipam.Options{
+			Gateway:   resolved.Network.Gateway,
+			Reserved:  []string{resolved.Network.Gateway, resolved.Seed.Address},
+			Allocated: st.AllocatedIPs,
+			OnChange: func(allocated map[string]string) error {
+				st.AllocatedIPs = allocated
+				return state.Save(e.StateDir, st)
+			},
+		})
+		if err != nil {
+			return fmt.Errorf("initializing IPAM for network pool %q: %w", resolved.Network.Pool, err)
+		}
+		alloc = ipamAlloc
 	}
 
 	clients := map[string]*modulehost.Client{}
@@ -251,6 +298,11 @@ func (e *Engine) Destroy(ctx context.Context, resolved *resolver.Resolved, plan 
 			register, ok := broker.ForwarderFor(p.Function)
 			if !ok {
 				return fmt.Errorf("function %q (module %q): function type unknown to the core", p.Function, name)
+			}
+			if p.Function == "compute.vm/v1" && alloc != nil {
+				register = func(s *grpc.Server, conn *grpc.ClientConn) {
+					broker.ForwardComputeVMWithAllocator(s, conn, alloc)
+				}
 			}
 			for _, phase := range p.Phases {
 				e.Registry.SetModuleProvider(p.Function+"@"+phase, conn, register)
@@ -303,6 +355,13 @@ func (e *Engine) Destroy(ctx context.Context, resolved *resolver.Resolved, plan 
 			return err
 		}
 		e.audit(m.Name, "destroy", "ok")
+	}
+
+	if len(st.Modules) == 0 {
+		st.AllocatedIPs = map[string]string{}
+		if err := state.Save(e.StateDir, st); err != nil {
+			return err
+		}
 	}
 
 	return nil

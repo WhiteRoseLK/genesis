@@ -127,7 +127,11 @@ func (c *Client) ConfigureCloudInit(ctx context.Context, node string, vmid int, 
 		form.Set("sshkeys", url.QueryEscape(opts.SSHPublicKey))
 	}
 	if opts.IP != "" {
-		val := "ip=" + opts.IP
+		ip := opts.IP
+		if !strings.Contains(ip, "/") {
+			ip += "/24"
+		}
+		val := "ip=" + ip
 		if opts.Gateway != "" {
 			val += ",gw=" + opts.Gateway
 		}
