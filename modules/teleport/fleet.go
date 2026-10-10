@@ -56,7 +56,13 @@ func (m *teleportModule) installAgent(ctx context.Context, ownTarget connTarget,
 		return fmt.Errorf("generating the enrolment token: %w", err)
 	}
 
-	agentTarget := &ansiblev1.Target{Host: t.GetHost(), Port: t.GetPort(), User: t.GetUser(), SshPrivateKey: t.GetSshPrivateKey()}
+	agentTarget := &ansiblev1.Target{
+		Host:          t.GetHost(),
+		Port:          t.GetPort(),
+		User:          t.GetUser(),
+		SshPrivateKey: t.GetSshPrivateKey(),
+		SshHostKey:    t.GetSshHostKey(),
+	}
 	vars, err := sdk.NewState(map[string]any{
 		"node_name":   t.GetHost(),
 		"join_token":  joinToken,

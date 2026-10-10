@@ -11,6 +11,7 @@ import (
 	"crypto/rand"
 	"encoding/pem"
 	"os/exec"
+	"strings"
 	"testing"
 	"time"
 
@@ -167,5 +168,75 @@ func TestRunPlaybookActuallyConfiguresTarget(t *testing.T) {
 	got := dockerExec(t, target.containerID, "cat", "/tmp/marker.txt")
 	if got != "ok" {
 		t.Errorf("content of /tmp/marker.txt = %q, want %q — the playbook did not really act on the target", got, "ok")
+	}
+}
+
+// TestRunPlaybookHostKeyVerification verifies that host key checking works
+// end-to-end when SshHostKey is set (Issue #28): valid host key succeeds with
+// StrictHostKeyChecking=yes, and an invalid host key is strictly rejected.
+func TestRunPlaybookHostKeyVerification(t *testing.T) {
+	rt := testutil.RequireRuntime(t)
+	target := startSSHTarget(t, rt)
+
+	const playbook = `---
+- hosts: target
+  gather_facts: false
+  tasks:
+    - name: write a marker
+      ansible.builtin.raw: echo -n "verified" > /tmp/verified.txt
+`
+	server := &ansibleServer{runtime: rt}
+	// Initial connection to ensure sshd is ready
+	initialResp := runPlaybookWithRetry(t, server, &ansiblev1.RunPlaybookRequest{
+		Target: &ansiblev1.Target{
+			Host:          target.ip,
+			Port:          target.port,
+			User:          target.user,
+			SshPrivateKey: target.privateKeyPEM,
+		},
+		PlaybookYaml: []byte(playbook),
+	})
+	if !initialResp.GetOk() {
+		t.Fatalf("initial RunPlaybook failed:\n%s", initialResp.GetOutput())
+	}
+
+	// Read host key from target container
+	rawKey := dockerExec(t, target.containerID, "sh", "-c", "cat /config/ssh_host_keys/ssh_host_ed25519_key.pub 2>/dev/null || cat /etc/ssh/ssh_host_ed25519_key.pub 2>/dev/null")
+	hostKey := strings.TrimSpace(rawKey)
+	if hostKey == "" {
+		t.Fatalf("could not read host key from container %s", target.containerID)
+	}
+
+	// 1. With correct host key: succeeds with StrictHostKeyChecking=yes
+	validResp, err := server.RunPlaybook(context.Background(), &ansiblev1.RunPlaybookRequest{
+		Target: &ansiblev1.Target{
+			Host:          target.ip,
+			Port:          target.port,
+			User:          target.user,
+			SshPrivateKey: target.privateKeyPEM,
+			SshHostKey:    hostKey,
+		},
+		PlaybookYaml: []byte(playbook),
+	})
+	if err != nil {
+		t.Fatalf("RunPlaybook with valid host key failed with error: %v", err)
+	}
+	if !validResp.GetOk() {
+		t.Fatalf("RunPlaybook with valid host key failed:\n%s", validResp.GetOutput())
+	}
+
+	// 2. With mismatched host key: fails due to StrictHostKeyChecking=yes
+	invalidResp, err := server.RunPlaybook(context.Background(), &ansiblev1.RunPlaybookRequest{
+		Target: &ansiblev1.Target{
+			Host:          target.ip,
+			Port:          target.port,
+			User:          target.user,
+			SshPrivateKey: target.privateKeyPEM,
+			SshHostKey:    "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIWrongHostKeyThatDoesNotMatchTarget1234567890",
+		},
+		PlaybookYaml: []byte(playbook),
+	})
+	if err == nil && invalidResp.GetOk() {
+		t.Errorf("RunPlaybook with mismatched host key unexpectedly succeeded:\n%s", invalidResp.GetOutput())
 	}
 }

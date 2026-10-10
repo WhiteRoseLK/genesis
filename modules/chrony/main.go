@@ -138,7 +138,13 @@ func (m *chronyModule) dialWithToken(token string) error {
 // error). It returns true when an agent is enrolled.
 func (m *chronyModule) installFleetAgents(ctx context.Context, target *ansiblev1.Target) (bool, error) {
 	_, err := m.fleetAgentClient.Install(ctx, &fleetagentv1.InstallRequest{
-		Target: &fleetagentv1.Target{Host: target.GetHost(), Port: target.GetPort(), User: target.GetUser(), SshPrivateKey: target.GetSshPrivateKey()},
+		Target: &fleetagentv1.Target{
+			Host:          target.GetHost(),
+			Port:          target.GetPort(),
+			User:          target.GetUser(),
+			SshPrivateKey: target.GetSshPrivateKey(),
+			SshHostKey:    target.GetSshHostKey(),
+		},
 	})
 	if err != nil {
 		if status.Code(err) == codes.Unimplemented {
@@ -224,6 +230,9 @@ func (m *chronyModule) Provision(ctx context.Context, req *modulev1.StepRequest)
 	state["vm_name"] = name
 	state["vm_ip"] = vm.GetIp()
 	state["vm_ssh_port"] = int64(vm.GetSshPort())
+	if vm.GetSshHostPublicKey() != "" {
+		state["vm_host_key"] = vm.GetSshHostPublicKey()
+	}
 	s, err := sdk.NewState(state)
 	if err != nil {
 		return nil, err
@@ -233,6 +242,10 @@ func (m *chronyModule) Provision(ctx context.Context, req *modulev1.StepRequest)
 
 func (m *chronyModule) targetFromState(ctx context.Context, req *modulev1.StepRequest, pair sshKeyPair) (*ansiblev1.Target, error) {
 	state := sdk.StateMap(req.GetState())
+	var hostKey string
+	if hk, ok := state["vm_host_key"].(string); ok {
+		hostKey = hk
+	}
 	if state["admin_method"] == "teleport" {
 		certResp, err := m.accessSSHClient.SignUserKey(ctx, &accesssshv1.SignUserKeyRequest{
 			Principals: []string{sshUser},
@@ -246,6 +259,7 @@ func (m *chronyModule) targetFromState(ctx context.Context, req *modulev1.StepRe
 			User:              sshUser,
 			SshPrivateKey:     certResp.GetPrivateKeyOpenssh(),
 			SshCertificatePem: certResp.GetCertificateOpenssh(),
+			SshHostKey:        hostKey,
 		}, nil
 	}
 	port, _ := state["vm_ssh_port"].(int64)
@@ -262,6 +276,7 @@ func (m *chronyModule) targetFromState(ctx context.Context, req *modulev1.StepRe
 		Port:          int32(port),
 		User:          sshUser,
 		SshPrivateKey: pair.PrivateKeyOpenSSH,
+		SshHostKey:    hostKey,
 	}, nil
 }
 
@@ -356,6 +371,7 @@ func (m *chronyModule) Verify(ctx context.Context, req *modulev1.StepRequest) (*
 		Port:          verifierVM.GetSshPort(),
 		User:          sshUser,
 		SshPrivateKey: pair.PrivateKeyOpenSSH,
+		SshHostKey:    verifierVM.GetSshHostPublicKey(),
 	}
 	vars, err := sdk.NewState(map[string]any{"ntp_server": fmt.Sprint(serverState["vm_ip"])})
 	if err != nil {

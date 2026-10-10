@@ -25,6 +25,10 @@ message Target {
   // ssh_service speaks standard SSH on its own port, not a proprietary
   // protocol).
   string ssh_certificate_pem = 5;
+  // ssh_host_key: public host key of the target VM (e.g. "ssh-ed25519 AAAAC3...").
+  // When set, StrictHostKeyChecking=yes is enabled and the key is written to
+  // /work/known_hosts to protect against man-in-the-middle / IP spoofing attacks.
+  string ssh_host_key = 6;
 }
 
 message RunPlaybookRequest {

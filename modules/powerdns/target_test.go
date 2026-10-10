@@ -75,6 +75,29 @@ func TestPowerDNSTargetFromState(t *testing.T) {
 		if ansibleTarget.GetSshCertificatePem() != "" {
 			t.Errorf("got certificate %q, want empty", ansibleTarget.GetSshCertificatePem())
 		}
+		if ansibleTarget.GetSshHostKey() != "" {
+			t.Errorf("got host key %q, want empty", ansibleTarget.GetSshHostKey())
+		}
+	})
+
+	t.Run("direct ssh with host key", func(t *testing.T) {
+		m := &powerdnsModule{}
+		st, err := sdk.NewState(map[string]any{
+			"vm_ip":       "10.0.0.6",
+			"vm_ssh_port": int64(22),
+			"vm_host_key": "ssh-ed25519 AAAAC3...",
+		})
+		if err != nil {
+			t.Fatalf("NewState: %v", err)
+		}
+		target, err := m.targetFromState(ctx, &modulev1.StepRequest{State: st}, pair)
+		if err != nil {
+			t.Fatalf("targetFromState: %v", err)
+		}
+		ansibleTarget := target.ansible()
+		if ansibleTarget.GetSshHostKey() != "ssh-ed25519 AAAAC3..." {
+			t.Errorf("got host key %q, want ssh-ed25519 AAAAC3...", ansibleTarget.GetSshHostKey())
+		}
 	})
 
 	t.Run("teleport enrolled switches to port 3022 with certificate", func(t *testing.T) {

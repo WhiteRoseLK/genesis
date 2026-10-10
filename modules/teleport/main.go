@@ -84,14 +84,15 @@ type connTarget struct {
 	Port       int32
 	User       string
 	PrivateKey string
+	HostKey    string
 }
 
 func (t connTarget) ansible() *ansiblev1.Target {
-	return &ansiblev1.Target{Host: t.Host, Port: t.Port, User: t.User, SshPrivateKey: t.PrivateKey}
+	return &ansiblev1.Target{Host: t.Host, Port: t.Port, User: t.User, SshPrivateKey: t.PrivateKey, SshHostKey: t.HostKey}
 }
 
 func (t connTarget) osBase() *osbasev1.Target {
-	return &osbasev1.Target{Host: t.Host, Port: t.Port, User: t.User, SshPrivateKey: t.PrivateKey}
+	return &osbasev1.Target{Host: t.Host, Port: t.Port, User: t.User, SshPrivateKey: t.PrivateKey, SshHostKey: t.HostKey}
 }
 
 type teleportModule struct {
@@ -263,7 +264,11 @@ func targetFromState(req *modulev1.StepRequest, pair sshKeyPair) connTarget {
 	case int32:
 		port = int64(v)
 	}
-	return connTarget{Host: host, Port: int32(port), User: user, PrivateKey: pair.PrivateKeyOpenSSH}
+	var hostKey string
+	if hk, ok := state["vm_host_key"].(string); ok {
+		hostKey = hk
+	}
+	return connTarget{Host: host, Port: int32(port), User: user, PrivateKey: pair.PrivateKeyOpenSSH, HostKey: hostKey}
 }
 
 // Provision creates (or finds again, EnsureVM is idempotent) teleport's
@@ -287,6 +292,9 @@ func (m *teleportModule) Provision(ctx context.Context, req *modulev1.StepReques
 	state["vm_name"] = name
 	state["vm_ip"] = vm.GetIp()
 	state["vm_ssh_port"] = int64(vm.GetSshPort())
+	if vm.GetSshHostPublicKey() != "" {
+		state["vm_host_key"] = vm.GetSshHostPublicKey()
+	}
 	state["cluster_name"] = clusterNameFromConfig(req)
 	s, err := sdk.NewState(state)
 	if err != nil {

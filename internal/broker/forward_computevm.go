@@ -64,6 +64,9 @@ func (f *forwardingComputeVM) EnsureVM(ctx context.Context, req *computevmv1.Ens
 	if vm != nil && vm.GetIp() == "" && req.GetIp() != "" {
 		vm.Ip = req.GetIp()
 	}
+	if vm != nil && vm.GetSshHostPublicKey() == "" && req.GetSshHostPublicKey() != "" {
+		vm.SshHostPublicKey = req.GetSshHostPublicKey()
+	}
 	return vm, nil
 }
 

@@ -17,6 +17,8 @@ message Target {
   int32 port = 2;
   string user = 3;
   string ssh_private_key = 4; // OpenSSH private key, obtained through core.secrets/v1
+  // ssh_host_key: public host key of the target VM.
+  string ssh_host_key = 5;
 }
 
 message InstallRequest {

@@ -32,6 +32,8 @@ type Target struct {
 	Port          int32                  `protobuf:"varint,2,opt,name=port,proto3" json:"port,omitempty"`
 	User          string                 `protobuf:"bytes,3,opt,name=user,proto3" json:"user,omitempty"`
 	SshPrivateKey string                 `protobuf:"bytes,4,opt,name=ssh_private_key,json=sshPrivateKey,proto3" json:"ssh_private_key,omitempty"` // OpenSSH private key, obtained through core.secrets/v1
+	// ssh_host_key: public host key of the target VM.
+	SshHostKey    string `protobuf:"bytes,5,opt,name=ssh_host_key,json=sshHostKey,proto3" json:"ssh_host_key,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -90,6 +92,13 @@ func (x *Target) GetUser() string {
 func (x *Target) GetSshPrivateKey() string {
 	if x != nil {
 		return x.SshPrivateKey
+	}
+	return ""
+}
+
+func (x *Target) GetSshHostKey() string {
+	if x != nil {
+		return x.SshHostKey
 	}
 	return ""
 }
@@ -178,12 +187,14 @@ var File_functions_fleet_agent_v1_agent_proto protoreflect.FileDescriptor
 
 const file_functions_fleet_agent_v1_agent_proto_rawDesc = "" +
 	"\n" +
-	"$functions/fleet/agent/v1/agent.proto\x12\x18functions.fleet.agent.v1\"l\n" +
+	"$functions/fleet/agent/v1/agent.proto\x12\x18functions.fleet.agent.v1\"\x8e\x01\n" +
 	"\x06Target\x12\x12\n" +
 	"\x04host\x18\x01 \x01(\tR\x04host\x12\x12\n" +
 	"\x04port\x18\x02 \x01(\x05R\x04port\x12\x12\n" +
 	"\x04user\x18\x03 \x01(\tR\x04user\x12&\n" +
-	"\x0fssh_private_key\x18\x04 \x01(\tR\rsshPrivateKey\"J\n" +
+	"\x0fssh_private_key\x18\x04 \x01(\tR\rsshPrivateKey\x12 \n" +
+	"\fssh_host_key\x18\x05 \x01(\tR\n" +
+	"sshHostKey\"J\n" +
 	"\x0eInstallRequest\x128\n" +
 	"\x06target\x18\x01 \x01(\v2 .functions.fleet.agent.v1.TargetR\x06target\"\x11\n" +
 	"\x0fInstallResponse2l\n" +

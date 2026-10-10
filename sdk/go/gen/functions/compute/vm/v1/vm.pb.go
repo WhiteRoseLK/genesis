@@ -112,12 +112,14 @@ type EnsureVMRequest struct {
 	Size  string                 `protobuf:"bytes,3,opt,name=size,proto3" json:"size,omitempty"`
 	Extra map[string]string      `protobuf:"bytes,4,rep,name=extra,proto3" json:"extra,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
 	// cloud-init (docs/07-mvp-modules.md: "IP, service SSH key, genesis user").
-	Ip            string `protobuf:"bytes,5,opt,name=ip,proto3" json:"ip,omitempty"`
-	Gateway       string `protobuf:"bytes,6,opt,name=gateway,proto3" json:"gateway,omitempty"`
-	SshPublicKey  string `protobuf:"bytes,7,opt,name=ssh_public_key,json=sshPublicKey,proto3" json:"ssh_public_key,omitempty"`
-	User          string `protobuf:"bytes,8,opt,name=user,proto3" json:"user,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	Ip           string `protobuf:"bytes,5,opt,name=ip,proto3" json:"ip,omitempty"`
+	Gateway      string `protobuf:"bytes,6,opt,name=gateway,proto3" json:"gateway,omitempty"`
+	SshPublicKey string `protobuf:"bytes,7,opt,name=ssh_public_key,json=sshPublicKey,proto3" json:"ssh_public_key,omitempty"`
+	User         string `protobuf:"bytes,8,opt,name=user,proto3" json:"user,omitempty"`
+	// ssh_host_public_key: public host key configured or expected on the VM.
+	SshHostPublicKey string `protobuf:"bytes,9,opt,name=ssh_host_public_key,json=sshHostPublicKey,proto3" json:"ssh_host_public_key,omitempty"`
+	unknownFields    protoimpl.UnknownFields
+	sizeCache        protoimpl.SizeCache
 }
 
 func (x *EnsureVMRequest) Reset() {
@@ -206,6 +208,13 @@ func (x *EnsureVMRequest) GetUser() string {
 	return ""
 }
 
+func (x *EnsureVMRequest) GetSshHostPublicKey() string {
+	if x != nil {
+		return x.SshHostPublicKey
+	}
+	return ""
+}
+
 type VM struct {
 	state  protoimpl.MessageState `protogen:"open.v1"`
 	Id     string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
@@ -215,9 +224,11 @@ type VM struct {
 	// ssh_port: 22 for a real VM; may differ for a provider that simulates
 	// VMs as containers (fake-compute) — modules that connect to it
 	// (os.base/v1.Target, etc.) must use this port, not assume 22.
-	SshPort       int32 `protobuf:"varint,5,opt,name=ssh_port,json=sshPort,proto3" json:"ssh_port,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	SshPort int32 `protobuf:"varint,5,opt,name=ssh_port,json=sshPort,proto3" json:"ssh_port,omitempty"`
+	// ssh_host_public_key: public host key of the VM, if known or configured.
+	SshHostPublicKey string `protobuf:"bytes,6,opt,name=ssh_host_public_key,json=sshHostPublicKey,proto3" json:"ssh_host_public_key,omitempty"`
+	unknownFields    protoimpl.UnknownFields
+	sizeCache        protoimpl.SizeCache
 }
 
 func (x *VM) Reset() {
@@ -283,6 +294,13 @@ func (x *VM) GetSshPort() int32 {
 		return x.SshPort
 	}
 	return 0
+}
+
+func (x *VM) GetSshHostPublicKey() string {
+	if x != nil {
+		return x.SshHostPublicKey
+	}
+	return ""
 }
 
 type GetVMRequest struct {
@@ -496,7 +514,7 @@ const file_functions_compute_vm_v1_vm_proto_rawDesc = "" +
 	" functions/compute/vm/v1/vm.proto\x12\x17functions.compute.vm.v1\x1a\x1fgoogle/protobuf/timestamp.proto\"*\n" +
 	"\x12EnsureImageRequest\x12\x14\n" +
 	"\x05image\x18\x01 \x01(\tR\x05image\"\x15\n" +
-	"\x13EnsureImageResponse\"\xb4\x02\n" +
+	"\x13EnsureImageResponse\"\xe3\x02\n" +
 	"\x0fEnsureVMRequest\x12\x12\n" +
 	"\x04name\x18\x01 \x01(\tR\x04name\x12\x10\n" +
 	"\x03env\x18\x02 \x01(\tR\x03env\x12\x12\n" +
@@ -505,17 +523,19 @@ const file_functions_compute_vm_v1_vm_proto_rawDesc = "" +
 	"\x02ip\x18\x05 \x01(\tR\x02ip\x12\x18\n" +
 	"\agateway\x18\x06 \x01(\tR\agateway\x12$\n" +
 	"\x0essh_public_key\x18\a \x01(\tR\fsshPublicKey\x12\x12\n" +
-	"\x04user\x18\b \x01(\tR\x04user\x1a8\n" +
+	"\x04user\x18\b \x01(\tR\x04user\x12-\n" +
+	"\x13ssh_host_public_key\x18\t \x01(\tR\x10sshHostPublicKey\x1a8\n" +
 	"\n" +
 	"ExtraEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
-	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"k\n" +
+	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"\x9a\x01\n" +
 	"\x02VM\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x12\n" +
 	"\x04name\x18\x02 \x01(\tR\x04name\x12\x0e\n" +
 	"\x02ip\x18\x03 \x01(\tR\x02ip\x12\x16\n" +
 	"\x06status\x18\x04 \x01(\tR\x06status\x12\x19\n" +
-	"\bssh_port\x18\x05 \x01(\x05R\asshPort\"\"\n" +
+	"\bssh_port\x18\x05 \x01(\x05R\asshPort\x12-\n" +
+	"\x13ssh_host_public_key\x18\x06 \x01(\tR\x10sshHostPublicKey\"\"\n" +
 	"\fGetVMRequest\x12\x12\n" +
 	"\x04name\x18\x01 \x01(\tR\x04name\"%\n" +
 	"\x0fDeleteVMRequest\x12\x12\n" +

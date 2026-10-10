@@ -4,6 +4,7 @@ package broker
 
 import (
 	"archive/tar"
+	"bufio"
 	"bytes"
 	"context"
 	"encoding/json"
@@ -64,6 +65,11 @@ func (a *ansibleServer) RunPlaybook(ctx context.Context, req *ansiblev1.RunPlayb
 		return nil, fmt.Errorf("preparing the playbook files: %w", err)
 	}
 
+	hostKeyChecking := "False"
+	if strings.TrimSpace(target.GetSshHostKey()) != "" {
+		hostKeyChecking = "True"
+	}
+
 	result, err := a.runtime.Run(ctx, runner.RunOptions{
 		Image:   ansibleImage,
 		Command: []string{"sh", "-c", "tar -xf - -C /work && exec " + playbookCmd},
@@ -71,7 +77,7 @@ func (a *ansibleServer) RunPlaybook(ctx context.Context, req *ansiblev1.RunPlayb
 		// to the container and the files are extracted there as 0600.
 		Tmpfs: []string{"/work:rw,mode=1777"},
 		Stdin: archive,
-		Env:   map[string]string{"ANSIBLE_HOST_KEY_CHECKING": "False"},
+		Env:   map[string]string{"ANSIBLE_HOST_KEY_CHECKING": hostKeyChecking},
 	})
 	if err != nil {
 		return nil, fmt.Errorf("running the ansible container: %w", err)
@@ -88,11 +94,19 @@ func (a *ansibleServer) RunPlaybook(ctx context.Context, req *ansiblev1.RunPlayb
 func targetFiles(target *ansiblev1.Target) map[string][]byte {
 	files := map[string][]byte{
 		"id_target": []byte(target.GetSshPrivateKey()),
-		"inventory.ini": []byte(fmt.Sprintf(
-			"target ansible_host=%s ansible_port=%d ansible_user=%s ansible_ssh_private_key_file=/work/id_target ansible_ssh_common_args='-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null'\n",
-			target.GetHost(), target.GetPort(), target.GetUser(),
-		)),
 	}
+
+	sshCommonArgs := "-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null"
+	if hostKey := strings.TrimSpace(target.GetSshHostKey()); hostKey != "" {
+		files["known_hosts"] = []byte(formatKnownHosts(target.GetHost(), target.GetPort(), hostKey))
+		sshCommonArgs = "-o StrictHostKeyChecking=yes -o UserKnownHostsFile=/work/known_hosts"
+	}
+
+	files["inventory.ini"] = []byte(fmt.Sprintf(
+		"target ansible_host=%s ansible_port=%d ansible_user=%s ansible_ssh_private_key_file=/work/id_target ansible_ssh_common_args='%s'\n",
+		target.GetHost(), target.GetPort(), target.GetUser(), sshCommonArgs,
+	))
+
 	// ssh_certificate_pem (ADR-018): OpenSSH looks up a certificate next to
 	// its private key by convention, named "<keyfile>-cert.pub" — no extra
 	// ssh_config option needed to make the client present it.
@@ -100,6 +114,37 @@ func targetFiles(target *ansiblev1.Target) map[string][]byte {
 		files["id_target-cert.pub"] = []byte(cert)
 	}
 	return files
+}
+
+// formatKnownHosts formats the host key entry for OpenSSH's known_hosts file.
+// If port is standard (22 or 0), the host pattern is simply the host; otherwise,
+// it is formatted as [host]:port according to OpenSSH known_hosts specifications.
+func formatKnownHosts(host string, port int32, key string) string {
+	var hostPattern string
+	if port == 0 || port == 22 {
+		hostPattern = host
+	} else {
+		hostPattern = fmt.Sprintf("[%s]:%d", host, port)
+	}
+
+	var sb strings.Builder
+	scanner := bufio.NewScanner(strings.NewReader(key))
+	for scanner.Scan() {
+		line := strings.TrimSpace(scanner.Text())
+		if line == "" || strings.HasPrefix(line, "#") {
+			continue
+		}
+		if strings.HasPrefix(line, hostPattern) || strings.HasPrefix(line, "@") || strings.HasPrefix(line, "|1|") {
+			sb.WriteString(line)
+			sb.WriteByte('\n')
+		} else {
+			sb.WriteString(hostPattern)
+			sb.WriteByte(' ')
+			sb.WriteString(line)
+			sb.WriteByte('\n')
+		}
+	}
+	return sb.String()
 }
 
 // tarFiles builds an in-memory tar archive, each file as 0600.
