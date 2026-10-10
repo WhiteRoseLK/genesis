@@ -10,6 +10,7 @@ import (
 	"github.com/spf13/cobra"
 	"google.golang.org/protobuf/types/known/structpb"
 
+	"github.com/WhiteRoseLK/genesis/internal/ipam"
 	"github.com/WhiteRoseLK/genesis/internal/modulehost"
 	"github.com/WhiteRoseLK/genesis/internal/resolver"
 	modulev1 "github.com/WhiteRoseLK/genesis/sdk/go/gen/module/v1"
@@ -34,6 +35,12 @@ func newValidateCmd() *cobra.Command {
 		out := cmd.OutOrStdout()
 		if _, err := fmt.Fprintf(out, "%s: valid structure and module resolution.\n", file); err != nil {
 			return err
+		}
+
+		if resolved.Network.Pool != "" || resolved.Network.CIDR != "" {
+			if err := ipam.ValidateNetwork(resolved.Network, resolved.Seed); err != nil {
+				return fmt.Errorf("network validation failed: %w", err)
+			}
 		}
 
 		var hasErrors bool

@@ -60,3 +60,53 @@ capabilities:
 		t.Fatalf("validate should have failed for missing module, got success:\n%s", out)
 	}
 }
+
+func TestValidateNetworkBoundaries(t *testing.T) {
+	useTempHomeKeepingGoCache(t)
+	lockFile := filepath.Join(t.TempDir(), "genesis.lock")
+	installChainModules(t, lockFile)
+
+	// 1. Gateway inside pool
+	badGwSpec := filepath.Join(t.TempDir(), "bad_gw.yaml")
+	gwContent := `apiVersion: genesis/v1alpha1
+kind: Environment
+metadata: { name: lab }
+network: { cidr: 10.10.0.0/24, gateway: 10.10.0.60, pool: 10.10.0.50-10.10.0.99, domain: lab.internal }
+seed: { address: 10.10.0.10 }
+capabilities:
+  test-a: {}
+`
+	if err := os.WriteFile(badGwSpec, []byte(gwContent), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	out, err := runCLI(t, "validate", "-f", badGwSpec)
+	if err == nil {
+		t.Fatalf("validate should have failed when gateway is inside pool, got success:\n%s", out)
+	}
+	if !strings.Contains(out, "network validation failed") {
+		t.Errorf("validate stdout = %q, want network validation failed error", out)
+	}
+
+	// 2. Seed address inside pool
+	badSeedSpec := filepath.Join(t.TempDir(), "bad_seed.yaml")
+	seedContent := `apiVersion: genesis/v1alpha1
+kind: Environment
+metadata: { name: lab }
+network: { cidr: 10.10.0.0/24, gateway: 10.10.0.1, pool: 10.10.0.50-10.10.0.99, domain: lab.internal }
+seed: { address: 10.10.0.60 }
+capabilities:
+  test-a: {}
+`
+	if err := os.WriteFile(badSeedSpec, []byte(seedContent), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	out, err = runCLI(t, "validate", "-f", badSeedSpec)
+	if err == nil {
+		t.Fatalf("validate should have failed when seed address is inside pool, got success:\n%s", out)
+	}
+	if !strings.Contains(out, "network validation failed") {
+		t.Errorf("validate stdout = %q, want network validation failed error", out)
+	}
+}

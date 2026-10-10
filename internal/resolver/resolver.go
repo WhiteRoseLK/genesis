@@ -44,6 +44,8 @@ type Resolved struct {
 	// different providers per phase (docs/05-bootstrap-lifecycle.md: CoreDNS
 	// in the seed, PowerDNS as the target, both dns.zone/v1).
 	FunctionProviders map[string]map[string]string
+	Network           spec.Network
+	Seed              spec.Seed
 }
 
 // ProviderFor returns the module providing function for phase. If phase is
@@ -110,6 +112,8 @@ func Resolve(env *spec.Environment, installed []modulehost.Installed) (*Resolved
 		Modules:           map[string]*Module{},
 		CapabilityModule:  map[string]string{},
 		FunctionProviders: map[string]map[string]string{},
+		Network:           env.Network,
+		Seed:              env.Seed,
 	}
 
 	// 1. Capability -> module (explicit or default), doc 04.

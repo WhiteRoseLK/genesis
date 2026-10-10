@@ -24,6 +24,8 @@ type State struct {
 	// is what lets `Check` find that a step is already compliant
 	// (internal/engine, milestone M4).
 	Modules map[string]ModuleState `json:"modules,omitempty"`
+	// AllocatedIPs maps VM name to allocated IPv4 address from network.pool.
+	AllocatedIPs map[string]string `json:"allocated_ips,omitempty"`
 }
 
 // ModuleState is a module's own state, opaque to the core.
@@ -42,5 +44,6 @@ func New() *State {
 		SchemaVersion:  currentSchemaVersion,
 		SecretsBackend: "file",
 		Modules:        map[string]ModuleState{},
+		AllocatedIPs:   map[string]string{},
 	}
 }
