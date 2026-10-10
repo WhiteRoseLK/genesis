@@ -83,3 +83,125 @@ func TestRedactValuesMasksSecretsFromVars(t *testing.T) {
 		t.Errorf("short value wrongly masked: %s", got)
 	}
 }
+
+func TestTargetFilesWithoutHostKeyDisablesStrictHostKeyChecking(t *testing.T) {
+	files := targetFiles(&ansiblev1.Target{
+		Host:          "10.0.0.5",
+		Port:          22,
+		User:          "genesis",
+		SshPrivateKey: "key",
+	})
+	if _, ok := files["known_hosts"]; ok {
+		t.Errorf("known_hosts present although ssh_host_key is empty: %v", files)
+	}
+	inventory := string(files["inventory.ini"])
+	if !strings.Contains(inventory, "StrictHostKeyChecking=no") {
+		t.Errorf("inventory does not disable host key checking when ssh_host_key is empty: %s", inventory)
+	}
+	if !strings.Contains(inventory, "UserKnownHostsFile=/dev/null") {
+		t.Errorf("inventory does not set UserKnownHostsFile=/dev/null: %s", inventory)
+	}
+}
+
+func TestTargetFilesWithHostKeyEnablesStrictHostKeyChecking(t *testing.T) {
+	const hostKey = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIExampleHostKeyPublic123"
+	files := targetFiles(&ansiblev1.Target{
+		Host:          "10.0.0.5",
+		Port:          22,
+		User:          "genesis",
+		SshPrivateKey: "key",
+		SshHostKey:    hostKey,
+	})
+
+	knownHosts, ok := files["known_hosts"]
+	if !ok {
+		t.Fatalf("known_hosts missing from targetFiles: %v", files)
+	}
+	expectedEntry := "10.0.0.5 " + hostKey + "\n"
+	if string(knownHosts) != expectedEntry {
+		t.Errorf("known_hosts = %q, want %q", string(knownHosts), expectedEntry)
+	}
+
+	inventory := string(files["inventory.ini"])
+	if !strings.Contains(inventory, "StrictHostKeyChecking=yes") {
+		t.Errorf("inventory does not enable StrictHostKeyChecking=yes: %s", inventory)
+	}
+	if !strings.Contains(inventory, "UserKnownHostsFile=/work/known_hosts") {
+		t.Errorf("inventory does not point UserKnownHostsFile to /work/known_hosts: %s", inventory)
+	}
+}
+
+func TestTargetFilesWithHostKeyNonStandardPort(t *testing.T) {
+	const hostKey = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIExampleHostKeyPublic123"
+	files := targetFiles(&ansiblev1.Target{
+		Host:          "10.0.0.5",
+		Port:          2222,
+		User:          "genesis",
+		SshPrivateKey: "key",
+		SshHostKey:    hostKey,
+	})
+
+	knownHosts, ok := files["known_hosts"]
+	if !ok {
+		t.Fatalf("known_hosts missing from targetFiles: %v", files)
+	}
+	expectedEntry := "[10.0.0.5]:2222 " + hostKey + "\n"
+	if string(knownHosts) != expectedEntry {
+		t.Errorf("known_hosts = %q, want %q", string(knownHosts), expectedEntry)
+	}
+}
+
+func TestFormatKnownHosts(t *testing.T) {
+	tests := []struct {
+		name string
+		host string
+		port int32
+		key  string
+		want string
+	}{
+		{
+			name: "standard port 22 bare key",
+			host: "10.0.0.5",
+			port: 22,
+			key:  "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAI123",
+			want: "10.0.0.5 ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAI123\n",
+		},
+		{
+			name: "port 0 defaults to standard host pattern",
+			host: "10.0.0.5",
+			port: 0,
+			key:  "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAI123",
+			want: "10.0.0.5 ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAI123\n",
+		},
+		{
+			name: "non-standard port brackets pattern",
+			host: "10.0.0.5",
+			port: 3022,
+			key:  "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAI123",
+			want: "[10.0.0.5]:3022 ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAI123\n",
+		},
+		{
+			name: "already formatted with host pattern",
+			host: "10.0.0.5",
+			port: 22,
+			key:  "10.0.0.5 ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAI123",
+			want: "10.0.0.5 ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAI123\n",
+		},
+		{
+			name: "multi-line with comments and whitespace",
+			host: "10.0.0.5",
+			port: 22,
+			key:  "# host key comment\n\nssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAI123\nssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQC...\n",
+			want: "10.0.0.5 ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAI123\n10.0.0.5 ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQC...\n",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := formatKnownHosts(tt.host, tt.port, tt.key)
+			if got != tt.want {
+				t.Errorf("formatKnownHosts() = %q, want %q", got, tt.want)
+			}
+		})
+	}
+}

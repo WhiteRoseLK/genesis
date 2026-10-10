@@ -32,6 +32,8 @@ message EnsureVMRequest {
   string gateway = 6;
   string ssh_public_key = 7;
   string user = 8;
+  // ssh_host_public_key: public host key configured or expected on the VM.
+  string ssh_host_public_key = 9;
 }
 
 message VM {
@@ -43,6 +45,8 @@ message VM {
   // VMs as containers (fake-compute) — modules that connect to it
   // (os.base/v1.Target, etc.) must use this port, not assume 22.
   int32 ssh_port = 5;
+  // ssh_host_public_key: public host key of the VM, if known or configured.
+  string ssh_host_public_key = 6;
 }
 
 message GetVMRequest {

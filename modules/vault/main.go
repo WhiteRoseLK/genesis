@@ -191,7 +191,13 @@ func (m *vaultModule) dialWithToken(token string) error {
 // error), the same method as modules/chrony and modules/powerdns. It returns true when an agent is enrolled.
 func (m *vaultModule) installFleetAgents(ctx context.Context, target connTarget) (bool, error) {
 	_, err := m.fleetAgentClient.Install(ctx, &fleetagentv1.InstallRequest{
-		Target: &fleetagentv1.Target{Host: target.Host, Port: target.Port, User: target.User, SshPrivateKey: target.PrivateKey},
+		Target: &fleetagentv1.Target{
+			Host:          target.Host,
+			Port:          target.Port,
+			User:          target.User,
+			SshPrivateKey: target.PrivateKey,
+			SshHostKey:    target.HostKey,
+		},
 	})
 	if err != nil {
 		if status.Code(err) == codes.Unimplemented {
@@ -253,6 +259,7 @@ type connTarget struct {
 	User           string
 	PrivateKey     string
 	CertificatePem string
+	HostKey        string
 }
 
 func (t connTarget) ansible() *ansiblev1.Target {
@@ -262,15 +269,20 @@ func (t connTarget) ansible() *ansiblev1.Target {
 		User:              t.User,
 		SshPrivateKey:     t.PrivateKey,
 		SshCertificatePem: t.CertificatePem,
+		SshHostKey:        t.HostKey,
 	}
 }
 
 func (t connTarget) osBase() *osbasev1.Target {
-	return &osbasev1.Target{Host: t.Host, Port: t.Port, User: t.User, SshPrivateKey: t.PrivateKey}
+	return &osbasev1.Target{Host: t.Host, Port: t.Port, User: t.User, SshPrivateKey: t.PrivateKey, SshHostKey: t.HostKey}
 }
 
 func (m *vaultModule) targetFromState(ctx context.Context, req *modulev1.StepRequest, pair sshKeyPair) (connTarget, error) {
 	state := sdk.StateMap(req.GetState())
+	var hostKey string
+	if hk, ok := state["vm_host_key"].(string); ok {
+		hostKey = hk
+	}
 	if state["admin_method"] == "teleport" {
 		certResp, err := m.accessSSHClient.SignUserKey(ctx, &accesssshv1.SignUserKeyRequest{
 			Principals: []string{sshUser},
@@ -284,6 +296,7 @@ func (m *vaultModule) targetFromState(ctx context.Context, req *modulev1.StepReq
 			User:           sshUser,
 			PrivateKey:     certResp.GetPrivateKeyOpenssh(),
 			CertificatePem: certResp.GetCertificateOpenssh(),
+			HostKey:        hostKey,
 		}, nil
 	}
 	var port int64
@@ -293,7 +306,7 @@ func (m *vaultModule) targetFromState(ctx context.Context, req *modulev1.StepReq
 	case float64:
 		port = int64(v)
 	}
-	return connTarget{Host: fmt.Sprint(state["vm_ip"]), Port: int32(port), User: sshUser, PrivateKey: pair.PrivateKeyOpenSSH}, nil
+	return connTarget{Host: fmt.Sprint(state["vm_ip"]), Port: int32(port), User: sshUser, PrivateKey: pair.PrivateKeyOpenSSH, HostKey: hostKey}, nil
 }
 
 // Provision creates (or finds again, EnsureVM is idempotent) vault's dedicated
@@ -317,6 +330,9 @@ func (m *vaultModule) Provision(ctx context.Context, req *modulev1.StepRequest) 
 	state["vm_name"] = name
 	state["vm_ip"] = vm.GetIp()
 	state["vm_ssh_port"] = int64(vm.GetSshPort())
+	if vm.GetSshHostPublicKey() != "" {
+		state["vm_host_key"] = vm.GetSshHostPublicKey()
+	}
 	s, err := sdk.NewState(state)
 	if err != nil {
 		return nil, err

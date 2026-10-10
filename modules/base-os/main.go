@@ -134,6 +134,7 @@ func toAnsibleTarget(t *osbasev1.Target) *ansiblev1.Target {
 		Port:          t.GetPort(),
 		User:          t.GetUser(),
 		SshPrivateKey: t.GetSshPrivateKey(),
+		SshHostKey:    t.GetSshHostKey(),
 	}
 }
 

@@ -59,6 +59,24 @@ func TestTargetFromState(t *testing.T) {
 			t.Errorf("User = %q, want \"custom-user\"", target.User)
 		}
 	})
+
+	t.Run("host key in state", func(t *testing.T) {
+		st, err := sdk.NewState(map[string]any{
+			"vm_ip":       "10.0.0.15",
+			"vm_ssh_port": int64(22),
+			"vm_host_key": "ssh-ed25519 AAAAC3...",
+		})
+		if err != nil {
+			t.Fatalf("NewState: %v", err)
+		}
+		target := targetFromState(&modulev1.StepRequest{State: st}, pair)
+		if target.HostKey != "ssh-ed25519 AAAAC3..." {
+			t.Errorf("HostKey = %q, want \"ssh-ed25519 AAAAC3...\"", target.HostKey)
+		}
+		if target.ansible().GetSshHostKey() != "ssh-ed25519 AAAAC3..." {
+			t.Errorf("ansible SshHostKey = %q, want \"ssh-ed25519 AAAAC3...\"", target.ansible().GetSshHostKey())
+		}
+	})
 }
 
 func TestCheckRestoresState(t *testing.T) {

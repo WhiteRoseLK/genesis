@@ -39,8 +39,12 @@ type Target struct {
 	// ssh_service speaks standard SSH on its own port, not a proprietary
 	// protocol).
 	SshCertificatePem string `protobuf:"bytes,5,opt,name=ssh_certificate_pem,json=sshCertificatePem,proto3" json:"ssh_certificate_pem,omitempty"`
-	unknownFields     protoimpl.UnknownFields
-	sizeCache         protoimpl.SizeCache
+	// ssh_host_key: public host key of the target VM (e.g. "ssh-ed25519 AAAAC3...").
+	// When set, StrictHostKeyChecking=yes is enabled and the key is written to
+	// /work/known_hosts to protect against man-in-the-middle / IP spoofing attacks.
+	SshHostKey    string `protobuf:"bytes,6,opt,name=ssh_host_key,json=sshHostKey,proto3" json:"ssh_host_key,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
 }
 
 func (x *Target) Reset() {
@@ -104,6 +108,13 @@ func (x *Target) GetSshPrivateKey() string {
 func (x *Target) GetSshCertificatePem() string {
 	if x != nil {
 		return x.SshCertificatePem
+	}
+	return ""
+}
+
+func (x *Target) GetSshHostKey() string {
+	if x != nil {
+		return x.SshHostKey
 	}
 	return ""
 }
@@ -224,13 +235,15 @@ var File_functions_core_ansible_v1_ansible_proto protoreflect.FileDescriptor
 
 const file_functions_core_ansible_v1_ansible_proto_rawDesc = "" +
 	"\n" +
-	"'functions/core/ansible/v1/ansible.proto\x12\x19functions.core.ansible.v1\x1a\x1cgoogle/protobuf/struct.proto\"\x9c\x01\n" +
+	"'functions/core/ansible/v1/ansible.proto\x12\x19functions.core.ansible.v1\x1a\x1cgoogle/protobuf/struct.proto\"\xbe\x01\n" +
 	"\x06Target\x12\x12\n" +
 	"\x04host\x18\x01 \x01(\tR\x04host\x12\x12\n" +
 	"\x04port\x18\x02 \x01(\x05R\x04port\x12\x12\n" +
 	"\x04user\x18\x03 \x01(\tR\x04user\x12&\n" +
 	"\x0fssh_private_key\x18\x04 \x01(\tR\rsshPrivateKey\x12.\n" +
-	"\x13ssh_certificate_pem\x18\x05 \x01(\tR\x11sshCertificatePem\"\xa1\x01\n" +
+	"\x13ssh_certificate_pem\x18\x05 \x01(\tR\x11sshCertificatePem\x12 \n" +
+	"\fssh_host_key\x18\x06 \x01(\tR\n" +
+	"sshHostKey\"\xa1\x01\n" +
 	"\x12RunPlaybookRequest\x129\n" +
 	"\x06target\x18\x01 \x01(\v2!.functions.core.ansible.v1.TargetR\x06target\x12#\n" +
 	"\rplaybook_yaml\x18\x02 \x01(\fR\fplaybookYaml\x12+\n" +

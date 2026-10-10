@@ -442,7 +442,11 @@ func (m *vaultModule) Verify(ctx context.Context, req *modulev1.StepRequest) (*m
 	}()
 
 	target := &ansiblev1.Target{
-		Host: verifierVM.GetIp(), Port: verifierVM.GetSshPort(), User: sshUser, SshPrivateKey: pair.PrivateKeyOpenSSH,
+		Host:          verifierVM.GetIp(),
+		Port:          verifierVM.GetSshPort(),
+		User:          sshUser,
+		SshPrivateKey: pair.PrivateKeyOpenSSH,
+		SshHostKey:    verifierVM.GetSshHostPublicKey(),
 	}
 	vars, err := sdk.NewState(map[string]any{
 		"vault_addr":        fmt.Sprintf("https://%s:%d", vmIP, vaultAPIPort),

@@ -190,11 +190,12 @@ func (s *computeVMServer) EnsureVM(ctx context.Context, req *computevmv1.EnsureV
 	}
 
 	vm := &computevmv1.VM{
-		Id:      resp.GetContainerId(),
-		Name:    req.GetName(),
-		Ip:      resp.GetIp(),
-		Status:  "running",
-		SshPort: sshTargetPort,
+		Id:               resp.GetContainerId(),
+		Name:             req.GetName(),
+		Ip:               resp.GetIp(),
+		Status:           "running",
+		SshPort:          sshTargetPort,
+		SshHostPublicKey: req.GetSshHostPublicKey(),
 	}
 
 	s.mu.Lock()

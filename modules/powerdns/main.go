@@ -191,7 +191,13 @@ func (m *powerdnsModule) dial() error {
 // error), the same method as modules/chrony. It returns true when an agent is enrolled.
 func (m *powerdnsModule) installFleetAgents(ctx context.Context, target connTarget) (bool, error) {
 	_, err := m.fleetAgentClient.Install(ctx, &fleetagentv1.InstallRequest{
-		Target: &fleetagentv1.Target{Host: target.Host, Port: target.Port, User: target.User, SshPrivateKey: target.PrivateKey},
+		Target: &fleetagentv1.Target{
+			Host:          target.Host,
+			Port:          target.Port,
+			User:          target.User,
+			SshPrivateKey: target.PrivateKey,
+			SshHostKey:    target.HostKey,
+		},
 	})
 	if err != nil {
 		if status.Code(err) == codes.Unimplemented {
@@ -285,6 +291,9 @@ func (m *powerdnsModule) Provision(ctx context.Context, req *modulev1.StepReques
 	state["vm_name"] = name
 	state["vm_ip"] = vm.GetIp()
 	state["vm_ssh_port"] = int64(vm.GetSshPort())
+	if vm.GetSshHostPublicKey() != "" {
+		state["vm_host_key"] = vm.GetSshHostPublicKey()
+	}
 	state["domain"] = domain(req)
 	s, err := sdk.NewState(state)
 	if err != nil {
@@ -302,10 +311,15 @@ type connTarget struct {
 	User           string
 	PrivateKey     string
 	CertificatePem string
+	HostKey        string
 }
 
 func (m *powerdnsModule) targetFromState(ctx context.Context, req *modulev1.StepRequest, pair sshKeyPair) (connTarget, error) {
 	state := sdk.StateMap(req.GetState())
+	var hostKey string
+	if hk, ok := state["vm_host_key"].(string); ok {
+		hostKey = hk
+	}
 	if state["admin_method"] == "teleport" {
 		certResp, err := m.accessSSHClient.SignUserKey(ctx, &accesssshv1.SignUserKeyRequest{
 			Principals: []string{sshUser},
@@ -319,6 +333,7 @@ func (m *powerdnsModule) targetFromState(ctx context.Context, req *modulev1.Step
 			User:           sshUser,
 			PrivateKey:     certResp.GetPrivateKeyOpenssh(),
 			CertificatePem: certResp.GetCertificateOpenssh(),
+			HostKey:        hostKey,
 		}, nil
 	}
 	var port int64
@@ -333,6 +348,7 @@ func (m *powerdnsModule) targetFromState(ctx context.Context, req *modulev1.Step
 		Port:       int32(port),
 		User:       sshUser,
 		PrivateKey: pair.PrivateKeyOpenSSH,
+		HostKey:    hostKey,
 	}, nil
 }
 
@@ -343,11 +359,12 @@ func (t connTarget) ansible() *ansiblev1.Target {
 		User:              t.User,
 		SshPrivateKey:     t.PrivateKey,
 		SshCertificatePem: t.CertificatePem,
+		SshHostKey:        t.HostKey,
 	}
 }
 
 func (t connTarget) osBase() *osbasev1.Target {
-	return &osbasev1.Target{Host: t.Host, Port: t.Port, User: t.User, SshPrivateKey: t.PrivateKey}
+	return &osbasev1.Target{Host: t.Host, Port: t.Port, User: t.User, SshPrivateKey: t.PrivateKey, SshHostKey: t.HostKey}
 }
 
 // Configure installs PowerDNS (authoritative + recursor), points the VM at the
@@ -551,7 +568,11 @@ func (m *powerdnsModule) Verify(ctx context.Context, req *modulev1.StepRequest) 
 
 	serverIP := fmt.Sprint(sdk.StateMap(req.GetState())["vm_ip"])
 	target := &ansiblev1.Target{
-		Host: verifierVM.GetIp(), Port: verifierVM.GetSshPort(), User: sshUser, SshPrivateKey: pair.PrivateKeyOpenSSH,
+		Host:          verifierVM.GetIp(),
+		Port:          verifierVM.GetSshPort(),
+		User:          sshUser,
+		SshPrivateKey: pair.PrivateKeyOpenSSH,
+		SshHostKey:    verifierVM.GetSshHostPublicKey(),
 	}
 	vars, err := sdk.NewState(map[string]any{
 		"dns_server":    serverIP,

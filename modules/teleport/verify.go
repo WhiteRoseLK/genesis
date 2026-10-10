@@ -54,7 +54,11 @@ func (m *teleportModule) Verify(ctx context.Context, req *modulev1.StepRequest) 
 	}()
 
 	if err := m.installAgent(ctx, ownTarget, &fleetagentv1.Target{
-		Host: agentVM.GetIp(), Port: agentVM.GetSshPort(), User: sshUser, SshPrivateKey: agentPair.PrivateKeyOpenSSH,
+		Host:          agentVM.GetIp(),
+		Port:          agentVM.GetSshPort(),
+		User:          sshUser,
+		SshPrivateKey: agentPair.PrivateKeyOpenSSH,
+		SshHostKey:    agentVM.GetSshHostPublicKey(),
 	}); err != nil {
 		return nil, fmt.Errorf("Verify(teleport): installing the agent on the test target: %w", err)
 	}
@@ -80,7 +84,11 @@ func (m *teleportModule) Verify(ctx context.Context, req *modulev1.StepRequest) 
 	}()
 
 	verifierTarget := &ansiblev1.Target{
-		Host: verifierVM.GetIp(), Port: verifierVM.GetSshPort(), User: sshUser, SshPrivateKey: verifierPair.PrivateKeyOpenSSH,
+		Host:          verifierVM.GetIp(),
+		Port:          verifierVM.GetSshPort(),
+		User:          sshUser,
+		SshPrivateKey: verifierPair.PrivateKeyOpenSSH,
+		SshHostKey:    verifierVM.GetSshHostPublicKey(),
 	}
 	vars, err := sdk.NewState(map[string]any{
 		"user_private_key_pem":     privKeyPEM,
