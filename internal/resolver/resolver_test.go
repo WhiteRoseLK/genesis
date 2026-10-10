@@ -18,9 +18,10 @@ func timeout() <-chan time.Time {
 
 func installedModule(name string, opts ...func(*sdk.ManifestFile)) modulehost.Installed {
 	m := &sdk.ManifestFile{
-		Name:    name,
-		Version: "0.1.0",
-		Core:    ">=0.1.0",
+		Name:     name,
+		Version:  "0.1.0",
+		Core:     ">=0.1.0",
+		Protocol: sdk.ProtocolVersion,
 	}
 	for _, opt := range opts {
 		opt(m)
@@ -66,6 +67,10 @@ func withRequires(phase string, entries ...sdk.RequireEntry) func(*sdk.ManifestF
 
 func withCore(constraint string) func(*sdk.ManifestFile) {
 	return func(m *sdk.ManifestFile) { m.Core = constraint }
+}
+
+func withProtocol(proto int32) func(*sdk.ManifestFile) {
+	return func(m *sdk.ManifestFile) { m.Protocol = proto }
 }
 
 func specWithCapability(capName, moduleName string) *spec.Environment {
@@ -198,6 +203,48 @@ func TestResolveIncompatibleCoreVersionFails(t *testing.T) {
 	}
 	if _, err := Resolve(env, installed); err == nil {
 		t.Fatal("incompatible core constraint: unexpected success")
+	}
+}
+
+func TestResolveIncompatibleProtocolVersionFails(t *testing.T) {
+	env := specWithCapability("compute", "proxmox")
+	installed := []modulehost.Installed{
+		installedModule("proxmox", withCapabilities("compute"), withProtocol(2)),
+	}
+	_, err := Resolve(env, installed)
+	if err == nil {
+		t.Fatal("incompatible protocol version: unexpected success")
+	}
+	if !strings.Contains(err.Error(), "unsupported protocol version 2") {
+		t.Errorf("error = %q, want it to mention unsupported protocol version 2", err.Error())
+	}
+}
+
+func TestResolveMissingProtocolFails(t *testing.T) {
+	env := specWithCapability("compute", "proxmox")
+	installed := []modulehost.Installed{
+		installedModule("proxmox", withCapabilities("compute"), withProtocol(0)),
+	}
+	_, err := Resolve(env, installed)
+	if err == nil {
+		t.Fatal("missing protocol (0): unexpected success")
+	}
+	if !strings.Contains(err.Error(), "unsupported protocol version 0") {
+		t.Errorf("error = %q, want it to mention unsupported protocol version 0", err.Error())
+	}
+}
+
+func TestResolveOptionalCoreSucceeds(t *testing.T) {
+	env := specWithCapability("compute", "proxmox")
+	installed := []modulehost.Installed{
+		installedModule("proxmox", withCapabilities("compute"), withCore("")),
+	}
+	resolved, err := Resolve(env, installed)
+	if err != nil {
+		t.Fatalf("module without core constraint should succeed: %v", err)
+	}
+	if resolved.CapabilityModule["compute"] != "proxmox" {
+		t.Errorf("CapabilityModule[compute] = %q, want proxmox", resolved.CapabilityModule["compute"])
 	}
 }
 

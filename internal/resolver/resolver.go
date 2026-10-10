@@ -19,6 +19,10 @@ import (
 // constraint of each manifest (single source: internal/version).
 const CoreVersion = coreversion.Version
 
+// ProtocolVersion is the module lifecycle protocol version supported by the
+// core (ADR-0039, docs/03-module-contract.md §2).
+const ProtocolVersion = sdk.ProtocolVersion
+
 // Module is a module selected by the resolution.
 type Module struct {
 	Name      string
@@ -157,8 +161,11 @@ func Resolve(env *spec.Environment, installed []modulehost.Installed) (*Resolved
 		return nil, err
 	}
 
-	// 3. Core version compatibility (docs/03-module-contract.md §1).
+	// 3. Runtime compatibility (protocol version, ADR-0039) and optional core constraint.
 	for _, m := range r.Modules {
+		if err := checkProtocolCompatibility(m.Name, m.Manifest.Protocol); err != nil {
+			return nil, err
+		}
 		if err := checkCoreCompatibility(m.Name, m.Manifest.Core); err != nil {
 			return nil, err
 		}

@@ -3,7 +3,7 @@ name: bind
 version: 0.1.0
 description: "Target DNS (docs/10-adding-a-module.md): dns.zone/v1 and dns.resolver/v1, BIND 9 on its own VM, takes over the zone from coredns"
 layer: foundation
-core: ">=0.1.0 <0.3.0"
+core: ">=0.1.0"
 protocol: 1
 
 capabilities: []

@@ -3,7 +3,7 @@ name: base-os
 version: 0.1.0
 description: "functional configuration of target VMs (CA, resolver, NTP); pure hardening (Harden) deferred to a future iteration"
 layer: foundation
-core: ">=0.1.0 <0.3.0"
+core: ">=0.1.0"
 protocol: 1
 
 capabilities: []

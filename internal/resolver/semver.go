@@ -8,8 +8,17 @@ import (
 	"strings"
 )
 
+// checkProtocolCompatibility checks that the module's protocol matches the
+// lifecycle protocol supported by the core (docs/03-module-contract.md §2, ADR-0039).
+func checkProtocolCompatibility(moduleName string, protoVersion int32) error {
+	if protoVersion != ProtocolVersion {
+		return fmt.Errorf("module %q: unsupported protocol version %d (core supports protocol %d)", moduleName, protoVersion, ProtocolVersion)
+	}
+	return nil
+}
+
 // checkCoreCompatibility checks that CoreVersion satisfies constraint, in the
-// doc 03 format (e.g. ">=0.1.0 <0.2.0"): a list of ">=X.Y.Z" / "<X.Y.Z"
+// doc 03 format (e.g. ">=0.1.0"): a list of ">=X.Y.Z" / "<X.Y.Z"
 // conditions separated by spaces, all of them required.
 func checkCoreCompatibility(moduleName, constraint string) error {
 	if constraint == "" {

@@ -67,10 +67,10 @@ Never report a vulnerability in a public issue: see [`SECURITY.md`](SECURITY.md)
 
 [Release Please](https://github.com/googleapis/release-please) keeps one release PR per package up to date:
 
-- **core**: `vX.Y.Z` tag, `CHANGELOG.md` at the root, version written to `internal/version` (compared with the modules' `core` constraint);
+- **core**: `vX.Y.Z` tag, `CHANGELOG.md` at the root, version written to `internal/version` (compared with optional module `core` constraints);
 - **SDK**: `sdk/vX.Y.Z` tag (Go submodule convention), `sdk/CHANGELOG.md`.
 
-Before 1.0, a `feat` bumps the patch version and a breaking change bumps the minor version. A minor release changes the version compared with the modules' `core` constraint: **in the PR that introduces a breaking change**, raise the upper bound of the constraint of the repository's modules (`modules/*/module.yaml` and the `scaffold` template) if the change does not stop them from working with the new core; otherwise the release PR fails in CI. Test modules (`test/modules/*`) have no upper bound. Binary publishing (GoReleaser) will come later.
+Before 1.0, a `feat` bumps the patch version and a breaking change bumps the minor version. Runtime compatibility between the core and modules is based on the lifecycle protocol version (`protocol: 1`, ADR-0039). The `core:` constraint in `module.yaml` is optional and only evaluated when a module specifically requires a minimum core version (without requiring an artificial upper bound). Minor core releases therefore do not require bumping module manifests. Binary publishing (GoReleaser) will come later.
 
 ## Dependencies
 

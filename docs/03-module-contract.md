@@ -10,8 +10,8 @@ name: vault
 version: 0.1.0
 description: HashiCorp Vault — PKI and secret storage
 layer: foundation
-core: ">=0.1.0 <0.2.0"
-protocol: 1                       # version of the module ↔ core gRPC protocol
+core: ">=0.1.0"                   # optional: core version constraint if specific features are required
+protocol: 1                       # version of the module ↔ core gRPC protocol (runtime compatibility, ADR-0039)
 
 capabilities:                     # user capabilities this module can satisfy
   - pki
@@ -48,6 +48,8 @@ defaults:                         # is this module the default implementation?
 ```
 
 `@seed` / `@target` suffix: forces the provider. Without a suffix: the provider active at the time of the call.
+
+Runtime compatibility between the core and modules is governed primarily by `protocol: 1` (ADR-0039). The core validates that installed modules match its supported lifecycle protocol version. The `core:` constraint is optional and evaluated only when specified (without requiring an artificial upper bound).
 
 A module that provides **only** seed-phase functions (e.g. `coredns`, `step-ca`) declares `phases: [seed]`. A module may provide the same function in both phases.
 

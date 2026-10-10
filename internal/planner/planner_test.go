@@ -12,7 +12,7 @@ import (
 )
 
 func installedModule(name string, opts ...func(*sdk.ManifestFile)) modulehost.Installed {
-	m := &sdk.ManifestFile{Name: name, Version: "0.1.0", Core: ">=0.1.0"}
+	m := &sdk.ManifestFile{Name: name, Version: "0.1.0", Core: ">=0.1.0", Protocol: sdk.ProtocolVersion}
 	for _, opt := range opts {
 		opt(m)
 	}

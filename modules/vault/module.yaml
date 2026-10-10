@@ -3,7 +3,7 @@ name: vault
 version: 0.1.0
 description: "Target PKI + secrets (docs/07-mvp-modules.md): pki.issuer/v1 and secrets.kv/v1, single-node Raft, pki_int signed by step-ca, KV v2, genesis AppRole"
 layer: foundation
-core: ">=0.1.0 <0.3.0"
+core: ">=0.1.0"
 protocol: 1
 
 capabilities: []
