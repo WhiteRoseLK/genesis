@@ -1,0 +1,37 @@
+apiVersion: genesis/module/v1
+name: bind
+version: 0.1.0
+description: "Target DNS (docs/10-adding-a-module.md): dns.zone/v1 and dns.resolver/v1, BIND 9 on its own VM, takes over the zone from coredns"
+layer: foundation
+core: ">=0.1.0 <0.3.0"
+protocol: 1
+
+capabilities: []
+
+provides:
+  - function: dns.zone/v1
+    phases: [target]
+  - function: dns.resolver/v1
+    phases: [target]
+
+requires:
+  target:
+    - function: compute.vm/v1
+    - function: os.base/v1
+    - function: core.ansible/v1
+    - function: core.secrets/v1
+    - function: time.ntp/v1
+    - function: dns.resolver/v1
+    - function: dns.zone/v1@seed
+    - function: fleet.agent/v1
+      optional: true
+    - function: access.ssh/v1
+      optional: true
+
+config_schema: schema.json
+
+secrets: []
+
+resources: []
+
+defaults: {}

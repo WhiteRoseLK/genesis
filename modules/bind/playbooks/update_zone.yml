@@ -1,0 +1,21 @@
+---
+# UpdateZone (functions/dns/zone/v1, bind module):
+# updates a zone file and reloads named on the BIND server.
+- hosts: target
+  gather_facts: false
+  become: true
+  tasks:
+    - name: write updated zone file
+      ansible.builtin.copy:
+        content: "{{ zone_file_content }}"
+        dest: "/etc/bind/db.{{ domain }}"
+        mode: "0644"
+        owner: root
+        group: bind
+      register: updated_zone
+
+    - name: reload named
+      ansible.builtin.systemd:
+        name: named
+        state: reloaded
+      when: updated_zone.changed

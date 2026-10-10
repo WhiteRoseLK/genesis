@@ -3,6 +3,7 @@ go 1.27.2
 use (
 	.
 	./modules/base-os
+	./modules/bind
 	./modules/chrony
 	./modules/coredns
 	./modules/fake-compute
