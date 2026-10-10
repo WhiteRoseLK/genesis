@@ -56,8 +56,6 @@ const (
 	pdnsAPIPort       = 8081
 	verifyProbeName   = "verify-probe"
 	verifyProbeIP     = "10.255.255.1"
-	verifyReverseIP1  = "1"
-	verifyReverseZ    = "255.255.10.in-addr.arpa"
 	teleportAgentPort = 3022
 )
 
@@ -536,15 +534,6 @@ func (m *powerdnsModule) Verify(ctx context.Context, req *modulev1.StepRequest) 
 		_, _ = m.zoneServer.DeleteRecord(context.Background(), &dnszonev1.RecordKey{Zone: dom, Name: verifyProbeName, Type: "A"})
 	}()
 
-	if _, err := m.zoneServer.UpsertRecord(ctx, &dnszonev1.Record{
-		Zone: verifyReverseZ, Name: verifyReverseIP1, Type: "PTR", Values: []string{fqdn(verifyProbeName + "." + dom)}, Ttl: 300,
-	}); err != nil {
-		return nil, fmt.Errorf("Verify(powerdns): reverse probe: %w", err)
-	}
-	defer func() {
-		_, _ = m.zoneServer.DeleteRecord(context.Background(), &dnszonev1.RecordKey{Zone: verifyReverseZ, Name: verifyReverseIP1, Type: "PTR"})
-	}()
-
 	verifierName := name + verifierSuffix
 	pair, err := m.sshKeyPair(ctx, verifierName)
 	if err != nil {
@@ -711,6 +700,25 @@ func (s *powerdnsZoneServer) UpsertRecord(ctx context.Context, req *dnszonev1.Re
 	if err := client.patchRRset(ctx, req.GetZone(), rrset); err != nil {
 		return nil, err
 	}
+
+	// Automatic reverse zone (in-addr.arpa) derivation for A records (Issue #11).
+	if req.GetType() == "A" {
+		fqdnStr := recordName(req.GetZone(), req.GetName())
+		for _, ip := range req.GetValues() {
+			if ptrRec, err := sdk.ReversePTRForA(ip, fqdnStr, ttl); err == nil {
+				_ = client.ensureZone(ctx, ptrRec.GetZone())
+				ptrRRset := pdnsRRset{
+					Name:       recordName(ptrRec.GetZone(), ptrRec.GetName()),
+					Type:       "PTR",
+					TTL:        ttl,
+					ChangeType: "REPLACE",
+					Records:    []pdnsRecordContent{{Content: ptrRec.GetValues()[0]}},
+				}
+				_ = client.patchRRset(ctx, ptrRec.GetZone(), ptrRRset)
+			}
+		}
+	}
+
 	return &dnszonev1.Empty{}, nil
 }
 
@@ -719,6 +727,28 @@ func (s *powerdnsZoneServer) DeleteRecord(ctx context.Context, req *dnszonev1.Re
 	if err != nil {
 		return nil, err
 	}
+
+	// If deleting an A record, lookup existing values to clean up derived reverse PTR records.
+	if req.GetType() == "A" {
+		if rrsets, err := client.listRRsets(ctx, req.GetZone()); err == nil {
+			targetName := recordName(req.GetZone(), req.GetName())
+			for _, rr := range rrsets {
+				if rr.Name == targetName && rr.Type == "A" {
+					for _, rec := range rr.Records {
+						if revKey, err := sdk.ReverseKeyForA(rec.Content); err == nil {
+							revRRset := pdnsRRset{
+								Name:       recordName(revKey.GetZone(), revKey.GetName()),
+								Type:       "PTR",
+								ChangeType: "DELETE",
+							}
+							_ = client.patchRRset(ctx, revKey.GetZone(), revRRset)
+						}
+					}
+				}
+			}
+		}
+	}
+
 	rrset := pdnsRRset{
 		Name: recordName(req.GetZone(), req.GetName()), Type: req.GetType(), ChangeType: "DELETE",
 	}

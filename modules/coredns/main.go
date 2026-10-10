@@ -257,6 +257,21 @@ func (s *dnsZoneServer) UpsertRecord(ctx context.Context, req *dnszonev1.Record)
 	if s.records == nil {
 		s.records = map[string]*dnszonev1.Record{}
 	}
+	if req.GetType() == "A" {
+		if existing := s.records[recordKey(req.GetZone(), req.GetName(), req.GetType())]; existing != nil {
+			for _, oldIP := range existing.GetValues() {
+				if revKey, err := sdk.ReverseKeyForA(oldIP); err == nil {
+					delete(s.records, recordKey(revKey.GetZone(), revKey.GetName(), revKey.GetType()))
+				}
+			}
+		}
+		fqdnStr := sdk.RecordFQDN(req.GetZone(), req.GetName())
+		for _, ip := range req.GetValues() {
+			if ptrRec, err := sdk.ReversePTRForA(ip, fqdnStr, req.GetTtl()); err == nil {
+				s.records[recordKey(ptrRec.GetZone(), ptrRec.GetName(), ptrRec.GetType())] = ptrRec
+			}
+		}
+	}
 	s.records[recordKey(req.GetZone(), req.GetName(), req.GetType())] = req
 	s.mu.Unlock()
 
@@ -268,6 +283,15 @@ func (s *dnsZoneServer) UpsertRecord(ctx context.Context, req *dnszonev1.Record)
 
 func (s *dnsZoneServer) DeleteRecord(ctx context.Context, req *dnszonev1.RecordKey) (*dnszonev1.Empty, error) {
 	s.mu.Lock()
+	if req.GetType() == "A" {
+		if existing := s.records[recordKey(req.GetZone(), req.GetName(), req.GetType())]; existing != nil {
+			for _, ip := range existing.GetValues() {
+				if revKey, err := sdk.ReverseKeyForA(ip); err == nil {
+					delete(s.records, recordKey(revKey.GetZone(), revKey.GetName(), revKey.GetType()))
+				}
+			}
+		}
+	}
 	delete(s.records, recordKey(req.GetZone(), req.GetName(), req.GetType()))
 	s.mu.Unlock()
 
@@ -323,6 +347,9 @@ func (s *dnsZoneServer) stopContainer(ctx context.Context) error {
 // CoreDNS container (docs/07-mvp-modules.md: "Zone regenerated on every
 // UpsertRecord").
 func (s *dnsZoneServer) reload(ctx context.Context) error {
+	if s.module == nil {
+		return nil
+	}
 	s.mu.Lock()
 	zones := map[string][]*dnszonev1.Record{}
 	for _, r := range s.records {

@@ -50,7 +50,16 @@ func TestBindZoneServerOperations(t *testing.T) {
 		t.Fatalf("ListRecords returned %d records, want 2", len(listResp.GetRecords()))
 	}
 
-	// 3. Zone file rendering
+	// 2b. Verify automatic reverse PTR derivation
+	revResp, err := server.ListRecords(ctx, &dnszonev1.Zone{Zone: "0.10.10.in-addr.arpa"})
+	if err != nil {
+		t.Fatalf("ListRecords reverse: %v", err)
+	}
+	if len(revResp.GetRecords()) != 2 {
+		t.Fatalf("ListRecords reverse returned %d records, want 2", len(revResp.GetRecords()))
+	}
+
+	// 3. Zone file rendering (should only render forward zone records)
 	server.mu.Lock()
 	content := server.renderZoneFileLocked()
 	server.mu.Unlock()
@@ -63,6 +72,9 @@ func TestBindZoneServerOperations(t *testing.T) {
 	}
 	if !strings.Contains(content, "db IN A 10.10.0.101") {
 		t.Errorf("zone file missing db record: %s", content)
+	}
+	if strings.Contains(content, "in-addr.arpa") || strings.Contains(content, "PTR") {
+		t.Errorf("zone file should not contain reverse records: %s", content)
 	}
 
 	// 4. DeleteRecord
@@ -84,5 +96,16 @@ func TestBindZoneServerOperations(t *testing.T) {
 	}
 	if listResp2.GetRecords()[0].GetName() != "db" {
 		t.Errorf("remaining record name = %q, want db", listResp2.GetRecords()[0].GetName())
+	}
+
+	revResp2, err := server.ListRecords(ctx, &dnszonev1.Zone{Zone: "0.10.10.in-addr.arpa"})
+	if err != nil {
+		t.Fatalf("ListRecords reverse after delete: %v", err)
+	}
+	if len(revResp2.GetRecords()) != 1 {
+		t.Fatalf("ListRecords reverse after delete returned %d records, want 1", len(revResp2.GetRecords()))
+	}
+	if revResp2.GetRecords()[0].GetName() != "101" {
+		t.Errorf("remaining reverse record name = %q, want 101", revResp2.GetRecords()[0].GetName())
 	}
 }

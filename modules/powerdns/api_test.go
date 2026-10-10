@@ -127,6 +127,18 @@ func TestPowerDNSZoneServerRoundTrip(t *testing.T) {
 		t.Errorf("record = %+v, want infra01 A 10.10.0.5", got)
 	}
 
+	revRecords, err := zoneServer.ListRecords(ctx, &dnszonev1.Zone{Zone: "0.10.10.in-addr.arpa"})
+	if err != nil {
+		t.Fatalf("ListRecords reverse: %v", err)
+	}
+	if len(revRecords.GetRecords()) != 1 {
+		t.Fatalf("ListRecords reverse = %+v, want 1 record", revRecords.GetRecords())
+	}
+	revGot := revRecords.GetRecords()[0]
+	if revGot.GetName() != "5" || revGot.GetType() != "PTR" || revGot.GetValues()[0] != "infra01.lab.internal." {
+		t.Errorf("reverse record = %+v, want 5 PTR infra01.lab.internal.", revGot)
+	}
+
 	if _, err := zoneServer.DeleteRecord(ctx, &dnszonev1.RecordKey{Zone: "lab.internal", Name: "infra01", Type: "A"}); err != nil {
 		t.Fatalf("DeleteRecord: %v", err)
 	}
@@ -136,6 +148,14 @@ func TestPowerDNSZoneServerRoundTrip(t *testing.T) {
 	}
 	if len(records.GetRecords()) != 0 {
 		t.Errorf("ListRecords after DeleteRecord = %+v, want empty", records.GetRecords())
+	}
+
+	revRecords, err = zoneServer.ListRecords(ctx, &dnszonev1.Zone{Zone: "0.10.10.in-addr.arpa"})
+	if err != nil {
+		t.Fatalf("ListRecords reverse after delete: %v", err)
+	}
+	if len(revRecords.GetRecords()) != 0 {
+		t.Errorf("ListRecords reverse after delete = %+v, want empty", revRecords.GetRecords())
 	}
 }
 
