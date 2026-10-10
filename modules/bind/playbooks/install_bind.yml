@@ -1,0 +1,71 @@
+---
+# Configure (functions/dns/zone/v1 + dns/resolver/v1, bind module):
+# installs and configures BIND 9 Authoritative + Recursive resolver
+# (docs/10-adding-a-module.md) — Debian cloud image.
+- hosts: target
+  gather_facts: false
+  become: true
+  tasks:
+    - name: install BIND 9
+      ansible.builtin.apt:
+        name:
+          - bind9
+          - bind9utils
+          - dnsutils
+        state: present
+        update_cache: true
+
+    - name: configure named.conf.options (recursion and forwarders)
+      ansible.builtin.copy:
+        content: |
+          options {
+              directory "/var/cache/bind";
+              recursion yes;
+              allow-query { any; };
+              allow-recursion { any; };
+              forwarders {
+                  {% for r in upstream_resolvers %}{{ r }};{% endfor %}
+              };
+              dnssec-validation auto;
+              listen-on { any; };
+              listen-on-v6 { any; };
+          };
+        dest: /etc/bind/named.conf.options
+        mode: "0644"
+        owner: root
+        group: bind
+      register: options_conf
+
+    - name: configure named.conf.local (zones)
+      ansible.builtin.copy:
+        content: |
+          zone "{{ domain }}" {
+              type master;
+              file "/etc/bind/db.{{ domain }}";
+          };
+        dest: /etc/bind/named.conf.local
+        mode: "0644"
+        owner: root
+        group: bind
+      register: local_conf
+
+    - name: write forward zone file
+      ansible.builtin.copy:
+        content: "{{ zone_file_content }}"
+        dest: "/etc/bind/db.{{ domain }}"
+        mode: "0644"
+        owner: root
+        group: bind
+      register: zone_file
+
+    - name: enable and start named
+      ansible.builtin.systemd:
+        name: named
+        enabled: true
+        state: restarted
+      when: options_conf.changed or local_conf.changed or zone_file.changed
+
+    - name: make sure named is running
+      ansible.builtin.systemd:
+        name: named
+        state: started
