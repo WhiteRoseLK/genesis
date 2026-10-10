@@ -59,23 +59,34 @@ func (m *fakeComputeModule) Check(_ context.Context, req *modulev1.StepRequest) 
 	// demand through the compute.vm/v1 function. Captures the session token to
 	// reach core.container/v1 (the same mechanism as modules/base-os with
 	// core.ansible/v1).
-	m.brokerToken = req.GetBrokerToken()
+	_ = m.dialWithToken(req.GetBrokerToken())
 	return &modulev1.CheckResult{Status: modulev1.CheckResult_STATUS_COMPLIANT}, nil
 }
 
 func (m *fakeComputeModule) Provision(_ context.Context, req *modulev1.StepRequest) (*modulev1.StepResult, error) {
+	_ = m.dialWithToken(req.GetBrokerToken())
 	return ok(req)
 }
 
 func (m *fakeComputeModule) Configure(_ context.Context, req *modulev1.StepRequest) (*modulev1.StepResult, error) {
+	_ = m.dialWithToken(req.GetBrokerToken())
 	return ok(req)
 }
 
 func (m *fakeComputeModule) Verify(_ context.Context, req *modulev1.StepRequest) (*modulev1.StepResult, error) {
+	_ = m.dialWithToken(req.GetBrokerToken())
 	return ok(req)
 }
 
+func (m *fakeComputeModule) Repoint(_ context.Context, req *modulev1.RepointRequest) (*modulev1.StepResult, error) {
+	if err := m.dialWithToken(req.GetStep().GetBrokerToken()); err != nil {
+		return nil, err
+	}
+	return ok(req.GetStep())
+}
+
 func (m *fakeComputeModule) Destroy(_ context.Context, req *modulev1.StepRequest) (*modulev1.StepResult, error) {
+	_ = m.dialWithToken(req.GetBrokerToken())
 	return ok(req)
 }
 
@@ -87,23 +98,42 @@ func ok(req *modulev1.StepRequest) (*modulev1.StepResult, error) {
 	return &modulev1.StepResult{Status: modulev1.StepResult_STATUS_OK, State: s}, nil
 }
 
-// containers dials the broker session at most once (Dial only succeeds once
-// per token) and caches the client for every later call — the same precaution
-// as modules/base-os.
-func (m *fakeComputeModule) containers() (containerv1.ContainerClient, error) {
+// dialWithToken dials the broker session with token, or the cached token if
+// token is empty. If a new token is provided, it redials so that repoints are
+// observed. Dial is only attempted once per token.
+func (m *fakeComputeModule) dialWithToken(token string) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	if m.containerClient != nil {
-		return m.containerClient, nil
+	if token == "" {
+		if m.containerClient != nil {
+			return nil
+		}
+		token = m.brokerToken
 	}
-	if m.broker == nil || m.brokerToken == "" {
-		return nil, fmt.Errorf("fake-compute: no broker session (Check has not been called yet)")
+	if token == "" {
+		return fmt.Errorf("fake-compute: no broker session (Check has not been called yet)")
 	}
-	conn, err := m.broker.Dial(m.brokerToken)
+	if m.brokerToken == token && m.containerClient != nil {
+		return nil
+	}
+	if m.broker == nil {
+		return nil
+	}
+	conn, err := m.broker.Dial(token)
 	if err != nil {
-		return nil, fmt.Errorf("connecting to core.container/v1: %w", err)
+		return fmt.Errorf("connecting to core.container/v1: %w", err)
 	}
+	m.brokerToken = token
 	m.containerClient = containerv1.NewContainerClient(conn)
+	return nil
+}
+
+func (m *fakeComputeModule) containers() (containerv1.ContainerClient, error) {
+	if err := m.dialWithToken(""); err != nil {
+		return nil, err
+	}
+	m.mu.Lock()
+	defer m.mu.Unlock()
 	return m.containerClient, nil
 }
 

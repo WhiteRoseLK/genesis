@@ -295,6 +295,16 @@ func (m *teleportModule) Provision(ctx context.Context, req *modulev1.StepReques
 	return &modulev1.StepResult{Status: modulev1.StepResult_STATUS_OK, State: s}, nil
 }
 
+func (m *teleportModule) Repoint(_ context.Context, req *modulev1.RepointRequest) (*modulev1.StepResult, error) {
+	if err := m.dialWithToken(req.GetStep().GetBrokerToken()); err != nil {
+		return nil, err
+	}
+	return &modulev1.StepResult{
+		Status: modulev1.StepResult_STATUS_OK,
+		State:  req.GetStep().GetState(),
+	}, nil
+}
+
 func (m *teleportModule) Destroy(ctx context.Context, req *modulev1.StepRequest) (*modulev1.StepResult, error) {
 	if err := m.dialWithToken(req.GetBrokerToken()); err != nil {
 		return nil, err

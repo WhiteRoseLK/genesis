@@ -301,3 +301,57 @@ func TestResolveCarriesCapabilityConfigToModule(t *testing.T) {
 		t.Errorf("Config = %+v, want the spec's endpoint/node", cfg)
 	}
 }
+
+func TestConsumersFor(t *testing.T) {
+	r := &Resolved{
+		Modules: map[string]*Module{
+			"mod-a": {
+				Name: "mod-a",
+				Manifest: &sdk.ManifestFile{
+					Requires: map[string][]sdk.RequireEntry{
+						"target": {{Function: "dns.resolver/v1"}},
+					},
+				},
+			},
+			"mod-b": {
+				Name: "mod-b",
+				Manifest: &sdk.ManifestFile{
+					Requires: map[string][]sdk.RequireEntry{
+						"target": {{Function: "dns.resolver/v1@target"}},
+					},
+				},
+			},
+			"mod-seed-only": {
+				Name: "mod-seed-only",
+				Manifest: &sdk.ManifestFile{
+					Requires: map[string][]sdk.RequireEntry{
+						"target": {{Function: "dns.resolver/v1@seed"}},
+					},
+				},
+			},
+			"mod-other": {
+				Name: "mod-other",
+				Manifest: &sdk.ManifestFile{
+					Requires: map[string][]sdk.RequireEntry{
+						"target": {{Function: "time.ntp/v1"}},
+					},
+				},
+			},
+		},
+	}
+
+	consumers := r.ConsumersFor("dns.resolver/v1")
+	if len(consumers) != 2 || consumers[0] != "mod-a" || consumers[1] != "mod-b" {
+		t.Errorf("ConsumersFor(dns.resolver/v1) = %v, want [mod-a, mod-b]", consumers)
+	}
+
+	ntpConsumers := r.ConsumersFor("time.ntp/v1")
+	if len(ntpConsumers) != 1 || ntpConsumers[0] != "mod-other" {
+		t.Errorf("ConsumersFor(time.ntp/v1) = %v, want [mod-other]", ntpConsumers)
+	}
+
+	none := r.ConsumersFor("nonexistent/v1")
+	if len(none) != 0 {
+		t.Errorf("ConsumersFor(nonexistent/v1) = %v, want empty", none)
+	}
+}

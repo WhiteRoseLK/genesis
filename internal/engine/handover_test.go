@@ -190,3 +190,53 @@ func TestSeedKeptWhenAFunctionHasNoTarget(t *testing.T) {
 		t.Error("state: seed_retired=true, want false")
 	}
 }
+
+// TestRepointCalledOnActiveConsumers proves that when a module hands over a function,
+// an explicit Repoint(RepointRequest) is called on already-executed consumer modules
+// (docs/03-module-contract.md §5, docs/05-bootstrap-lifecycle.md).
+func TestRepointCalledOnActiveConsumers(t *testing.T) {
+	searchRoot := t.TempDir()
+	installedA := buildAndInstall(t, "test-a", searchRoot)
+	installedB := buildAndInstall(t, "test-b", searchRoot)
+
+	env := &spec.Environment{
+		Capabilities: map[string]spec.Capability{
+			"test-a": {Module: "test-a"},
+			"test-b": {Module: "test-b"},
+		},
+	}
+	resolved, err := resolver.Resolve(env, []modulehost.Installed{installedA, installedB})
+	if err != nil {
+		t.Fatalf("Resolve: %v", err)
+	}
+
+	// Order: test-b executed before test-a handover so test-b is an active consumer.
+	plan := &planner.Plan{Order: []string{"test-b", "test-a"}}
+
+	stateDir := t.TempDir()
+	var logBuf bytes.Buffer
+	e := New(stateDir, newTestSecretsStore(t))
+	e.Logger = slog.New(slog.NewTextHandler(&logBuf, nil))
+	if err := e.Run(context.Background(), resolved, plan); err != nil {
+		t.Fatalf("Run: %v", err)
+	}
+
+	logStr := logBuf.String()
+	if !strings.Contains(logStr, "module=test-b step=repoint outcome=test.a/v1") {
+		t.Errorf("test-b should have received Repoint for test.a/v1 upon test-a's handover:\n%s", logStr)
+	}
+
+	st, err := state.Load(stateDir)
+	if err != nil {
+		t.Fatalf("Load state: %v", err)
+	}
+	assertFlag(t, st, "test-b", "repointed", true)
+
+	var bFlags map[string]any
+	if err := json.Unmarshal(st.Modules["test-b"].StateJSON, &bFlags); err != nil {
+		t.Fatalf("invalid test-b state: %v", err)
+	}
+	if got := bFlags["repointed_function"]; got != "test.a/v1" {
+		t.Errorf("test-b state repointed_function = %v, want \"test.a/v1\"", got)
+	}
+}

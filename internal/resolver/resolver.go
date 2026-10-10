@@ -66,6 +66,37 @@ func (r *Resolved) ProviderFor(function, phase string) (string, bool) {
 	return name, ok
 }
 
+// ConsumersFor returns the sorted, deduplicated list of module names that
+// declare a requirement on function (either the bare function name or
+// function+"@target"). Modules requiring function+"@seed" explicitly bind
+// to the seed provider and are not consumers of a target repoint.
+func (r *Resolved) ConsumersFor(function string) []string {
+	var consumers []string
+	for name, m := range r.Modules {
+		if m == nil || m.Manifest == nil {
+			continue
+		}
+		consumed := false
+		for _, reqs := range m.Manifest.Requires {
+			for _, req := range reqs {
+				fn := req.Function
+				if fn == function || fn == function+"@target" {
+					consumed = true
+					break
+				}
+			}
+			if consumed {
+				break
+			}
+		}
+		if consumed {
+			consumers = append(consumers, name)
+		}
+	}
+	sort.Strings(consumers)
+	return consumers
+}
+
 // Resolve maps each capability of env to an installed module, automatically
 // adds the missing required modules, and checks the core version compatibility
 // (docs/02-architecture.md).

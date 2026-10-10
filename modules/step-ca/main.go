@@ -112,7 +112,7 @@ func (m *stepCAModule) Validate(context.Context, *modulev1.ValidateRequest) (*mo
 }
 
 func (m *stepCAModule) Check(_ context.Context, req *modulev1.StepRequest) (*modulev1.CheckResult, error) {
-	m.brokerToken = req.GetBrokerToken()
+	_ = m.dialWithToken(req.GetBrokerToken())
 	flags := sdk.StateMap(req.GetState())
 	if boolFlag(flags, "seeded") || boolFlag(flags, "retired") {
 		return &modulev1.CheckResult{Status: modulev1.CheckResult_STATUS_COMPLIANT}, nil
@@ -120,24 +120,39 @@ func (m *stepCAModule) Check(_ context.Context, req *modulev1.StepRequest) (*mod
 	return &modulev1.CheckResult{Status: modulev1.CheckResult_STATUS_TODO}, nil
 }
 
-// dial dials the broker session at most once (Dial only succeeds once per
-// token) — the same precaution as modules/chrony.
-func (m *stepCAModule) dial() error {
+// dialWithToken dials the broker session with token, or the cached token if
+// token is empty. If a new token is provided, it redials so that repoints are
+// observed. Dial is only attempted once per token.
+func (m *stepCAModule) dialWithToken(token string) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	if m.containerClient != nil {
-		return nil
+	if token == "" {
+		if m.containerClient != nil {
+			return nil
+		}
+		token = m.brokerToken
 	}
-	if m.broker == nil || m.brokerToken == "" {
+	if token == "" {
 		return fmt.Errorf("step-ca: no broker session (Check has not been called yet)")
 	}
-	conn, err := m.broker.Dial(m.brokerToken)
+	if m.brokerToken == token && m.containerClient != nil {
+		return nil
+	}
+	if m.broker == nil {
+		return nil
+	}
+	conn, err := m.broker.Dial(token)
 	if err != nil {
 		return fmt.Errorf("connecting to the required functions: %w", err)
 	}
+	m.brokerToken = token
 	m.containerClient = containerv1.NewContainerClient(conn)
 	m.secretsClient = secretsv1.NewSecretsClient(conn)
 	return nil
+}
+
+func (m *stepCAModule) dial() error {
+	return m.dialWithToken("")
 }
 
 // SeedUp bootstraps the CA (root + intermediate): this is the only lifecycle
@@ -145,6 +160,9 @@ func (m *stepCAModule) dial() error {
 // issue a certificate right after, so the work happens here, not lazily on the
 // first call (unlike modules/coredns).
 func (m *stepCAModule) SeedUp(ctx context.Context, req *modulev1.StepRequest) (*modulev1.StepResult, error) {
+	if err := m.dialWithToken(req.GetBrokerToken()); err != nil {
+		return nil, err
+	}
 	cfg := sdk.StateMap(req.GetConfig())
 	days := defaultIntermediateTTLDays
 	if d, ok := cfg["intermediate_ttl_days"].(float64); ok && d > 0 {
@@ -165,6 +183,9 @@ func (m *stepCAModule) SeedUp(ctx context.Context, req *modulev1.StepRequest) (*
 // on the network is needed, checking the chain directly IS the most direct
 // consumer test possible here.
 func (m *stepCAModule) Verify(ctx context.Context, req *modulev1.StepRequest) (*modulev1.StepResult, error) {
+	if err := m.dialWithToken(req.GetBrokerToken()); err != nil {
+		return nil, err
+	}
 	cert, err := m.IssueCert(ctx, &pkiissuerv1.IssueCertRequest{
 		CommonName: "verify.step-ca.internal",
 		TtlSeconds: int64((24 * time.Hour).Seconds()),
@@ -182,11 +203,23 @@ func (m *stepCAModule) Verify(ctx context.Context, req *modulev1.StepRequest) (*
 	return m.setFlag(req, "verified")
 }
 
+func (m *stepCAModule) Repoint(_ context.Context, req *modulev1.RepointRequest) (*modulev1.StepResult, error) {
+	if err := m.dialWithToken(req.GetStep().GetBrokerToken()); err != nil {
+		return nil, err
+	}
+	return &modulev1.StepResult{
+		Status: modulev1.StepResult_STATUS_OK,
+		State:  req.GetStep().GetState(),
+	}, nil
+}
+
 func (m *stepCAModule) SeedDown(_ context.Context, req *modulev1.StepRequest) (*modulev1.StepResult, error) {
+	_ = m.dialWithToken(req.GetBrokerToken())
 	return m.setFlag(req, "retired")
 }
 
 func (m *stepCAModule) Destroy(_ context.Context, req *modulev1.StepRequest) (*modulev1.StepResult, error) {
+	_ = m.dialWithToken(req.GetBrokerToken())
 	s, err := sdk.NewState(map[string]any{})
 	if err != nil {
 		return nil, err
