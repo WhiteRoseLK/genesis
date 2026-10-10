@@ -625,6 +625,9 @@ func (s *bindZoneServer) renderZoneFileLocked() string {
 		fmt.Fprintf(&b, "ns1 IN A %s\n", s.vmIP)
 	}
 	for _, r := range s.records {
+		if r.GetZone() != dom {
+			continue
+		}
 		name := r.GetName()
 		if name == "" {
 			name = "@"
@@ -660,6 +663,21 @@ func (s *bindZoneServer) UpsertRecord(_ context.Context, req *dnszonev1.Record) 
 	if s.records == nil {
 		s.records = map[string]*dnszonev1.Record{}
 	}
+	if req.GetType() == "A" {
+		if existing := s.records[recordKey(req.GetZone(), req.GetName(), req.GetType())]; existing != nil {
+			for _, oldIP := range existing.GetValues() {
+				if revKey, err := sdk.ReverseKeyForA(oldIP); err == nil {
+					delete(s.records, recordKey(revKey.GetZone(), revKey.GetName(), revKey.GetType()))
+				}
+			}
+		}
+		fqdnStr := sdk.RecordFQDN(req.GetZone(), req.GetName())
+		for _, ip := range req.GetValues() {
+			if ptrRec, err := sdk.ReversePTRForA(ip, fqdnStr, req.GetTtl()); err == nil {
+				s.records[recordKey(ptrRec.GetZone(), ptrRec.GetName(), ptrRec.GetType())] = ptrRec
+			}
+		}
+	}
 	s.records[recordKey(req.GetZone(), req.GetName(), req.GetType())] = req
 	return &dnszonev1.Empty{}, nil
 }
@@ -667,6 +685,15 @@ func (s *bindZoneServer) UpsertRecord(_ context.Context, req *dnszonev1.Record) 
 func (s *bindZoneServer) DeleteRecord(_ context.Context, req *dnszonev1.RecordKey) (*dnszonev1.Empty, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	if req.GetType() == "A" {
+		if existing := s.records[recordKey(req.GetZone(), req.GetName(), req.GetType())]; existing != nil {
+			for _, ip := range existing.GetValues() {
+				if revKey, err := sdk.ReverseKeyForA(ip); err == nil {
+					delete(s.records, recordKey(revKey.GetZone(), revKey.GetName(), revKey.GetType()))
+				}
+			}
+		}
+	}
 	delete(s.records, recordKey(req.GetZone(), req.GetName(), req.GetType()))
 	return &dnszonev1.Empty{}, nil
 }
