@@ -6,8 +6,11 @@ Goal: prove that the architecture is extensible. **Adding a product changes neit
 1. `genesis modules scaffold <name> --provides dns.zone/v1,dns.resolver/v1`
    Generates `modules/<name>/`: `module.yaml`, `main.go` with `sdk.Serve`, stubs for each RPC, `schema.json`, conformance test.
 2. Fill in the manifest: `provides`, `requires`, `capabilities`, secrets, resources, ports.
-3. Implement the lifecycle and the services of the provided functions.
-4. Write the `config_schema`.
+3. Implement the lifecycle and the services of the provided functions:
+   - **Broker session tokens**: Always dial required dependencies using `req.GetBrokerToken()` received on each lifecycle call (`Check`, `Provision`, `Configure`, `Verify`, `Handover`). Because the core issues fresh broker sessions per step, re-dialing only when the token changes ensures your module dynamically observes repointed services (e.g. DNS or PKI handover).
+   - **Repoint handler**: Implement `Repoint(ctx, &modulev1.RepointRequest{...})` so your module reconfigures its consumers if an active required dependency shifts to a new provider during handover.
+   - **Idempotence & state**: Persist non-sensitive connection parameters in `StepResult.State` (e.g. VM IPs, container IDs) and restore clients during `Check`. Never write plaintext secrets to state.
+4. Write the `config_schema` (`schema.json`) matching the capability options declared in the manifest.
 5. Pass the SDK **conformance suite**: `go test ./... -run Conformance`. It checks idempotence, that `Handover` can be replayed, that no secret appears in the outputs, and the semantics of each provided function (e.g. an `UpsertRecord` must be visible through `ListRecords`, then resolvable).
 6. `genesis modules install ./modules/<name>`, then reference `module: <name>` in a spec.
 
