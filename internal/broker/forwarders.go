@@ -20,6 +20,7 @@ var knownForwarders = map[string]func(*grpc.Server, *grpc.ClientConn){
 	"time.ntp/v1":     ForwardTimeNTP,
 	"pki.issuer/v1":   ForwardPkiIssuer,
 	"secrets.kv/v1":   ForwardSecretsKV,
+	"access.ssh/v1":   ForwardAccessSSH,
 }
 
 // ForwarderFor returns the forwarder to use for a function provided by a

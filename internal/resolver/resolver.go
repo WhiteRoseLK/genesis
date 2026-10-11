@@ -252,6 +252,9 @@ func closeRequirements(r *Resolved, byName map[string]modulehost.Installed) erro
 			for _, phaseEntries := range orderedRequires(m.Manifest.Requires) {
 				for _, entry := range phaseEntries.entries {
 					function, phase := SplitFunctionPhase(entry.Function)
+					if IsCoreFunction(function) {
+						continue
+					}
 					if _, ok := r.ProviderFor(function, phase); ok {
 						continue
 					}
@@ -354,6 +357,12 @@ func SplitFunctionPhase(function string) (name, phase string) {
 		return function[:i], function[i+1:]
 	}
 	return function, ""
+}
+
+// IsCoreFunction reports whether a function is provided natively by the core
+// (e.g. core.secrets/v1, core.container/v1, core.ansible/v1) rather than by a module.
+func IsCoreFunction(function string) bool {
+	return strings.HasPrefix(function, "core.")
 }
 
 func containsString(list []string, s string) bool {

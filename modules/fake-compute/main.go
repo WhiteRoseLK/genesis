@@ -173,8 +173,9 @@ func (s *computeVMServer) EnsureVM(ctx context.Context, req *computevmv1.EnsureV
 		user = "genesis"
 	}
 
+	containerName := "genesis-vm-" + req.GetName()
 	resp, err := containers.Run(ctx, &containerv1.RunRequest{
-		Name:  "genesis-vm-" + req.GetName(),
+		Name:  containerName,
 		Image: sshTargetImage,
 		Env: map[string]string{
 			"PUBLIC_KEY":      req.GetSshPublicKey(),
@@ -186,13 +187,35 @@ func (s *computeVMServer) EnsureVM(ctx context.Context, req *computevmv1.EnsureV
 		Detach: true,
 	})
 	if err != nil {
-		return nil, fmt.Errorf("starting VM %q: %w", req.GetName(), err)
+		// If the container already exists from a previous or interrupted run,
+		// remove it and recreate it so EnsureVM is truly idempotent across restarts.
+		_, _ = containers.Stop(ctx, &containerv1.StopRequest{ContainerId: containerName})
+		resp, err = containers.Run(ctx, &containerv1.RunRequest{
+			Name:  containerName,
+			Image: sshTargetImage,
+			Env: map[string]string{
+				"PUBLIC_KEY":      req.GetSshPublicKey(),
+				"USER_NAME":       user,
+				"PASSWORD_ACCESS": "false",
+				"SUDO_ACCESS":     "true",
+				"LISTEN_PORT":     fmt.Sprintf("%d", sshTargetPort),
+			},
+			Detach: true,
+		})
+		if err != nil {
+			return nil, fmt.Errorf("starting VM %q: %w", req.GetName(), err)
+		}
+	}
+
+	ip := resp.GetIp()
+	if req.GetIp() != "" {
+		ip = req.GetIp()
 	}
 
 	vm := &computevmv1.VM{
 		Id:               resp.GetContainerId(),
 		Name:             req.GetName(),
-		Ip:               resp.GetIp(),
+		Ip:               ip,
 		Status:           "running",
 		SshPort:          sshTargetPort,
 		SshHostPublicKey: req.GetSshHostPublicKey(),

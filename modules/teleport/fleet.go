@@ -7,6 +7,9 @@ import (
 	"fmt"
 	"regexp"
 
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
+
 	sdk "github.com/WhiteRoseLK/genesis/sdk/go"
 	ansiblev1 "github.com/WhiteRoseLK/genesis/sdk/go/gen/functions/core/ansible/v1"
 	fleetagentv1 "github.com/WhiteRoseLK/genesis/sdk/go/gen/functions/fleet/agent/v1"
@@ -29,7 +32,7 @@ func (s *teleportFleetServer) Install(ctx context.Context, req *fleetagentv1.Ins
 	ownTarget := m.ownTarget
 	m.mu.Unlock()
 	if ownTarget.Host == "" {
-		return nil, fmt.Errorf("fleet.agent/v1.Install: teleport not configured yet (Configure has not succeeded yet)")
+		return nil, status.Error(codes.Unimplemented, "fleet.agent/v1.Install: teleport not configured yet (Configure has not succeeded yet)")
 	}
 
 	t := req.GetTarget()

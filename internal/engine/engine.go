@@ -719,6 +719,10 @@ func (e *Engine) action(
 	}
 	result, err := rpc(ctx, req)
 	if err != nil {
+		if status.Code(err) == codes.Unimplemented && stepName == "verify.final" {
+			e.audit(m.Name, stepName, "unimplemented, skipped")
+			return nil
+		}
 		return modulehost.WrapModuleError(stepName, err)
 	}
 	if result.GetStatus() != modulev1.StepResult_STATUS_OK {

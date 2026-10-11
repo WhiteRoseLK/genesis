@@ -52,7 +52,8 @@ func Build(resolved *resolver.Resolved) (*Plan, error) {
 }
 
 func computeEdges(resolved *resolver.Resolved, names []string) ([]Edge, error) {
-	var edges []Edge
+	var mandatoryEdges []Edge
+	var optionalEdges []Edge
 
 	for _, name := range names {
 		m := resolved.Modules[name]
@@ -66,6 +67,9 @@ func computeEdges(resolved *resolver.Resolved, names []string) ([]Edge, error) {
 		for _, phase := range phases {
 			for _, entry := range m.Manifest.Requires[phase] {
 				function, functionPhase := resolver.SplitFunctionPhase(entry.Function)
+				if resolver.IsCoreFunction(function) {
+					continue
+				}
 				provider, ok := resolved.ProviderFor(function, functionPhase)
 				if !ok {
 					if entry.Optional {
@@ -79,10 +83,30 @@ func computeEdges(resolved *resolver.Resolved, names []string) ([]Edge, error) {
 				if provider == name {
 					continue // a module that provides for itself is not an ordering dependency
 				}
-				edges = append(edges, Edge{From: provider, To: name, Function: entry.Function})
+				edge := Edge{From: provider, To: name, Function: entry.Function}
+				if entry.Optional {
+					optionalEdges = append(optionalEdges, edge)
+				} else {
+					mandatoryEdges = append(mandatoryEdges, edge)
+				}
 			}
 		}
 	}
+
+	// Verify mandatory edges do not contain cycles.
+	if _, err := topologicalSort(names, mandatoryEdges); err != nil {
+		return nil, err
+	}
+
+	// Add optional edges only if they preserve the DAG (do not introduce cycles).
+	edges := mandatoryEdges
+	for _, opt := range optionalEdges {
+		candidate := append(append([]Edge(nil), edges...), opt)
+		if _, err := topologicalSort(names, candidate); err == nil {
+			edges = candidate
+		}
+	}
+
 	return edges, nil
 }
 
