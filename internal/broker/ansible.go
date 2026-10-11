@@ -33,6 +33,15 @@ func NativeAnsible(rt *runner.ContainerRuntime) nativeFactory {
 	}
 }
 
+// NativeAnsibleServer builds the core.ansible/v1 provider with a custom AnsibleServer implementation.
+func NativeAnsibleServer(srv ansiblev1.AnsibleServer) nativeFactory {
+	return func(_ string) func(*grpc.Server) {
+		return func(s *grpc.Server) {
+			ansiblev1.RegisterAnsibleServer(s, srv)
+		}
+	}
+}
+
 type ansibleServer struct {
 	ansiblev1.UnimplementedAnsibleServer
 	runtime *runner.ContainerRuntime

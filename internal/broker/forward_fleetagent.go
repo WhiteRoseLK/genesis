@@ -4,9 +4,10 @@ package broker
 
 import (
 	"context"
-	"fmt"
 
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 
 	fleetagentv1 "github.com/WhiteRoseLK/genesis/sdk/go/gen/functions/fleet/agent/v1"
 )
@@ -24,11 +25,22 @@ type fanoutFleetAgent struct {
 }
 
 func (f *fanoutFleetAgent) Install(ctx context.Context, req *fleetagentv1.InstallRequest) (*fleetagentv1.InstallResponse, error) {
+	if len(f.conns) == 0 {
+		return nil, status.Error(codes.Unimplemented, "fleet.agent/v1: no fleet agent providers connected")
+	}
+	unimplementedCount := 0
 	for i, conn := range f.conns {
 		client := fleetagentv1.NewFleetAgentClient(conn)
 		if _, err := client.Install(ctx, req); err != nil {
-			return nil, fmt.Errorf("fleet.agent/v1.Install (provider %d/%d): %w", i+1, len(f.conns), err)
+			if status.Code(err) == codes.Unimplemented {
+				unimplementedCount++
+				continue
+			}
+			return nil, status.Errorf(status.Code(err), "fleet.agent/v1.Install (provider %d/%d): %v", i+1, len(f.conns), err)
 		}
+	}
+	if unimplementedCount == len(f.conns) {
+		return nil, status.Error(codes.Unimplemented, "fleet.agent/v1: no fleet agent provider ready or implemented")
 	}
 	return &fleetagentv1.InstallResponse{}, nil
 }

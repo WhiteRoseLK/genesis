@@ -77,6 +77,11 @@ func (m *baseOSModule) Repoint(_ context.Context, req *modulev1.RepointRequest) 
 	}, nil
 }
 
+func (m *baseOSModule) Verify(_ context.Context, req *modulev1.StepRequest) (*modulev1.StepResult, error) {
+	_ = m.dialWithToken(req.GetBrokerToken())
+	return &modulev1.StepResult{Status: modulev1.StepResult_STATUS_OK, State: req.GetState()}, nil
+}
+
 func (m *baseOSModule) Destroy(_ context.Context, req *modulev1.StepRequest) (*modulev1.StepResult, error) {
 	_ = m.dialWithToken(req.GetBrokerToken())
 	return &modulev1.StepResult{Status: modulev1.StepResult_STATUS_OK, State: req.GetState()}, nil
