@@ -8,6 +8,13 @@
   gather_facts: false
   become: true
   tasks:
+    - name: ensure systemd-timesyncd is installed
+      ansible.builtin.apt:
+        name: systemd-timesyncd
+        state: present
+        update_cache: false
+        lock_timeout: 120
+
     - name: configure the NTP servers
       ansible.builtin.lineinfile:
         path: /etc/systemd/timesyncd.conf
@@ -20,4 +27,5 @@
       ansible.builtin.systemd:
         name: systemd-timesyncd
         state: restarted
+        enabled: true
       when: timesyncd_conf.changed

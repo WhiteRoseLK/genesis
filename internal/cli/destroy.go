@@ -7,7 +7,9 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"github.com/WhiteRoseLK/genesis/internal/broker"
 	"github.com/WhiteRoseLK/genesis/internal/engine"
+	"github.com/WhiteRoseLK/genesis/internal/runner"
 )
 
 func newDestroyCmd() *cobra.Command {
@@ -58,6 +60,13 @@ func newDestroyCmd() *cobra.Command {
 		}
 
 		e := engine.New(stateDir, store)
+
+		preferredRuntime := resolved.Seed.ContainerRuntime
+		if rt, err := runner.DetectContainerRuntime(preferredRuntime); err == nil {
+			e.Registry.SetNative("core.container/v1", broker.NativeContainer(rt, resolved.Seed.Address))
+			e.Registry.SetNative("core.ansible/v1", broker.NativeAnsible(rt))
+		}
+
 		if err := e.Destroy(cmd.Context(), resolved, p); err != nil {
 			return err
 		}

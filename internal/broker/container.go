@@ -14,23 +14,36 @@ import (
 // NativeContainer builds the core.container/v1 provider, native to the core
 // (docs/02-architecture.md: "runners are exposed to modules as built-in
 // functions").
-func NativeContainer(rt *runner.ContainerRuntime) nativeFactory {
+func NativeContainer(rt *runner.ContainerRuntime, seedAddress ...string) nativeFactory {
+	var addr string
+	if len(seedAddress) > 0 {
+		addr = seedAddress[0]
+	}
 	return func(_ string) func(*grpc.Server) {
 		return func(s *grpc.Server) {
-			containerv1.RegisterContainerServer(s, &containerServer{runtime: rt})
+			containerv1.RegisterContainerServer(s, &containerServer{runtime: rt, seedAddress: addr})
 		}
 	}
 }
 
 type containerServer struct {
 	containerv1.UnimplementedContainerServer
-	runtime *runner.ContainerRuntime
+	runtime     *runner.ContainerRuntime
+	seedAddress string
 }
 
 func (c *containerServer) Run(ctx context.Context, req *containerv1.RunRequest) (*containerv1.RunResponse, error) {
 	mounts := make([]runner.Mount, len(req.GetMounts()))
 	for i, m := range req.GetMounts() {
 		mounts[i] = runner.Mount{HostPath: m.GetHostPath(), ContainerPath: m.GetContainerPath(), ReadOnly: m.GetReadOnly()}
+	}
+	ports := make([]runner.PortMapping, len(req.GetPorts()))
+	for i, p := range req.GetPorts() {
+		ports[i] = runner.PortMapping{
+			HostPort:      int(p.GetHostPort()),
+			ContainerPort: int(p.GetContainerPort()),
+			Protocol:      p.GetProtocol(),
+		}
 	}
 	var files map[string][]byte
 	if len(req.GetFiles()) > 0 {
@@ -45,6 +58,7 @@ func (c *containerServer) Run(ctx context.Context, req *containerv1.RunRequest) 
 		Command: req.GetCommand(),
 		Env:     req.GetEnv(),
 		Mounts:  mounts,
+		Ports:   ports,
 		Files:   files,
 		Collect: req.GetCollect(),
 		Detach:  req.GetDetach(),
@@ -61,10 +75,13 @@ func (c *containerServer) Run(ctx context.Context, req *containerv1.RunRequest) 
 
 	var ip string
 	if req.GetDetach() {
-		// The IP only matters for a service that keeps running; an error here
-		// (network not assigned yet) must not fail the whole Run, the
-		// container has indeed started.
-		ip, _ = c.runtime.InspectIP(ctx, result.ContainerID)
+		// When running behind NAT, external nodes reach the service on the seed
+		// host's IP via port forwarding.
+		if c.seedAddress != "" {
+			ip = c.seedAddress
+		} else {
+			ip, _ = c.runtime.InspectIP(ctx, result.ContainerID)
+		}
 	}
 
 	return &containerv1.RunResponse{

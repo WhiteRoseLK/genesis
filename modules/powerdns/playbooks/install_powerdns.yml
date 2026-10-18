@@ -17,6 +17,8 @@
           - sqlite3
         state: present
         update_cache: true
+        cache_valid_time: 3600
+        lock_timeout: 120
 
     - name: stop pdns-server while the database is prepared
       ansible.builtin.systemd:
@@ -65,9 +67,12 @@
         content: |
           local-address=0.0.0.0
           local-port=53
-          forward-zones={{ domain }}=127.0.0.1:5300
+          forward-zones={{ domain }}=127.0.0.1:5300,in-addr.arpa=127.0.0.1:5300,10.in-addr.arpa=127.0.0.1:5300,168.192.in-addr.arpa=127.0.0.1:5300
           forward-zones-recurse=.={{ upstream_resolvers | join(';') }}
           allow-from=0.0.0.0/0
+          dont-query=
+          serve-rfc1918=no
+          dnssec=off
         dest: /etc/powerdns/recursor.conf
         mode: "0644"
       register: recursor_conf
@@ -77,6 +82,21 @@
         name: pdns
         enabled: true
         state: restarted
+
+    - name: disable systemd-resolved stub listener to free port 53
+      ansible.builtin.lineinfile:
+        path: /etc/systemd/resolved.conf
+        regexp: '^#?DNSStubListener='
+        line: 'DNSStubListener=no'
+      register: resolved_conf
+      failed_when: false
+
+    - name: restart systemd-resolved if stub listener changed
+      ansible.builtin.systemd:
+        name: systemd-resolved
+        state: restarted
+      when: resolved_conf.changed | default(false)
+      failed_when: false
 
     - name: enable and start pdns-recursor
       ansible.builtin.systemd:

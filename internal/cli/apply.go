@@ -12,9 +12,28 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"github.com/WhiteRoseLK/genesis/internal/broker"
 	"github.com/WhiteRoseLK/genesis/internal/engine"
+	"github.com/WhiteRoseLK/genesis/internal/resolver"
+	"github.com/WhiteRoseLK/genesis/internal/runner"
 	"github.com/WhiteRoseLK/genesis/internal/state"
 )
+
+func requiresContainerOrAnsible(resolved *resolver.Resolved) bool {
+	for _, m := range resolved.Modules {
+		if m.Manifest == nil {
+			continue
+		}
+		for _, reqs := range m.Manifest.Requires {
+			for _, req := range reqs {
+				if req.Function == "core.container/v1" || req.Function == "core.ansible/v1" {
+					return true
+				}
+			}
+		}
+	}
+	return false
+}
 
 func newApplyCmd() *cobra.Command {
 	cmd := &cobra.Command{
@@ -64,6 +83,15 @@ func newApplyCmd() *cobra.Command {
 		}
 
 		e := engine.New(stateDir, store)
+
+		preferredRuntime := resolved.Seed.ContainerRuntime
+		if rt, err := runner.DetectContainerRuntime(preferredRuntime); err == nil {
+			e.Registry.SetNative("core.container/v1", broker.NativeContainer(rt, resolved.Seed.Address))
+			e.Registry.SetNative("core.ansible/v1", broker.NativeAnsible(rt))
+		} else if requiresContainerOrAnsible(resolved) {
+			return fmt.Errorf("detecting container runtime: %w", err)
+		}
+
 		if err := e.Run(cmd.Context(), resolved, p); err != nil {
 			return err
 		}

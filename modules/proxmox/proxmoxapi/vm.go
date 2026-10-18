@@ -183,6 +183,7 @@ func (c *Client) ConfigureCloudInit(ctx context.Context, node string, vmid int, 
 	if len(opts.Tags) > 0 {
 		form.Set("tags", strings.Join(opts.Tags, ";"))
 	}
+	form.Set("ciupgrade", "0")
 	path := fmt.Sprintf("/nodes/%s/qemu/%d/config", node, vmid)
 	return c.doMaybeAsync(ctx, node, http.MethodPut, path, form)
 }

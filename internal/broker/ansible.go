@@ -9,6 +9,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"net"
 	"sort"
 	"strings"
 
@@ -86,7 +87,11 @@ func (a *ansibleServer) RunPlaybook(ctx context.Context, req *ansiblev1.RunPlayb
 		// to the container and the files are extracted there as 0600.
 		Tmpfs: []string{"/work:rw,mode=1777"},
 		Stdin: archive,
-		Env:   map[string]string{"ANSIBLE_HOST_KEY_CHECKING": hostKeyChecking},
+		Env: map[string]string{
+			"ANSIBLE_HOST_KEY_CHECKING": hostKeyChecking,
+			"ANSIBLE_SSH_RETRIES":       "3",
+			"ANSIBLE_TIMEOUT":           "30",
+		},
 	})
 	if err != nil {
 		return nil, fmt.Errorf("running the ansible container: %w", err)
@@ -185,19 +190,52 @@ func tarFiles(files map[string][]byte) ([]byte, error) {
 // names) that would make the output unreadable.
 const minRedactLen = 8
 
-// collectStrings returns every string contained in v, recursively.
+// isNonSensitive checks whether a key-value pair represents mundane configuration
+// (IP addresses, domain names, network parameters, paths) that must not be redacted.
+func isNonSensitive(key, s string) bool {
+	if net.ParseIP(s) != nil {
+		return true
+	}
+	if _, _, err := net.ParseCIDR(s); err == nil {
+		return true
+	}
+	k := strings.ToLower(key)
+	if k != "" {
+		sensitiveHints := []string{"secret", "key", "token", "pass", "cert", "tls", "cred", "auth", "private"}
+		for _, hint := range sensitiveHints {
+			if strings.Contains(k, hint) {
+				return false
+			}
+		}
+		nonSensitiveHints := []string{"server", "resolver", "host", "domain", "ip", "addr", "name", "subnet", "path", "url"}
+		for _, hint := range nonSensitiveHints {
+			if strings.Contains(k, hint) {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+// collectStrings returns every sensitive string contained in v, recursively.
 func collectStrings(v any) []string {
+	return collectStringsWithKey("", v)
+}
+
+func collectStringsWithKey(key string, v any) []string {
 	var out []string
 	switch t := v.(type) {
 	case string:
-		out = append(out, t)
+		if !isNonSensitive(key, t) {
+			out = append(out, t)
+		}
 	case map[string]any:
-		for _, e := range t {
-			out = append(out, collectStrings(e)...)
+		for k, e := range t {
+			out = append(out, collectStringsWithKey(k, e)...)
 		}
 	case []any:
 		for _, e := range t {
-			out = append(out, collectStrings(e)...)
+			out = append(out, collectStringsWithKey(key, e)...)
 		}
 	}
 	return out
@@ -213,7 +251,9 @@ func redactValues(out string, values []string) string {
 	for _, v := range values {
 		for _, line := range strings.Split(v, "\n") {
 			if line = strings.TrimSpace(line); len(line) >= minRedactLen {
-				needles = append(needles, line)
+				if net.ParseIP(line) == nil {
+					needles = append(needles, line)
+				}
 			}
 		}
 	}

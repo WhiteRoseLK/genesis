@@ -47,22 +47,23 @@ var installVaultPlaybook []byte
 var checkVaultPlaybook []byte
 
 const (
-	defaultVMName      = "vault01"
-	sshUser            = "genesis"
-	sshKeyRefFmt       = "vault/%s/ssh-key"
-	unsealKeysRef      = "vault/unseal-keys" // JSON array of 5 keys (doc 06: shamir-shares, recovery)
-	rootTokenRef       = "vault/root-token"
-	approleRoleIDRef   = "vault/approle-role-id"
-	approleSecretIDRef = "vault/approle-secret-id"
-	vaultAPIPort       = 8200
-	pkiMount           = "pki_int"
-	pkiRole            = "genesis"
-	kvMount            = "genesis"
-	appRoleName        = "genesis"
-	verifierSuffix     = "-verify"
-	unsealShares       = 5
-	unsealThreshold    = 3
-	teleportAgentPort  = 3022
+	defaultVMName          = "vault01"
+	sshUser                = "genesis"
+	sshKeyRefFmt           = "vault/%s/ssh-key"
+	unsealKeysRef          = "vault/unseal-keys" // JSON array of 5 keys (doc 06: shamir-shares, recovery)
+	rootTokenRef           = "vault/root-token"
+	approleRoleIDRef       = "vault/approle-role-id"
+	approleSecretIDRef     = "vault/approle-secret-id"
+	pkiIntermediateCertRef = "vault/pki-intermediate-cert"
+	vaultAPIPort           = 8200
+	pkiMount               = "pki_int"
+	pkiRole                = "genesis"
+	kvMount                = "genesis"
+	appRoleName            = "genesis"
+	verifierSuffix         = "-verify"
+	unsealShares           = 5
+	unsealThreshold        = 3
+	teleportAgentPort      = 3022
 )
 
 // genesisPolicy allows the application KV (doc 03, manifest example) and
@@ -132,13 +133,84 @@ func (m *vaultModule) Validate(context.Context, *modulev1.ValidateRequest) (*mod
 	return &modulev1.Diagnostics{}, nil
 }
 
-func (m *vaultModule) Check(_ context.Context, req *modulev1.StepRequest) (*modulev1.CheckResult, error) {
+func (m *vaultModule) Check(ctx context.Context, req *modulev1.StepRequest) (*modulev1.CheckResult, error) {
 	_ = m.dialWithToken(req.GetBrokerToken())
 	flags := sdk.StateMap(req.GetState())
 	if boolFlag(flags, "handed_over") || boolFlag(flags, "verified") {
+		if err := m.rehydrate(ctx, req); err != nil {
+			return nil, fmt.Errorf("rehydrating vault: %w", err)
+		}
 		return &modulev1.CheckResult{Status: modulev1.CheckResult_STATUS_COMPLIANT}, nil
 	}
 	return &modulev1.CheckResult{Status: modulev1.CheckResult_STATUS_TODO}, nil
+}
+
+func (m *vaultModule) rehydrate(ctx context.Context, req *modulev1.StepRequest) error {
+	m.mu.Lock()
+	if m.api != nil && m.approleToken != "" {
+		m.mu.Unlock()
+		return nil
+	}
+	m.mu.Unlock()
+
+	if m.broker == nil || m.secretsClient == nil {
+		return nil
+	}
+
+	state := sdk.StateMap(req.GetState())
+	vmIP := fmt.Sprint(state["vm_ip"])
+	if vmIP == "" || vmIP == "<nil>" {
+		return nil
+	}
+
+	var rootCAPEM string
+	if ca, err := m.getSecret(ctx, "vault/root-ca"); err == nil && ca != "" {
+		rootCAPEM = ca
+	} else if m.pkiSeedClient != nil {
+		if rootChain, err := m.pkiSeedClient.CAChain(ctx, &pkiissuerv1.Empty{}); err == nil {
+			rootCAPEM = rootChain.GetChainPem()
+		}
+	}
+	if rootCAPEM == "" {
+		return fmt.Errorf("cannot find root CA certificate for vault")
+	}
+
+	api, err := newVaultClient(fmt.Sprintf("https://%s:%d", vmIP, vaultAPIPort), rootCAPEM)
+	if err != nil {
+		return fmt.Errorf("creating vault client: %w", err)
+	}
+
+	if _, err := m.ensureInitializedAndUnsealed(ctx, api); err != nil {
+		return fmt.Errorf("unsealing vault: %w", err)
+	}
+	if err := m.waitForActive(ctx, api); err != nil {
+		return fmt.Errorf("waiting for active vault: %w", err)
+	}
+
+	roleID, err := m.getSecret(ctx, approleRoleIDRef)
+	if err != nil {
+		return fmt.Errorf("reading role ID: %w", err)
+	}
+	secretID, err := m.getSecret(ctx, approleSecretIDRef)
+	if err != nil {
+		return fmt.Errorf("reading secret ID: %w", err)
+	}
+	approleToken, err := api.appRoleLogin(ctx, roleID, secretID)
+	if err != nil {
+		return fmt.Errorf("login AppRole: %w", err)
+	}
+
+	pkiIntPEM, _ := m.getSecret(ctx, pkiIntermediateCertRef)
+
+	m.mu.Lock()
+	m.api = api
+	m.vmIP = vmIP
+	m.approleToken = approleToken
+	m.rootCAPEM = rootCAPEM
+	m.pkiIntPEM = pkiIntPEM
+	m.mu.Unlock()
+
+	return nil
 }
 
 func boolFlag(flags map[string]any, key string) bool {

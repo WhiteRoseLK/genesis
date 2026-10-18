@@ -62,9 +62,12 @@ func (m *coreDNSModule) Validate(context.Context, *modulev1.ValidateRequest) (*m
 // iteration (internal/engine) stops at seed_ready (docs/03-module-contract.md
 // §5); the session token is captured so that the function handlers
 // (UpsertRecord...) can reach core.container/v1.
-func (m *coreDNSModule) Check(_ context.Context, req *modulev1.StepRequest) (*modulev1.CheckResult, error) {
+func (m *coreDNSModule) Check(ctx context.Context, req *modulev1.StepRequest) (*modulev1.CheckResult, error) {
 	_ = m.dialWithToken(req.GetBrokerToken())
 	flags := sdk.StateMap(req.GetState())
+	if boolFlag(flags, "retired") {
+		return &modulev1.CheckResult{Status: modulev1.CheckResult_STATUS_COMPLIANT}, nil
+	}
 	if cid, ok := flags["container_id"].(string); ok && cid != "" {
 		m.zoneServer.mu.Lock()
 		if m.zoneServer.containerID == "" {
@@ -74,8 +77,14 @@ func (m *coreDNSModule) Check(_ context.Context, req *modulev1.StepRequest) (*mo
 			}
 		}
 		m.zoneServer.mu.Unlock()
+
+		if containers, err := m.containers(); err == nil {
+			if st, err := containers.Status(ctx, &containerv1.StatusRequest{ContainerId: cid}); err != nil || st.GetState() != "running" {
+				return &modulev1.CheckResult{Status: modulev1.CheckResult_STATUS_TODO}, nil
+			}
+		}
 	}
-	if boolFlag(flags, "seeded") || boolFlag(flags, "retired") {
+	if boolFlag(flags, "seeded") {
 		return &modulev1.CheckResult{Status: modulev1.CheckResult_STATUS_COMPLIANT}, nil
 	}
 	return &modulev1.CheckResult{Status: modulev1.CheckResult_STATUS_TODO}, nil
@@ -383,11 +392,8 @@ func (s *dnsZoneServer) reload(ctx context.Context) error {
 			return fmt.Errorf("writing zone %q: %w", zone, err)
 		}
 	}
-	if len(zoneNames) == 0 {
-		// Minimal valid Corefile as long as no zone has a record yet (a first
-		// call is possible before any UpsertRecord).
-		corefile.WriteString(".:53 {\n    health\n}\n")
-	}
+	// Forward all other queries to upstream DNS resolvers so bootstrap VMs can resolve packages
+	corefile.WriteString(".:53 {\n    forward . 1.1.1.1 9.9.9.9\n    log\n    errors\n    cache 30\n}\n")
 	if err := os.WriteFile(filepath.Join(dir, "Corefile"), []byte(corefile.String()), 0o644); err != nil { //nolint:gosec // G306: configuration without secrets
 		return fmt.Errorf("writing the Corefile: %w", err)
 	}
@@ -408,7 +414,11 @@ func (s *dnsZoneServer) reload(ctx context.Context) error {
 		Image:   corednsImage,
 		Command: []string{"-conf", "/zones/Corefile"},
 		Mounts:  []*containerv1.Mount{{HostPath: dir, ContainerPath: "/zones"}},
-		Detach:  true,
+		Ports: []*containerv1.PortMapping{
+			{HostPort: 53, ContainerPort: 53, Protocol: "udp"},
+			{HostPort: 53, ContainerPort: 53, Protocol: "tcp"},
+		},
+		Detach: true,
 	})
 	if err != nil {
 		return fmt.Errorf("starting CoreDNS: %w", err)
