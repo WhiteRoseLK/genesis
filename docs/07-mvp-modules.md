@@ -10,7 +10,7 @@ Each module lives in `modules/<name>/` with its `module.yaml`, its code, its Ans
 - **Provides**: `compute.vm/v1`. **Requires**: `core.secrets/v1`.
 - `Validate`: API access, token permissions, existing node, storage and bridge.
 - `EnsureImage`: downloads the Debian cloud image and creates a template (once).
-- `EnsureVM`: linked clone of the template, cloud-init (IP, service SSH key, `genesis` user), start, wait for SSH. Idempotence key: VM name + tag `genesis-env=<name>`.
+- `EnsureVM`: linked clone (or full clone on storages without linked clone support) of the template, cloud-init (IP, service SSH key, `genesis` user), start, wait for SSH. Idempotence key: VM name + tag `genesis-env-<name>`.
 - `Now`: the node's clock (seed clock check).
 - Accepted `extra`: `cpu_type`, `numa`, `tags`, `ha_group`…
 

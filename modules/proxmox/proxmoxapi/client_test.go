@@ -271,3 +271,74 @@ func TestNewHTTPClient(t *testing.T) {
 		}
 	})
 }
+
+func TestNextIDWithMinID(t *testing.T) {
+	var gotQuery string
+	client, _ := newTestServer(t, func(w http.ResponseWriter, r *http.Request) {
+		gotQuery = r.URL.RawQuery
+		writeData(t, w, "3005")
+	})
+
+	id, err := client.NextID(context.Background(), 3000)
+	if err != nil {
+		t.Fatalf("NextID: %v", err)
+	}
+	if id != 3005 {
+		t.Errorf("NextID = %d, want 3005", id)
+	}
+	if gotQuery != "vmid=3000" {
+		t.Errorf("query = %q, want vmid=3000", gotQuery)
+	}
+}
+
+func TestCloneVMFullAndStorageOptions(t *testing.T) {
+	var gotForm string
+	client, _ := newTestServer(t, func(w http.ResponseWriter, r *http.Request) {
+		body := make([]byte, r.ContentLength)
+		_, _ = r.Body.Read(body)
+		gotForm = string(body)
+		writeData(t, w, nil)
+	})
+
+	err := client.CloneVM(context.Background(), "pve01", CloneVMOptions{
+		TemplateID: 9000,
+		NewID:      3001,
+		Name:       "infra01",
+		Full:       true,
+		Storage:    "SSD",
+	})
+	if err != nil {
+		t.Fatalf("CloneVM: %v", err)
+	}
+	if !strings.Contains(gotForm, "full=1") || !strings.Contains(gotForm, "storage=SSD") || !strings.Contains(gotForm, "newid=3001") {
+		t.Errorf("form sent = %q, want full=1, storage=SSD, newid=3001", gotForm)
+	}
+}
+
+func TestCloneVMFallbackToFullClone(t *testing.T) {
+	attempts := 0
+	client, _ := newTestServer(t, func(w http.ResponseWriter, r *http.Request) {
+		attempts++
+		body := make([]byte, r.ContentLength)
+		_, _ = r.Body.Read(body)
+		form := string(body)
+		if strings.Contains(form, "full=0") {
+			http.Error(w, `{"data":null,"message":"Linked clone feature is not supported for 'SSD:vm-3000-disk-0'"}`, http.StatusBadRequest)
+			return
+		}
+		writeData(t, w, nil)
+	})
+
+	err := client.CloneVM(context.Background(), "pve01", CloneVMOptions{
+		TemplateID: 9000,
+		NewID:      3001,
+		Name:       "infra01",
+		Full:       false,
+	})
+	if err != nil {
+		t.Fatalf("CloneVM fallback: %v", err)
+	}
+	if attempts != 2 {
+		t.Errorf("attempts = %d, want 2 (linked clone then full clone fallback)", attempts)
+	}
+}
