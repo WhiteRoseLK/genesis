@@ -8,6 +8,9 @@ This guide walks you through building, configuring, deploying, and operating an 
 
 1. [Overview](#1-overview)
 2. [Prerequisites](#2-prerequisites)
+   - [Host Environment (The Seed)](#host-environment-the-seed)
+   - [Hypervisor Prerequisites (Proxmox VE)](#hypervisor-prerequisites-proxmox-ve)
+   - [Proxmox VE Golden Template Preparation](#proxmox-ve-golden-template-preparation)
 3. [Building the CLI](#3-building-the-cli)
 4. [Step-by-Step Walkthrough](#4-step-by-step-walkthrough)
    - [Step 1: Initialize the Seed (`genesis init`)](#step-1-initialize-the-seed-genesis-init)
@@ -57,6 +60,53 @@ The machine running `genesis` (the seed) can be a physical server, VM, or local 
   - Network reachability to the virtualization hypervisor (e.g. Proxmox VE API on port 8006).
   - Outbound Internet connectivity to pull container images and OS packages (connected profile).
   - IP routing to the target VM subnet.
+
+### Hypervisor Prerequisites (Proxmox VE)
+When targeting Proxmox VE (`compute.vm/v1`), ensure the cluster provides:
+- **API Access**: HTTPS connectivity on port 8006 with an API Token (format: `<user>@<realm>!<tokenid>`) having appropriate permissions (`VM.Allocate`, `VM.Clone`, `VM.Config.*`, `VM.PowerMgmt`, `VM.Audit`, `Datastore.AllocateSpace`, `Datastore.Audit`, `SDN.Use`).
+- **Network Bridge**: An existing Linux bridge or OVS bridge (e.g. `vmbr0`) with DHCP or static routing to the seed and internet gateway.
+- **Storage**: A storage pool supporting VM disk allocations (e.g. `SSD`, `local-lvm`, `ceph`). For storages that do not support snapshot-based linked clones (such as standard LVM), configure `full_clone: true` in the module configuration.
+- **VMID Allocation Range**: Genesis can place provisioned VMs into dedicated ID spaces (e.g. `vmid_min: 3000`) to avoid conflicts with existing cluster workloads.
+
+### Proxmox VE Golden Template Preparation
+
+The Proxmox VE REST API does not support raw disk image ingestion over HTTP without host-level shell operations. Therefore, Genesis assumes a base OS template is already available on the target node (see [Issue #8](https://github.com/WhiteRoseLK/genesis/issues/8)).
+
+Genesis requires a Cloud-Init enabled template equipped with:
+- **VirtIO SCSI Storage**: Disk attached as `scsi0` with `virtio-scsi-single` controller.
+- **Cloud-Init Drive**: Attached as `ide2`.
+- **Serial Console**: `serial0=socket` with `vga=serial0` display for headless terminal output.
+- **QEMU Guest Agent**: Enabled (`agent=1`) for guest IP and status detection.
+
+#### Automated Template Creation
+Run the helper script [`scripts/create-proxmox-template.sh`](../scripts/create-proxmox-template.sh) directly on your Proxmox VE node:
+```bash
+# Creates a template named 'genesis-template' (VMID 3000) on storage 'SSD'
+bash scripts/create-proxmox-template.sh --vmid 3000 --name genesis-template --storage SSD --bridge vmbr0 --os ubuntu-24.04
+```
+
+#### Manual Template Creation Steps
+If you prefer creating the template manually from the Proxmox host shell:
+```bash
+# 1. Download official cloud image
+curl -O https://cloud-images.ubuntu.com/noble/current/noble-server-cloudimg-amd64.img
+
+# 2. Create VM
+qm create 3000 --name genesis-template --memory 2048 --cores 2 --cpu host --net0 virtio,bridge=vmbr0
+
+# 3. Import disk to target storage (e.g. SSD or local-lvm)
+qm importdisk 3000 noble-server-cloudimg-amd64.img SSD
+
+# 4. Attach disk, Cloud-Init drive, and serial console
+qm set 3000 --scsihw virtio-scsi-single --scsi0 SSD:vm-3000-disk-0
+qm set 3000 --boot c --bootdisk scsi0
+qm set 3000 --ide2 SSD:cloudinit
+qm set 3000 --serial0 socket --vga serial0
+qm set 3000 --agent enabled=1
+
+# 5. Convert VM to template
+qm template 3000
+```
 
 ---
 
