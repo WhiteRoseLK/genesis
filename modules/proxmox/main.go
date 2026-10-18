@@ -1,16 +1,13 @@
 // SPDX-License-Identifier: Apache-2.0
 
 // proxmox provides compute.vm/v1 on an existing Proxmox VE cluster
-// (docs/07-mvp-modules.md). There is no access to a real cluster in this
-// development environment (see docs/PROGRESS.md, M5): built and tested against
-// HTTP fixtures, never run against a real instance.
+// (docs/07-mvp-modules.md).
 //
-// Accepted scope for this milestone: EnsureImage assumes a template already
-// exists under the requested name (`image` in the config) rather than
-// downloading the cloud image and creating the template automatically — that
-// chain of operations is the most complex and the least verifiable without a
-// real cluster; to be built once it can be validated (M9 or on explicit
-// request).
+// Template requirements: EnsureImage verifies that a Cloud-Init enabled
+// template already exists under the requested name (`image` in the config).
+// Automatic template download over the Proxmox REST API is not natively
+// supported without host shell access; templates must be created beforehand
+// (see docs/user-guide.md or scripts/create-proxmox-template.sh).
 package main
 
 import (
@@ -197,7 +194,7 @@ func (s *computeVMServer) EnsureImage(ctx context.Context, req *computevmv1.Ensu
 	}
 	if tmpl == nil {
 		return nil, fmt.Errorf(
-			"template %q not found on node %q: automatic template creation (cloud image download) is not supported yet — create it manually beforehand",
+			"template %q not found on node %q: Proxmox VE templates must be prepared beforehand with cloud-init (see docs/user-guide.md or scripts/create-proxmox-template.sh)",
 			req.GetImage(), cfg.Node,
 		)
 	}
