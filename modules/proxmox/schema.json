@@ -9,6 +9,8 @@
     "storage": { "type": "string" },
     "bridge": { "type": "string" },
     "image": { "type": "string" },
+    "vmid_min": { "type": "integer", "minimum": 100 },
+    "full_clone": { "type": "boolean" },
     "tls_insecure": { "type": "boolean" },
     "tls_ca_cert_ref": { "type": "string", "pattern": "^(env|file|vault)://" },
     "credentials": {

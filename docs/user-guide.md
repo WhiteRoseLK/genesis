@@ -144,6 +144,8 @@ capabilities:
       storage: local-lvm
       bridge: vmbr0
       image: debian-13
+      vmid_min: 3000
+      full_clone: true
       credentials:
         token_id_ref: env://PVE_TOKEN_ID
         token_secret_ref: env://PVE_TOKEN_SECRET

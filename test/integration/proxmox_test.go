@@ -105,6 +105,13 @@ func (f *fakeProxmoxServer) handler() http.HandlerFunc {
 			}
 			f.writeData(w, nil)
 
+		case strings.HasSuffix(path, "/status/stop"):
+			id := extractVMID(path, "/nodes/pve01/qemu/", "/status/stop")
+			if vm, ok := f.vms[id]; ok {
+				vm.Status = "stopped"
+			}
+			f.writeData(w, nil)
+
 		case strings.HasSuffix(path, "/status/current"):
 			id := extractVMID(path, "/nodes/pve01/qemu/", "/status/current")
 			vm, ok := f.vms[id]

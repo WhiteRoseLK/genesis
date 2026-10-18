@@ -20,17 +20,43 @@ type VM struct {
 	Template int    `json:"template,omitempty"` // 1 if it is a template
 }
 
-// NextID asks the cluster for a free VM ID.
-func (c *Client) NextID(ctx context.Context) (int, error) {
-	var idStr string
-	if err := c.do(ctx, http.MethodGet, "/cluster/nextid", nil, &idStr); err != nil {
-		return 0, err
+// NextID asks the cluster for a free VM ID. If minID is provided and > 0,
+// it finds the first free ID starting from minID.
+func (c *Client) NextID(ctx context.Context, minID ...int) (int, error) {
+	start := 0
+	if len(minID) > 0 {
+		start = minID[0]
 	}
-	id, err := strconv.Atoi(idStr)
-	if err != nil {
-		return 0, fmt.Errorf("unexpected ID from /cluster/nextid: %q", idStr)
+	if start <= 0 {
+		var idStr string
+		if err := c.do(ctx, http.MethodGet, "/cluster/nextid", nil, &idStr); err != nil {
+			return 0, err
+		}
+		id, err := strconv.Atoi(idStr)
+		if err != nil {
+			return 0, fmt.Errorf("unexpected ID from /cluster/nextid: %q", idStr)
+		}
+		return id, nil
 	}
-	return id, nil
+
+	// Proxmox /cluster/nextid?vmid=X checks if X is available. If X already
+	// exists, it returns HTTP 400 "VM X already exists". We find the first free
+	// ID starting from start.
+	for candidate := start; candidate < start+10000; candidate++ {
+		var idStr string
+		err := c.do(ctx, http.MethodGet, fmt.Sprintf("/cluster/nextid?vmid=%d", candidate), nil, &idStr)
+		if err == nil {
+			id, err := strconv.Atoi(idStr)
+			if err != nil {
+				return 0, fmt.Errorf("unexpected ID from /cluster/nextid: %q", idStr)
+			}
+			return id, nil
+		}
+		if !strings.Contains(err.Error(), "already exists") {
+			return 0, err
+		}
+	}
+	return 0, fmt.Errorf("no free VM ID found starting from %d", start)
 }
 
 // ListVMs lists the node's VMs (and templates).
@@ -86,22 +112,36 @@ func (c *Client) doMaybeAsync(ctx context.Context, node, method, path string, fo
 	return nil
 }
 
-// CloneVMOptions describes a linked clone (docs/07: "linked clone of the
-// template").
+// CloneVMOptions describes a clone of a template.
 type CloneVMOptions struct {
 	TemplateID int
 	NewID      int
 	Name       string
+	Full       bool
+	Storage    string
 }
 
-// CloneVM makes a (linked) clone of the template into a new VM.
+// CloneVM makes a clone of the template into a new VM.
 func (c *Client) CloneVM(ctx context.Context, node string, opts CloneVMOptions) error {
 	form := url.Values{}
 	form.Set("newid", strconv.Itoa(opts.NewID))
 	form.Set("name", opts.Name)
-	form.Set("full", "0")
+	if opts.Full {
+		form.Set("full", "1")
+	} else {
+		form.Set("full", "0")
+	}
+	if opts.Storage != "" {
+		form.Set("storage", opts.Storage)
+	}
 	path := fmt.Sprintf("/nodes/%s/qemu/%d/clone", node, opts.TemplateID)
-	return c.doMaybeAsync(ctx, node, http.MethodPost, path, form)
+	err := c.doMaybeAsync(ctx, node, http.MethodPost, path, form)
+	if err != nil && !opts.Full && strings.Contains(err.Error(), "Linked clone feature is not supported") {
+		// Fallback to full clone if linked clone is unsupported on this storage (e.g. standard LVM).
+		form.Set("full", "1")
+		return c.doMaybeAsync(ctx, node, http.MethodPost, path, form)
+	}
+	return err
 }
 
 // CloudInitOptions configures cloud-init on a VM (docs/07: "IP, service SSH
@@ -123,8 +163,9 @@ func (c *Client) ConfigureCloudInit(ctx context.Context, node string, vmid int, 
 	if opts.SSHPublicKey != "" {
 		// The Proxmox API expects sshkeys to be URL-encoded again before the
 		// form encoding itself (double encoding, a documented quirk of the
-		// API).
-		form.Set("sshkeys", url.QueryEscape(opts.SSHPublicKey))
+		// API). Proxmox requires %20 for spaces rather than '+' from QueryEscape.
+		escaped := strings.ReplaceAll(url.QueryEscape(strings.TrimSpace(opts.SSHPublicKey)), "+", "%20")
+		form.Set("sshkeys", escaped)
 	}
 	if opts.IP != "" {
 		ip := opts.IP
@@ -152,8 +193,20 @@ func (c *Client) StartVM(ctx context.Context, node string, vmid int) error {
 	return c.doMaybeAsync(ctx, node, http.MethodPost, path, nil)
 }
 
-// DeleteVM deletes a VM.
+// StopVM stops a running VM immediately.
+func (c *Client) StopVM(ctx context.Context, node string, vmid int) error {
+	path := fmt.Sprintf("/nodes/%s/qemu/%d/status/stop", node, vmid)
+	return c.doMaybeAsync(ctx, node, http.MethodPost, path, nil)
+}
+
+// DeleteVM deletes a VM. If the VM is running, it stops it first.
 func (c *Client) DeleteVM(ctx context.Context, node string, vmid int) error {
+	status, err := c.Status(ctx, node, vmid)
+	if err == nil && status != nil && status.Status == "running" {
+		if stopErr := c.StopVM(ctx, node, vmid); stopErr != nil {
+			return fmt.Errorf("stopping VM %d before deletion: %w", vmid, stopErr)
+		}
+	}
 	path := fmt.Sprintf("/nodes/%s/qemu/%d", node, vmid)
 	return c.doMaybeAsync(ctx, node, http.MethodDelete, path, nil)
 }

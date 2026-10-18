@@ -44,6 +44,8 @@ type proxmoxConfig struct {
 	Storage      string `json:"storage"`
 	Bridge       string `json:"bridge"`
 	Image        string `json:"image"`
+	VMIDMin      int    `json:"vmid_min"`
+	FullClone    *bool  `json:"full_clone"`
 	TLSInsecure  bool   `json:"tls_insecure"`
 	TLSCACert    string `json:"tls_ca_cert"`
 	TLSCACertRef string `json:"tls_ca_cert_ref"`
@@ -231,23 +233,40 @@ func (s *computeVMServer) EnsureVM(ctx context.Context, req *computevmv1.EnsureV
 		return nil, fmt.Errorf("template %q not found: call EnsureImage first", cfg.Image)
 	}
 
-	newID, err := client.NextID(ctx)
+	var newID int
+	if cfg.VMIDMin > 0 {
+		newID, err = client.NextID(ctx, cfg.VMIDMin)
+	} else {
+		newID, err = client.NextID(ctx)
+	}
 	if err != nil {
 		return nil, fmt.Errorf("getting a VM ID: %w", err)
 	}
 
+	fullClone := false
+	if cfg.FullClone != nil {
+		fullClone = *cfg.FullClone
+	}
 	if err := client.CloneVM(ctx, cfg.Node, proxmoxapi.CloneVMOptions{
-		TemplateID: template.VMID, NewID: newID, Name: req.GetName(),
+		TemplateID: template.VMID,
+		NewID:      newID,
+		Name:       req.GetName(),
+		Full:       fullClone,
+		Storage:    cfg.Storage,
 	}); err != nil {
 		return nil, fmt.Errorf("cloning %q: %w", req.GetName(), err)
 	}
 
+	tag := "genesis"
+	if env := req.GetEnv(); env != "" {
+		tag = "genesis-env-" + env
+	}
 	if err := client.ConfigureCloudInit(ctx, cfg.Node, newID, proxmoxapi.CloudInitOptions{
 		User:         req.GetUser(),
 		SSHPublicKey: req.GetSshPublicKey(),
 		IP:           req.GetIp(),
 		Gateway:      req.GetGateway(),
-		Tags:         []string{"genesis-env=" + req.GetEnv()},
+		Tags:         []string{tag},
 	}); err != nil {
 		return nil, fmt.Errorf("cloud-init configuration of %q: %w", req.GetName(), err)
 	}
