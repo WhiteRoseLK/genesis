@@ -4,6 +4,7 @@ package cli
 
 import (
 	"fmt"
+	"os"
 	"sort"
 	"strconv"
 	"strings"
@@ -14,6 +15,15 @@ import (
 	"github.com/WhiteRoseLK/genesis/internal/planner"
 	"github.com/WhiteRoseLK/genesis/internal/resolver"
 	"github.com/WhiteRoseLK/genesis/internal/spec"
+)
+
+const (
+	ansiReset  = "\033[0m"
+	ansiBold   = "\033[1m"
+	ansiGreen  = "\033[32m"
+	ansiYellow = "\033[33m"
+	ansiCyan   = "\033[36m"
+	ansiGray   = "\033[90m"
 )
 
 func newPlanCmd() *cobra.Command {
@@ -61,18 +71,19 @@ func resolveAndPlan(file string) (*resolver.Resolved, *planner.Plan, error) {
 
 func printPlan(cmd *cobra.Command, resolved *resolver.Resolved, p *planner.Plan) error {
 	var b strings.Builder
+	colorEnabled := isColorEnabled()
+
 	fmt.Fprintf(&b, "Execution plan (%d modules):\n", len(p.Order))
 
-	headers := []string{"#", "MODULE", "PHASE / LOCATION", "FUNCTIONS PROVIDED", "SOURCE"}
+	headers := []string{"#", "MODULE", "PHASE / LOCATION", "SOURCE"}
 	rows := make([][]string, len(p.Order))
 
 	for i, name := range p.Order {
 		m := resolved.Modules[name]
 		num := strconv.Itoa(i + 1)
 		phase := determineModulePhase(m)
-		funcs := determineModuleFunctions(m)
 		source := determineModuleSource(m, resolved)
-		rows[i] = []string{num, name, phase, funcs, source}
+		rows[i] = []string{num, name, phase, source}
 	}
 
 	widths := make([]int, len(headers))
@@ -87,40 +98,90 @@ func printPlan(cmd *cobra.Command, resolved *resolver.Resolved, p *planner.Plan)
 		}
 	}
 
+	// Print headers
 	for i, h := range headers {
 		if i > 0 {
 			b.WriteString("  ")
 		}
-		fmt.Fprintf(&b, "%-*s", widths[i], h)
+		padding := strings.Repeat(" ", widths[i]-len(h))
+		b.WriteString(colorize(h, ansiBold, colorEnabled) + padding)
 	}
 	b.WriteString("\n")
 
+	// Print separator line
 	for i := range headers {
 		if i > 0 {
 			b.WriteString("  ")
 		}
-		b.WriteString(strings.Repeat("-", widths[i]))
+		sep := strings.Repeat("-", widths[i])
+		b.WriteString(colorize(sep, ansiGray, colorEnabled))
 	}
 	b.WriteString("\n")
 
+	// Print rows
 	for _, row := range rows {
 		for i, col := range row {
 			if i > 0 {
 				b.WriteString("  ")
 			}
-			fmt.Fprintf(&b, "%-*s", widths[i], col)
+			padding := strings.Repeat(" ", widths[i]-len(col))
+			color := getCellColor(i, col)
+			b.WriteString(colorize(col, color, colorEnabled) + padding)
 		}
 		b.WriteString("\n")
 	}
 
-	b.WriteString("\nPhases:\n")
-	b.WriteString("  • Seed    : Temporary bootstrap services running in Docker on host (retired at end of apply).\n")
-	b.WriteString("  • Target  : Final production services running on dedicated VMs on the cluster.\n")
-	b.WriteString("  • Control : Infrastructure drivers and management providers.\n")
+	// Print footer / legend
+	b.WriteString("\n")
+	b.WriteString(colorize("Phases:\n", ansiBold, colorEnabled))
+	fmt.Fprintf(&b, "  • %s    : Temporary bootstrap services running in Docker on host (retired at end of apply).\n",
+		colorize("Seed", ansiYellow, colorEnabled))
+	fmt.Fprintf(&b, "  • %s  : Final production services running on dedicated VMs on the cluster.\n",
+		colorize("Target", ansiGreen, colorEnabled))
+	fmt.Fprintf(&b, "  • %s : Infrastructure drivers and management providers.\n",
+		colorize("Control", ansiCyan, colorEnabled))
 
 	out := cmd.OutOrStdout()
 	_, err := fmt.Fprint(out, b.String())
 	return err
+}
+
+func colorize(text, code string, enabled bool) string {
+	if !enabled || code == "" {
+		return text
+	}
+	return code + text + ansiReset
+}
+
+func isColorEnabled() bool {
+	return os.Getenv("NO_COLOR") == ""
+}
+
+func getCellColor(colIdx int, val string) string {
+	switch colIdx {
+	case 0: // #
+		return ansiGray
+	case 1: // MODULE
+		return ansiBold
+	case 2: // PHASE / LOCATION
+		if strings.HasPrefix(val, "Seed") {
+			return ansiYellow
+		}
+		if strings.HasPrefix(val, "Target") {
+			return ansiGreen
+		}
+		if strings.HasPrefix(val, "Control") {
+			return ansiCyan
+		}
+		return ""
+	case 3: // SOURCE
+		if strings.HasPrefix(val, "automatic") {
+			return ansiGray
+		}
+		return ""
+	default:
+		return ""
+	}
 }
 
 func determineModulePhase(m *resolver.Module) string {
@@ -171,25 +232,6 @@ func determineModulePhase(m *resolver.Module) string {
 		return "Target (cluster service)"
 	}
 	return "Control (host / OS utility)"
-}
-
-func determineModuleFunctions(m *resolver.Module) string {
-	if m == nil || m.Manifest == nil {
-		return "-"
-	}
-	var fns []string
-	seen := map[string]bool{}
-	for _, p := range m.Manifest.Provides {
-		fn := p.Function
-		if !seen[fn] {
-			seen[fn] = true
-			fns = append(fns, fn)
-		}
-	}
-	if len(fns) == 0 {
-		return "-"
-	}
-	return strings.Join(fns, ", ")
 }
 
 func determineModuleSource(m *resolver.Module, resolved *resolver.Resolved) string {
