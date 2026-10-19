@@ -26,10 +26,13 @@ func newSecretsCmd() *cobra.Command {
 // openSecretsStore loads the existing master key (fails if `genesis init` has
 // not been run) and builds the `file` store. If the state indicates that secrets
 // have migrated to vault or the seed is retired, the file store is marked read-only.
-func openSecretsStore(cmd *cobra.Command) (*secrets.FileStore, error) {
-	stateDir, err := cmd.Flags().GetString("state-dir")
-	if err != nil {
-		return nil, err
+func openSecretsStore(cmd *cobra.Command, stateDir string) (*secrets.FileStore, error) {
+	if stateDir == "" {
+		var err error
+		stateDir, err = cmd.Flags().GetString("state-dir")
+		if err != nil {
+			return nil, err
+		}
 	}
 	provider := secrets.FileMasterKeyProvider{StateDir: stateDir}
 	identity, err := provider.Load(cmd.Context())
@@ -49,7 +52,7 @@ func newSecretsListCmd() *cobra.Command {
 		Short: "List generated secrets (metadata only, never a value)",
 	}
 	cmd.RunE = func(cmd *cobra.Command, args []string) error {
-		store, err := openSecretsStore(cmd)
+		store, err := openSecretsStore(cmd, "")
 		if err != nil {
 			return err
 		}
@@ -80,7 +83,7 @@ func newSecretsGetCmd() *cobra.Command {
 		Args:  cobra.ExactArgs(1),
 	}
 	cmd.RunE = func(cmd *cobra.Command, args []string) error {
-		store, err := openSecretsStore(cmd)
+		store, err := openSecretsStore(cmd, "")
 		if err != nil {
 			return err
 		}

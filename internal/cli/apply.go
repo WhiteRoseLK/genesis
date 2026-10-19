@@ -54,11 +54,15 @@ func newApplyCmd() *cobra.Command {
 			}
 		}
 
-		store, err := openSecretsStore(cmd)
+		stateDir, err := cmd.Flags().GetString("state-dir")
 		if err != nil {
 			return err
 		}
-		stateDir, err := cmd.Flags().GetString("state-dir")
+		if !cmd.Flags().Changed("state-dir") && resolved.Seed.StateDir != "" {
+			stateDir = resolved.Seed.StateDir
+		}
+
+		store, err := openSecretsStore(cmd, stateDir)
 		if err != nil {
 			return err
 		}
