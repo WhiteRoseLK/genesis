@@ -124,6 +124,9 @@ func (m *vaultModule) Configure(ctx context.Context, req *modulev1.StepRequest) 
 	m.mu.Unlock()
 
 	modState := sdk.StateMap(req.GetState())
+	if m.rootCAPEM != "" {
+		modState["root_ca_pem"] = m.rootCAPEM
+	}
 	if modState["admin_method"] != "teleport" {
 		enrolled, err := m.installFleetAgents(ctx, target)
 		if err != nil {

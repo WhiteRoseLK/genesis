@@ -164,7 +164,9 @@ func (m *vaultModule) rehydrate(ctx context.Context, req *modulev1.StepRequest) 
 	}
 
 	var rootCAPEM string
-	if ca, err := m.getSecret(ctx, "vault/root-ca"); err == nil && ca != "" {
+	if rca, ok := state["root_ca_pem"].(string); ok && rca != "" {
+		rootCAPEM = rca
+	} else if ca, err := m.getSecret(ctx, "vault/root-ca"); err == nil && ca != "" {
 		rootCAPEM = ca
 	} else if m.pkiSeedClient != nil {
 		if rootChain, err := m.pkiSeedClient.CAChain(ctx, &pkiissuerv1.Empty{}); err == nil {
