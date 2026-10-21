@@ -490,6 +490,18 @@ func (m *powerdnsModule) Handover(ctx context.Context, req *modulev1.StepRequest
 			len(ownRecords.GetRecords()), len(seedRecords.GetRecords()))
 	}
 
+	name := vmName(req)
+	pair, err := m.sshKeyPair(ctx, name)
+	if err == nil {
+		if target, err := m.targetFromState(ctx, req, pair); err == nil {
+			_, _ = m.osBaseClient.SetResolver(ctx, &osbasev1.SetResolverRequest{
+				Target:      target.osBase(),
+				Nameservers: []string{"127.0.0.1", "1.1.1.1"},
+				Domain:      dom,
+			})
+		}
+	}
+
 	state := sdk.StateMap(req.GetState())
 	state["handed_over"] = true
 	s, err := sdk.NewState(state)
@@ -635,9 +647,61 @@ func parseResolutionOutput(output string) (forward, reverse, external string, er
 	return f[1], r[1], e[1], nil
 }
 
-func (m *powerdnsModule) Repoint(_ context.Context, req *modulev1.RepointRequest) (*modulev1.StepResult, error) {
+func (m *powerdnsModule) Repoint(ctx context.Context, req *modulev1.RepointRequest) (*modulev1.StepResult, error) {
 	if err := m.dialWithToken(req.GetStep().GetBrokerToken()); err != nil {
 		return nil, err
+	}
+	if req.GetFunction() == "fleet.agent/v1" {
+		modState := sdk.StateMap(req.GetStep().GetState())
+		if modState["admin_method"] != "teleport" {
+			name := vmName(req.GetStep())
+			pair, err := m.sshKeyPair(ctx, name)
+			if err != nil {
+				return nil, err
+			}
+			var port int64
+			switch v := modState["vm_ssh_port"].(type) {
+			case int64:
+				port = v
+			case float64:
+				port = int64(v)
+			}
+			if port == 0 {
+				port = 22
+			}
+			var hostKey string
+			if hk, ok := modState["vm_host_key"].(string); ok {
+				hostKey = hk
+			}
+			directTarget := connTarget{
+				Host:       fmt.Sprint(modState["vm_ip"]),
+				Port:       int32(port),
+				User:       sshUser,
+				PrivateKey: pair.PrivateKeyOpenSSH,
+				HostKey:    hostKey,
+			}
+			dom := domain(req.GetStep())
+			_, _ = m.osBaseClient.SetResolver(ctx, &osbasev1.SetResolverRequest{
+				Target:      directTarget.osBase(),
+				Nameservers: []string{"127.0.0.1", "1.1.1.1"},
+				Domain:      dom,
+			})
+			enrolled, err := m.installFleetAgents(ctx, directTarget)
+			if err != nil {
+				return nil, err
+			}
+			if enrolled {
+				modState["admin_method"] = "teleport"
+				s, err := sdk.NewState(modState)
+				if err != nil {
+					return nil, err
+				}
+				return &modulev1.StepResult{
+					Status: modulev1.StepResult_STATUS_OK,
+					State:  s,
+				}, nil
+			}
+		}
 	}
 	return &modulev1.StepResult{
 		Status: modulev1.StepResult_STATUS_OK,

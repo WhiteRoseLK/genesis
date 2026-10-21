@@ -583,9 +583,55 @@ func (m *bindModule) Verify(ctx context.Context, req *modulev1.StepRequest) (*mo
 	return &modulev1.StepResult{Status: modulev1.StepResult_STATUS_OK, State: s}, nil
 }
 
-func (m *bindModule) Repoint(_ context.Context, req *modulev1.RepointRequest) (*modulev1.StepResult, error) {
+func (m *bindModule) Repoint(ctx context.Context, req *modulev1.RepointRequest) (*modulev1.StepResult, error) {
 	if err := m.dialWithToken(req.GetStep().GetBrokerToken()); err != nil {
 		return nil, err
+	}
+	if req.GetFunction() == "fleet.agent/v1" {
+		modState := sdk.StateMap(req.GetStep().GetState())
+		if modState["admin_method"] != "teleport" {
+			name := vmName(req.GetStep())
+			pair, err := m.sshKeyPair(ctx, name)
+			if err != nil {
+				return nil, err
+			}
+			var port int64
+			switch v := modState["vm_ssh_port"].(type) {
+			case int64:
+				port = v
+			case float64:
+				port = int64(v)
+			}
+			if port == 0 {
+				port = 22
+			}
+			var hostKey string
+			if hk, ok := modState["vm_host_key"].(string); ok {
+				hostKey = hk
+			}
+			directTarget := connTarget{
+				Host:       fmt.Sprint(modState["vm_ip"]),
+				Port:       int32(port),
+				User:       sshUser,
+				PrivateKey: pair.PrivateKeyOpenSSH,
+				HostKey:    hostKey,
+			}
+			enrolled, err := m.installFleetAgents(ctx, directTarget)
+			if err != nil {
+				return nil, err
+			}
+			if enrolled {
+				modState["admin_method"] = "teleport"
+				s, err := sdk.NewState(modState)
+				if err != nil {
+					return nil, err
+				}
+				return &modulev1.StepResult{
+					Status: modulev1.StepResult_STATUS_OK,
+					State:  s,
+				}, nil
+			}
+		}
 	}
 	return &modulev1.StepResult{
 		Status: modulev1.StepResult_STATUS_OK,
