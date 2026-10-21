@@ -37,12 +37,15 @@ func (c *containerServer) Run(ctx context.Context, req *containerv1.RunRequest) 
 	for i, m := range req.GetMounts() {
 		mounts[i] = runner.Mount{HostPath: m.GetHostPath(), ContainerPath: m.GetContainerPath(), ReadOnly: m.GetReadOnly()}
 	}
-	ports := make([]runner.PortMapping, len(req.GetPorts()))
-	for i, p := range req.GetPorts() {
-		ports[i] = runner.PortMapping{
-			HostPort:      int(p.GetHostPort()),
-			ContainerPort: int(p.GetContainerPort()),
-			Protocol:      p.GetProtocol(),
+	var ports []runner.PortMapping
+	if c.seedAddress != "" {
+		ports = make([]runner.PortMapping, len(req.GetPorts()))
+		for i, p := range req.GetPorts() {
+			ports[i] = runner.PortMapping{
+				HostPort:      int(p.GetHostPort()),
+				ContainerPort: int(p.GetContainerPort()),
+				Protocol:      p.GetProtocol(),
+			}
 		}
 	}
 	var files map[string][]byte
