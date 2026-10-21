@@ -10,6 +10,7 @@ import (
 	"net/url"
 	"strconv"
 	"strings"
+	"time"
 )
 
 // VM is the subset of a Proxmox VM's fields that the module needs.
@@ -241,4 +242,200 @@ func (c *Client) Time(ctx context.Context, node string) (*NodeTime, error) {
 		return nil, err
 	}
 	return &t, nil
+}
+
+// ConfigureVM updates VM configuration parameters.
+func (c *Client) ConfigureVM(ctx context.Context, node string, vmid int, params url.Values) error {
+	path := fmt.Sprintf("/nodes/%s/qemu/%d/config", node, vmid)
+	return c.doMaybeAsync(ctx, node, http.MethodPost, path, params)
+}
+
+// GetVMConfig retrieves the current configuration parameters of a VM or template.
+func (c *Client) GetVMConfig(ctx context.Context, node string, vmid int) (map[string]any, error) {
+	var cfg map[string]any
+	path := fmt.Sprintf("/nodes/%s/qemu/%d/config", node, vmid)
+	if err := c.do(ctx, http.MethodGet, path, nil, &cfg); err != nil {
+		return nil, err
+	}
+	return cfg, nil
+}
+
+// ConvertToTemplate converts a regular VM into a template.
+func (c *Client) ConvertToTemplate(ctx context.Context, node string, vmid int) error {
+	path := fmt.Sprintf("/nodes/%s/qemu/%d/template", node, vmid)
+	return c.doMaybeAsync(ctx, node, http.MethodPost, path, nil)
+}
+
+// PingAgent checks if the QEMU guest agent is running and responding in the VM.
+func (c *Client) PingAgent(ctx context.Context, node string, vmid int) error {
+	path := fmt.Sprintf("/nodes/%s/qemu/%d/agent/ping", node, vmid)
+	return c.do(ctx, http.MethodPost, path, nil, nil)
+}
+
+// WaitForAgent polls PingAgent until the QEMU guest agent responds or ctx expires.
+func (c *Client) WaitForAgent(ctx context.Context, node string, vmid int) error {
+	ticker := time.NewTicker(2 * time.Second)
+	defer ticker.Stop()
+	for {
+		if err := c.PingAgent(ctx, node, vmid); err == nil {
+			return nil
+		}
+		select {
+		case <-ctx.Done():
+			return fmt.Errorf("waiting for QEMU guest agent on VM %d: %w", vmid, ctx.Err())
+		case <-ticker.C:
+		}
+	}
+}
+
+// AgentExecResult is the result of executing a command in the VM via QEMU guest agent.
+type AgentExecResult struct {
+	Exited   int    `json:"exited"`
+	ExitCode int    `json:"exitcode"`
+	OutData  string `json:"out-data"`
+	ErrData  string `json:"err-data"`
+}
+
+// AgentExec runs a command in the VM via the QEMU guest agent and waits for it to finish.
+func (c *Client) AgentExec(ctx context.Context, node string, vmid int, command []string) (*AgentExecResult, error) {
+	path := fmt.Sprintf("/nodes/%s/qemu/%d/agent/exec", node, vmid)
+	payload := map[string]any{
+		"command": command,
+	}
+	var res struct {
+		PID int `json:"pid"`
+	}
+	if err := c.doJSON(ctx, http.MethodPost, path, payload, &res); err != nil {
+		return nil, fmt.Errorf("agent exec on VM %d: %w", vmid, err)
+	}
+	if res.PID <= 0 {
+		return nil, fmt.Errorf("agent exec on VM %d returned invalid pid %d", vmid, res.PID)
+	}
+
+	statusPath := fmt.Sprintf("/nodes/%s/qemu/%d/agent/exec-status?pid=%d", node, vmid, res.PID)
+	ticker := time.NewTicker(1 * time.Second)
+	defer ticker.Stop()
+
+	for {
+		var status AgentExecResult
+		if err := c.do(ctx, http.MethodGet, statusPath, nil, &status); err != nil {
+			return nil, fmt.Errorf("checking agent exec status on VM %d: %w", vmid, err)
+		}
+		if status.Exited == 1 {
+			if status.ExitCode != 0 {
+				return &status, fmt.Errorf("agent exec on VM %d failed (exit code %d): %s\n%s", vmid, status.ExitCode, status.ErrData, status.OutData)
+			}
+			return &status, nil
+		}
+		select {
+		case <-ctx.Done():
+			return nil, fmt.Errorf("waiting for agent exec on VM %d (pid %d): %w", vmid, res.PID, ctx.Err())
+		case <-ticker.C:
+		}
+	}
+}
+
+// WaitForStopped polls Status until the VM is in 'stopped' status or ctx expires.
+func (c *Client) WaitForStopped(ctx context.Context, node string, vmid int) error {
+	ticker := time.NewTicker(1 * time.Second)
+	defer ticker.Stop()
+	for {
+		status, err := c.Status(ctx, node, vmid)
+		if err == nil && status != nil && status.Status == "stopped" {
+			return nil
+		}
+		select {
+		case <-ctx.Done():
+			return fmt.Errorf("waiting for VM %d to stop: %w", vmid, ctx.Err())
+		case <-ticker.C:
+		}
+	}
+}
+
+// CreateVMOptions describes the parameters for creating a new VM directly (e.g. from an imported disk).
+type CreateVMOptions struct {
+	VMID         int
+	Name         string
+	Memory       int
+	Cores        int
+	CPU          string
+	SCSIHardware string
+	SCSI0        string
+	Net0         string
+	IDE2         string
+	Boot         string
+	Serial0      string
+	VGA          string
+	Agent        string
+	Description  string
+}
+
+// CreateVM creates a new VM on the node.
+func (c *Client) CreateVM(ctx context.Context, node string, opts CreateVMOptions) error {
+	payload := map[string]any{
+		"vmid": opts.VMID,
+		"name": opts.Name,
+	}
+	if opts.Memory > 0 {
+		payload["memory"] = opts.Memory
+	}
+	if opts.Cores > 0 {
+		payload["cores"] = opts.Cores
+	}
+	if opts.CPU != "" {
+		payload["cpu"] = opts.CPU
+	}
+	if opts.SCSIHardware != "" {
+		payload["scsihw"] = opts.SCSIHardware
+	}
+	if opts.SCSI0 != "" {
+		payload["scsi0"] = opts.SCSI0
+	}
+	if opts.Net0 != "" {
+		payload["net0"] = opts.Net0
+	}
+	if opts.IDE2 != "" {
+		payload["ide2"] = opts.IDE2
+	}
+	if opts.Boot != "" {
+		payload["boot"] = opts.Boot
+	}
+	if opts.Serial0 != "" {
+		payload["serial0"] = opts.Serial0
+	}
+	if opts.VGA != "" {
+		payload["vga"] = opts.VGA
+	}
+	if opts.Agent != "" {
+		payload["agent"] = opts.Agent
+	}
+	if opts.Description != "" {
+		payload["description"] = opts.Description
+	}
+
+	path := fmt.Sprintf("/nodes/%s/qemu", url.PathEscape(node))
+	var upid string
+	if err := c.doJSON(ctx, http.MethodPost, path, payload, &upid); err != nil {
+		return fmt.Errorf("creating VM %d (%s): %w", opts.VMID, opts.Name, err)
+	}
+	if upid != "" {
+		return c.WaitForTask(ctx, node, upid)
+	}
+	return nil
+}
+
+// ResizeDisk resizes a disk of a VM.
+func (c *Client) ResizeDisk(ctx context.Context, node string, vmid int, disk, size string) error {
+	form := url.Values{}
+	form.Set("disk", disk)
+	form.Set("size", size)
+	path := fmt.Sprintf("/nodes/%s/qemu/%d/resize", url.PathEscape(node), vmid)
+	var upid string
+	if err := c.do(ctx, http.MethodPut, path, form, &upid); err != nil {
+		return fmt.Errorf("resizing disk %s of VM %d: %w", disk, vmid, err)
+	}
+	if upid != "" {
+		return c.WaitForTask(ctx, node, upid)
+	}
+	return nil
 }
