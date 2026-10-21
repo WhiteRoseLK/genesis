@@ -201,6 +201,23 @@ func TestDeleteVM(t *testing.T) {
 	}
 }
 
+func TestGetVMConfig(t *testing.T) {
+	client, _ := newTestServer(t, func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodGet && r.URL.Path == "/api2/json/nodes/pve01/qemu/3000/config" {
+			writeData(t, w, map[string]any{"description": "Genesis Base Template", "name": "genesis-template"})
+			return
+		}
+		t.Fatalf("unexpected request: %s %s", r.Method, r.URL.Path)
+	})
+	cfg, err := client.GetVMConfig(context.Background(), "pve01", 3000)
+	if err != nil {
+		t.Fatalf("GetVMConfig: %v", err)
+	}
+	if cfg["description"] != "Genesis Base Template" {
+		t.Errorf("description = %v, want Genesis Base Template", cfg["description"])
+	}
+}
+
 func TestNewHTTPClient(t *testing.T) {
 	t.Run("default options return DefaultClient", func(t *testing.T) {
 		hc, err := NewHTTPClient(TLSOptions{})
@@ -340,5 +357,206 @@ func TestCloneVMFallbackToFullClone(t *testing.T) {
 	}
 	if attempts != 2 {
 		t.Errorf("attempts = %d, want 2 (linked clone then full clone fallback)", attempts)
+	}
+}
+
+func TestPingAgent(t *testing.T) {
+	client, _ := newTestServer(t, func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost || r.URL.Path != "/api2/json/nodes/pve01/qemu/3000/agent/ping" {
+			t.Fatalf("unexpected request: %s %s", r.Method, r.URL.Path)
+		}
+		writeData(t, w, nil)
+	})
+
+	if err := client.PingAgent(context.Background(), "pve01", 3000); err != nil {
+		t.Fatalf("PingAgent: %v", err)
+	}
+}
+
+func TestWaitForAgent(t *testing.T) {
+	calls := 0
+	client, _ := newTestServer(t, func(w http.ResponseWriter, r *http.Request) {
+		calls++
+		if calls < 2 {
+			http.Error(w, `{"data":null,"message":"QEMU guest agent is not running"}`, http.StatusInternalServerError)
+			return
+		}
+		writeData(t, w, nil)
+	})
+
+	if err := client.WaitForAgent(context.Background(), "pve01", 3000); err != nil {
+		t.Fatalf("WaitForAgent: %v", err)
+	}
+	if calls != 2 {
+		t.Errorf("calls = %d, want 2 polls before success", calls)
+	}
+}
+
+func TestAgentExec(t *testing.T) {
+	var gotCommand []string
+	execChecked := 0
+	client, _ := newTestServer(t, func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/api2/json/nodes/pve01/qemu/3000/agent/exec" {
+			var body struct {
+				Command []string `json:"command"`
+			}
+			if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+				t.Fatalf("decode exec body: %v", err)
+			}
+			gotCommand = body.Command
+			writeData(t, w, map[string]int{"pid": 1234})
+			return
+		}
+		if r.URL.Path == "/api2/json/nodes/pve01/qemu/3000/agent/exec-status" {
+			execChecked++
+			if execChecked < 2 {
+				writeData(t, w, AgentExecResult{Exited: 0})
+				return
+			}
+			writeData(t, w, AgentExecResult{Exited: 1, ExitCode: 0, OutData: "success"})
+			return
+		}
+		t.Fatalf("unexpected path: %s", r.URL.Path)
+	})
+
+	res, err := client.AgentExec(context.Background(), "pve01", 3000, []string{"sh", "-c", "echo hello"})
+	if err != nil {
+		t.Fatalf("AgentExec: %v", err)
+	}
+	if res.OutData != "success" {
+		t.Errorf("OutData = %q, want 'success'", res.OutData)
+	}
+	if len(gotCommand) != 3 || gotCommand[2] != "echo hello" {
+		t.Errorf("command sent = %v, want [sh -c 'echo hello']", gotCommand)
+	}
+}
+
+func TestWaitForStopped(t *testing.T) {
+	calls := 0
+	client, _ := newTestServer(t, func(w http.ResponseWriter, r *http.Request) {
+		calls++
+		if calls < 2 {
+			writeData(t, w, VMStatus{VMID: 3000, Status: "running"})
+			return
+		}
+		writeData(t, w, VMStatus{VMID: 3000, Status: "stopped"})
+	})
+
+	if err := client.WaitForStopped(context.Background(), "pve01", 3000); err != nil {
+		t.Fatalf("WaitForStopped: %v", err)
+	}
+	if calls != 2 {
+		t.Errorf("calls = %d, want 2 polls before stopped", calls)
+	}
+}
+
+func TestEnsureStorageContent(t *testing.T) {
+	putCalled := false
+	client, _ := newTestServer(t, func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodGet && r.URL.Path == "/api2/json/storage/local" {
+			writeData(t, w, StorageConfig{Storage: "local", Type: "dir", Content: "images,iso"})
+			return
+		}
+		if r.Method == http.MethodPut && r.URL.Path == "/api2/json/storage/local" {
+			putCalled = true
+			writeData(t, w, nil)
+			return
+		}
+		t.Fatalf("unexpected request: %s %s", r.Method, r.URL.Path)
+	})
+
+	if err := client.EnsureStorageContent(context.Background(), "local", "import"); err != nil {
+		t.Fatalf("EnsureStorageContent: %v", err)
+	}
+	if !putCalled {
+		t.Error("expected PUT /storage/local to be called")
+	}
+}
+
+func TestListAndFindStorageVolume(t *testing.T) {
+	client, _ := newTestServer(t, func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/api2/json/nodes/pve01/storage/local/content" {
+			writeData(t, w, []StorageContent{
+				{VolID: "local:iso/boot.iso", Content: "iso"},
+				{VolID: "local:import/ubuntu.qcow2", Content: "import", Size: 600000000},
+			})
+			return
+		}
+		t.Fatalf("unexpected request: %s %s", r.Method, r.URL.Path)
+	})
+
+	vol, err := client.FindStorageVolume(context.Background(), "pve01", "local", "local:import/ubuntu.qcow2")
+	if err != nil {
+		t.Fatalf("FindStorageVolume: %v", err)
+	}
+	if vol == nil || vol.Size != 600000000 {
+		t.Errorf("expected volume with size 600000000, got %v", vol)
+	}
+
+	missing, err := client.FindStorageVolume(context.Background(), "pve01", "local", "local:import/missing.qcow2")
+	if err != nil {
+		t.Fatalf("FindStorageVolume missing: %v", err)
+	}
+	if missing != nil {
+		t.Errorf("expected nil for missing volume, got %v", missing)
+	}
+}
+
+func TestDownloadURL(t *testing.T) {
+	client, _ := newTestServer(t, func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodPost && r.URL.Path == "/api2/json/nodes/pve01/storage/local/download-url" {
+			writeData(t, w, "UPID:pve01:download:test")
+			return
+		}
+		t.Fatalf("unexpected request: %s %s", r.Method, r.URL.Path)
+	})
+
+	upid, err := client.DownloadURL(context.Background(), "pve01", "local", "https://example.com/image.img", "image.qcow2", "import")
+	if err != nil {
+		t.Fatalf("DownloadURL: %v", err)
+	}
+	if upid != "UPID:pve01:download:test" {
+		t.Errorf("upid = %q, want 'UPID:pve01:download:test'", upid)
+	}
+}
+
+func TestCreateVM(t *testing.T) {
+	var gotPayload map[string]any
+	client, _ := newTestServer(t, func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodPost && r.URL.Path == "/api2/json/nodes/pve01/qemu" {
+			if err := json.NewDecoder(r.Body).Decode(&gotPayload); err != nil {
+				t.Fatalf("decode body: %v", err)
+			}
+			writeData(t, w, nil)
+			return
+		}
+		t.Fatalf("unexpected request: %s %s", r.Method, r.URL.Path)
+	})
+
+	err := client.CreateVM(context.Background(), "pve01", CreateVMOptions{
+		VMID:   3000,
+		Name:   "template-test",
+		Memory: 2048,
+		SCSI0:  "SSD:0,import-from=local:import/image.qcow2",
+	})
+	if err != nil {
+		t.Fatalf("CreateVM: %v", err)
+	}
+	if gotPayload["name"] != "template-test" {
+		t.Errorf("payload name = %v, want template-test", gotPayload["name"])
+	}
+}
+
+func TestResizeDisk(t *testing.T) {
+	client, _ := newTestServer(t, func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodPut && r.URL.Path == "/api2/json/nodes/pve01/qemu/3000/resize" {
+			writeData(t, w, nil)
+			return
+		}
+		t.Fatalf("unexpected request: %s %s", r.Method, r.URL.Path)
+	})
+
+	if err := client.ResizeDisk(context.Background(), "pve01", 3000, "scsi0", "10G"); err != nil {
+		t.Fatalf("ResizeDisk: %v", err)
 	}
 }

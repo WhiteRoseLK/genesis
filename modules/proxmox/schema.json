@@ -9,8 +9,12 @@
     "storage": { "type": "string" },
     "bridge": { "type": "string" },
     "image": { "type": "string" },
+    "base_template": { "type": "string" },
+    "cloud_image_url": { "type": "string" },
+    "download_storage": { "type": "string" },
     "vmid_min": { "type": "integer", "minimum": 100 },
     "full_clone": { "type": "boolean" },
+    "keep_template": { "type": "boolean" },
     "tls_insecure": { "type": "boolean" },
     "tls_ca_cert_ref": { "type": "string", "pattern": "^(env|file|vault)://" },
     "credentials": {

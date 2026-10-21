@@ -9,6 +9,7 @@
 package proxmoxapi
 
 import (
+	"bytes"
 	"context"
 	"crypto/tls"
 	"crypto/x509"
@@ -89,21 +90,16 @@ type envelope struct {
 	Data json.RawMessage `json:"data"`
 }
 
-// do runs a request and decodes its "data" envelope into out (nil to ignore
+// execute runs an HTTP request and decodes its "data" envelope into out (nil to ignore
 // the body).
-func (c *Client) do(ctx context.Context, method, path string, form url.Values, out any) error {
-	var body io.Reader
-	if form != nil {
-		body = strings.NewReader(form.Encode())
-	}
-
+func (c *Client) execute(ctx context.Context, method, path, contentType string, body io.Reader, out any) error {
 	req, err := http.NewRequestWithContext(ctx, method, c.baseURL+path, body)
 	if err != nil {
 		return fmt.Errorf("building the request %s %s: %w", method, path, err)
 	}
 	req.Header.Set("Authorization", fmt.Sprintf("PVEAPIToken=%s=%s", c.tokenID, c.tokenSecret))
-	if form != nil {
-		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	if contentType != "" {
+		req.Header.Set("Content-Type", contentType)
 	}
 
 	resp, err := c.httpClient.Do(req)
@@ -132,6 +128,33 @@ func (c *Client) do(ctx context.Context, method, path string, form url.Values, o
 		return fmt.Errorf("decoding the response of %s %s: %w", method, path, err)
 	}
 	return nil
+}
+
+// do runs a form-urlencoded request and decodes its "data" envelope into out (nil to ignore
+// the body).
+func (c *Client) do(ctx context.Context, method, path string, form url.Values, out any) error {
+	var body io.Reader
+	contentType := ""
+	if form != nil {
+		body = strings.NewReader(form.Encode())
+		contentType = "application/x-www-form-urlencoded"
+	}
+	return c.execute(ctx, method, path, contentType, body, out)
+}
+
+// doJSON runs a JSON request and decodes its "data" envelope into out (nil to ignore the body).
+func (c *Client) doJSON(ctx context.Context, method, path string, in any, out any) error {
+	var body io.Reader
+	contentType := ""
+	if in != nil {
+		data, err := json.Marshal(in)
+		if err != nil {
+			return fmt.Errorf("marshaling json for %s %s: %w", method, path, err)
+		}
+		body = bytes.NewReader(data)
+		contentType = "application/json"
+	}
+	return c.execute(ctx, method, path, contentType, body, out)
 }
 
 // TaskStatus is the state of an asynchronous Proxmox task (identified by its
