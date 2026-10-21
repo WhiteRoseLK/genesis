@@ -1,6 +1,6 @@
 module github.com/WhiteRoseLK/genesis
 
-go 1.27.2
+go 1.27.3
 
 require (
 	filippo.io/age v1.3.2

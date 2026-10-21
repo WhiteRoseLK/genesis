@@ -1,0 +1,5 @@
+{
+  "schema_version": 1,
+  "secrets_backend": "vault",
+  "seed_retired": true
+}
