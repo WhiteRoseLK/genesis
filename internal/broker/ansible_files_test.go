@@ -205,3 +205,38 @@ func TestFormatKnownHosts(t *testing.T) {
 		})
 	}
 }
+
+func TestRedactValuesDoesNotMaskMundaneConfigFromVars(t *testing.T) {
+	vars := map[string]any{
+		"dns_server":    "192.168.1.211",
+		"forward_name":  "verify-probe.lab.internal",
+		"reverse_ip":    "10.255.255.1",
+		"external_name": "example.com",
+		"domain":        "lab.internal",
+		"api_key":       "secret-pdns-api-token-value",
+	}
+	out := `TASK [show the results] ***
+ok: [target] => {
+    "msg": {
+        "external": "93.184.216.34",
+        "forward": "10.255.255.1",
+        "reverse": "verify-probe.lab.internal.",
+        "api_key": "secret-pdns-api-token-value"
+    }
+}`
+
+	got := redactValues(out, collectStrings(vars))
+
+	if strings.Contains(got, "secret-pdns-api-token-value") {
+		t.Errorf("secret api_key was not redacted: %s", got)
+	}
+	if !strings.Contains(got, `"forward": "10.255.255.1"`) {
+		t.Errorf("mundane IP was wrongly redacted: %s", got)
+	}
+	if !strings.Contains(got, `"reverse": "verify-probe.lab.internal."`) {
+		t.Errorf("mundane domain name was wrongly redacted: %s", got)
+	}
+	if !strings.Contains(got, `"external": "93.184.216.34"`) {
+		t.Errorf("external IP was wrongly redacted: %s", got)
+	}
+}

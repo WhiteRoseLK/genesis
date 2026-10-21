@@ -18,8 +18,8 @@ import (
 )
 
 var (
-	privateKeyB64Re = regexp.MustCompile(`PRIVATE_KEY_B64:(\S+)`)
-	certificateB64  = regexp.MustCompile(`CERTIFICATE_B64:(\S+)`)
+	privateKeyB64Re = regexp.MustCompile(`PRIVATE_KEY_B64:([A-Za-z0-9+/=]+)`)
+	certificateB64  = regexp.MustCompile(`CERTIFICATE_B64:([A-Za-z0-9+/=]+)`)
 )
 
 // Verify proves, from a disposable third-party VM, a real SSH connection
@@ -150,11 +150,13 @@ func (m *teleportModule) signUserCert(ctx context.Context, ownTarget connTarget,
 	if privMatch == nil || certMatch == nil {
 		return "", "", fmt.Errorf("private key/certificate not found in the output of tctl auth sign:\n%s", resp.GetOutput())
 	}
-	priv, err := base64.StdEncoding.DecodeString(privMatch[1])
+	privStr := strings.Trim(privMatch[1], "\"'\\ \r\n\t")
+	priv, err := base64.StdEncoding.DecodeString(privStr)
 	if err != nil {
 		return "", "", fmt.Errorf("decoding the generated private key: %w", err)
 	}
-	cert, err := base64.StdEncoding.DecodeString(certMatch[1])
+	certStr := strings.Trim(certMatch[1], "\"'\\ \r\n\t")
+	cert, err := base64.StdEncoding.DecodeString(certStr)
 	if err != nil {
 		return "", "", fmt.Errorf("decoding the generated certificate: %w", err)
 	}

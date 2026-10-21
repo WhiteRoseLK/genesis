@@ -61,6 +61,13 @@ type Mount struct {
 	ReadOnly      bool
 }
 
+// PortMapping is a host -> container port forward.
+type PortMapping struct {
+	HostPort      int
+	ContainerPort int
+	Protocol      string // "tcp", "udp", or "" (default "tcp")
+}
+
 // RunOptions describes a container to start.
 type RunOptions struct {
 	Name    string
@@ -68,6 +75,8 @@ type RunOptions struct {
 	Command []string
 	Env     map[string]string
 	Mounts  []Mount
+	// Ports: port forwardings (`-p` option).
+	Ports []PortMapping
 	// Tmpfs: in-memory mount points (`--tmpfs` option), for files that must
 	// never touch the seed's disk.
 	Tmpfs []string
@@ -156,6 +165,13 @@ func containerArgs(args []string, opts RunOptions) ([]string, []string) {
 	}
 	for _, t := range opts.Tmpfs {
 		args = append(args, "--tmpfs", t)
+	}
+	for _, p := range opts.Ports {
+		proto := p.Protocol
+		if proto == "" {
+			proto = "tcp"
+		}
+		args = append(args, "-p", fmt.Sprintf("%d:%d/%s", p.HostPort, p.ContainerPort, proto))
 	}
 	for _, m := range opts.Mounts {
 		spec := fmt.Sprintf("%s:%s", m.HostPath, m.ContainerPath)

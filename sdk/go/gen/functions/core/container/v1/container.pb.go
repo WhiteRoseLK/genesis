@@ -140,6 +140,66 @@ func (x *File) GetContent() []byte {
 	return nil
 }
 
+type PortMapping struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	HostPort      int32                  `protobuf:"varint,1,opt,name=host_port,json=hostPort,proto3" json:"host_port,omitempty"`
+	ContainerPort int32                  `protobuf:"varint,2,opt,name=container_port,json=containerPort,proto3" json:"container_port,omitempty"`
+	Protocol      string                 `protobuf:"bytes,3,opt,name=protocol,proto3" json:"protocol,omitempty"` // "tcp" or "udp", defaults to "tcp"
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *PortMapping) Reset() {
+	*x = PortMapping{}
+	mi := &file_functions_core_container_v1_container_proto_msgTypes[2]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *PortMapping) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*PortMapping) ProtoMessage() {}
+
+func (x *PortMapping) ProtoReflect() protoreflect.Message {
+	mi := &file_functions_core_container_v1_container_proto_msgTypes[2]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use PortMapping.ProtoReflect.Descriptor instead.
+func (*PortMapping) Descriptor() ([]byte, []int) {
+	return file_functions_core_container_v1_container_proto_rawDescGZIP(), []int{2}
+}
+
+func (x *PortMapping) GetHostPort() int32 {
+	if x != nil {
+		return x.HostPort
+	}
+	return 0
+}
+
+func (x *PortMapping) GetContainerPort() int32 {
+	if x != nil {
+		return x.ContainerPort
+	}
+	return 0
+}
+
+func (x *PortMapping) GetProtocol() string {
+	if x != nil {
+		return x.Protocol
+	}
+	return ""
+}
+
 type RunRequest struct {
 	state   protoimpl.MessageState `protogen:"open.v1"`
 	Name    string                 `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"` // optional, generated when empty
@@ -155,15 +215,16 @@ type RunRequest struct {
 	// files: placed in the container before it starts. collect: read back
 	// after it exits, returned in RunResponse.collected if exit_code == 0.
 	// Blocking mode (detach=false) only.
-	Files         []*File  `protobuf:"bytes,7,rep,name=files,proto3" json:"files,omitempty"`
-	Collect       []string `protobuf:"bytes,8,rep,name=collect,proto3" json:"collect,omitempty"`
+	Files         []*File        `protobuf:"bytes,7,rep,name=files,proto3" json:"files,omitempty"`
+	Collect       []string       `protobuf:"bytes,8,rep,name=collect,proto3" json:"collect,omitempty"`
+	Ports         []*PortMapping `protobuf:"bytes,9,rep,name=ports,proto3" json:"ports,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
 func (x *RunRequest) Reset() {
 	*x = RunRequest{}
-	mi := &file_functions_core_container_v1_container_proto_msgTypes[2]
+	mi := &file_functions_core_container_v1_container_proto_msgTypes[3]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -175,7 +236,7 @@ func (x *RunRequest) String() string {
 func (*RunRequest) ProtoMessage() {}
 
 func (x *RunRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_functions_core_container_v1_container_proto_msgTypes[2]
+	mi := &file_functions_core_container_v1_container_proto_msgTypes[3]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -188,7 +249,7 @@ func (x *RunRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RunRequest.ProtoReflect.Descriptor instead.
 func (*RunRequest) Descriptor() ([]byte, []int) {
-	return file_functions_core_container_v1_container_proto_rawDescGZIP(), []int{2}
+	return file_functions_core_container_v1_container_proto_rawDescGZIP(), []int{3}
 }
 
 func (x *RunRequest) GetName() string {
@@ -247,6 +308,13 @@ func (x *RunRequest) GetCollect() []string {
 	return nil
 }
 
+func (x *RunRequest) GetPorts() []*PortMapping {
+	if x != nil {
+		return x.Ports
+	}
+	return nil
+}
+
 type RunResponse struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	ContainerId   string                 `protobuf:"bytes,1,opt,name=container_id,json=containerId,proto3" json:"container_id,omitempty"`
@@ -261,7 +329,7 @@ type RunResponse struct {
 
 func (x *RunResponse) Reset() {
 	*x = RunResponse{}
-	mi := &file_functions_core_container_v1_container_proto_msgTypes[3]
+	mi := &file_functions_core_container_v1_container_proto_msgTypes[4]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -273,7 +341,7 @@ func (x *RunResponse) String() string {
 func (*RunResponse) ProtoMessage() {}
 
 func (x *RunResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_functions_core_container_v1_container_proto_msgTypes[3]
+	mi := &file_functions_core_container_v1_container_proto_msgTypes[4]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -286,7 +354,7 @@ func (x *RunResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RunResponse.ProtoReflect.Descriptor instead.
 func (*RunResponse) Descriptor() ([]byte, []int) {
-	return file_functions_core_container_v1_container_proto_rawDescGZIP(), []int{3}
+	return file_functions_core_container_v1_container_proto_rawDescGZIP(), []int{4}
 }
 
 func (x *RunResponse) GetContainerId() string {
@@ -340,7 +408,7 @@ type StopRequest struct {
 
 func (x *StopRequest) Reset() {
 	*x = StopRequest{}
-	mi := &file_functions_core_container_v1_container_proto_msgTypes[4]
+	mi := &file_functions_core_container_v1_container_proto_msgTypes[5]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -352,7 +420,7 @@ func (x *StopRequest) String() string {
 func (*StopRequest) ProtoMessage() {}
 
 func (x *StopRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_functions_core_container_v1_container_proto_msgTypes[4]
+	mi := &file_functions_core_container_v1_container_proto_msgTypes[5]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -365,7 +433,7 @@ func (x *StopRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use StopRequest.ProtoReflect.Descriptor instead.
 func (*StopRequest) Descriptor() ([]byte, []int) {
-	return file_functions_core_container_v1_container_proto_rawDescGZIP(), []int{4}
+	return file_functions_core_container_v1_container_proto_rawDescGZIP(), []int{5}
 }
 
 func (x *StopRequest) GetContainerId() string {
@@ -383,7 +451,7 @@ type StopResponse struct {
 
 func (x *StopResponse) Reset() {
 	*x = StopResponse{}
-	mi := &file_functions_core_container_v1_container_proto_msgTypes[5]
+	mi := &file_functions_core_container_v1_container_proto_msgTypes[6]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -395,7 +463,7 @@ func (x *StopResponse) String() string {
 func (*StopResponse) ProtoMessage() {}
 
 func (x *StopResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_functions_core_container_v1_container_proto_msgTypes[5]
+	mi := &file_functions_core_container_v1_container_proto_msgTypes[6]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -408,7 +476,7 @@ func (x *StopResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use StopResponse.ProtoReflect.Descriptor instead.
 func (*StopResponse) Descriptor() ([]byte, []int) {
-	return file_functions_core_container_v1_container_proto_rawDescGZIP(), []int{5}
+	return file_functions_core_container_v1_container_proto_rawDescGZIP(), []int{6}
 }
 
 type StatusRequest struct {
@@ -420,7 +488,7 @@ type StatusRequest struct {
 
 func (x *StatusRequest) Reset() {
 	*x = StatusRequest{}
-	mi := &file_functions_core_container_v1_container_proto_msgTypes[6]
+	mi := &file_functions_core_container_v1_container_proto_msgTypes[7]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -432,7 +500,7 @@ func (x *StatusRequest) String() string {
 func (*StatusRequest) ProtoMessage() {}
 
 func (x *StatusRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_functions_core_container_v1_container_proto_msgTypes[6]
+	mi := &file_functions_core_container_v1_container_proto_msgTypes[7]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -445,7 +513,7 @@ func (x *StatusRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use StatusRequest.ProtoReflect.Descriptor instead.
 func (*StatusRequest) Descriptor() ([]byte, []int) {
-	return file_functions_core_container_v1_container_proto_rawDescGZIP(), []int{6}
+	return file_functions_core_container_v1_container_proto_rawDescGZIP(), []int{7}
 }
 
 func (x *StatusRequest) GetContainerId() string {
@@ -465,7 +533,7 @@ type StatusResponse struct {
 
 func (x *StatusResponse) Reset() {
 	*x = StatusResponse{}
-	mi := &file_functions_core_container_v1_container_proto_msgTypes[7]
+	mi := &file_functions_core_container_v1_container_proto_msgTypes[8]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -477,7 +545,7 @@ func (x *StatusResponse) String() string {
 func (*StatusResponse) ProtoMessage() {}
 
 func (x *StatusResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_functions_core_container_v1_container_proto_msgTypes[7]
+	mi := &file_functions_core_container_v1_container_proto_msgTypes[8]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -490,7 +558,7 @@ func (x *StatusResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use StatusResponse.ProtoReflect.Descriptor instead.
 func (*StatusResponse) Descriptor() ([]byte, []int) {
-	return file_functions_core_container_v1_container_proto_rawDescGZIP(), []int{7}
+	return file_functions_core_container_v1_container_proto_rawDescGZIP(), []int{8}
 }
 
 func (x *StatusResponse) GetState() string {
@@ -518,7 +586,11 @@ const file_functions_core_container_v1_container_proto_rawDesc = "" +
 	"\tread_only\x18\x03 \x01(\bR\breadOnly\"4\n" +
 	"\x04File\x12\x12\n" +
 	"\x04path\x18\x01 \x01(\tR\x04path\x12\x18\n" +
-	"\acontent\x18\x02 \x01(\fR\acontent\"\xf3\x02\n" +
+	"\acontent\x18\x02 \x01(\fR\acontent\"m\n" +
+	"\vPortMapping\x12\x1b\n" +
+	"\thost_port\x18\x01 \x01(\x05R\bhostPort\x12%\n" +
+	"\x0econtainer_port\x18\x02 \x01(\x05R\rcontainerPort\x12\x1a\n" +
+	"\bprotocol\x18\x03 \x01(\tR\bprotocol\"\xb3\x03\n" +
 	"\n" +
 	"RunRequest\x12\x12\n" +
 	"\x04name\x18\x01 \x01(\tR\x04name\x12\x14\n" +
@@ -528,7 +600,8 @@ const file_functions_core_container_v1_container_proto_rawDesc = "" +
 	"\x06mounts\x18\x05 \x03(\v2\".functions.core.container.v1.MountR\x06mounts\x12\x16\n" +
 	"\x06detach\x18\x06 \x01(\bR\x06detach\x127\n" +
 	"\x05files\x18\a \x03(\v2!.functions.core.container.v1.FileR\x05files\x12\x18\n" +
-	"\acollect\x18\b \x03(\tR\acollect\x1a6\n" +
+	"\acollect\x18\b \x03(\tR\acollect\x12>\n" +
+	"\x05ports\x18\t \x03(\v2(.functions.core.container.v1.PortMappingR\x05ports\x1a6\n" +
 	"\bEnvEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
 	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"\xce\x01\n" +
@@ -564,34 +637,36 @@ func file_functions_core_container_v1_container_proto_rawDescGZIP() []byte {
 	return file_functions_core_container_v1_container_proto_rawDescData
 }
 
-var file_functions_core_container_v1_container_proto_msgTypes = make([]protoimpl.MessageInfo, 9)
+var file_functions_core_container_v1_container_proto_msgTypes = make([]protoimpl.MessageInfo, 10)
 var file_functions_core_container_v1_container_proto_goTypes = []any{
 	(*Mount)(nil),          // 0: functions.core.container.v1.Mount
 	(*File)(nil),           // 1: functions.core.container.v1.File
-	(*RunRequest)(nil),     // 2: functions.core.container.v1.RunRequest
-	(*RunResponse)(nil),    // 3: functions.core.container.v1.RunResponse
-	(*StopRequest)(nil),    // 4: functions.core.container.v1.StopRequest
-	(*StopResponse)(nil),   // 5: functions.core.container.v1.StopResponse
-	(*StatusRequest)(nil),  // 6: functions.core.container.v1.StatusRequest
-	(*StatusResponse)(nil), // 7: functions.core.container.v1.StatusResponse
-	nil,                    // 8: functions.core.container.v1.RunRequest.EnvEntry
+	(*PortMapping)(nil),    // 2: functions.core.container.v1.PortMapping
+	(*RunRequest)(nil),     // 3: functions.core.container.v1.RunRequest
+	(*RunResponse)(nil),    // 4: functions.core.container.v1.RunResponse
+	(*StopRequest)(nil),    // 5: functions.core.container.v1.StopRequest
+	(*StopResponse)(nil),   // 6: functions.core.container.v1.StopResponse
+	(*StatusRequest)(nil),  // 7: functions.core.container.v1.StatusRequest
+	(*StatusResponse)(nil), // 8: functions.core.container.v1.StatusResponse
+	nil,                    // 9: functions.core.container.v1.RunRequest.EnvEntry
 }
 var file_functions_core_container_v1_container_proto_depIdxs = []int32{
-	8, // 0: functions.core.container.v1.RunRequest.env:type_name -> functions.core.container.v1.RunRequest.EnvEntry
+	9, // 0: functions.core.container.v1.RunRequest.env:type_name -> functions.core.container.v1.RunRequest.EnvEntry
 	0, // 1: functions.core.container.v1.RunRequest.mounts:type_name -> functions.core.container.v1.Mount
 	1, // 2: functions.core.container.v1.RunRequest.files:type_name -> functions.core.container.v1.File
-	1, // 3: functions.core.container.v1.RunResponse.collected:type_name -> functions.core.container.v1.File
-	2, // 4: functions.core.container.v1.Container.Run:input_type -> functions.core.container.v1.RunRequest
-	4, // 5: functions.core.container.v1.Container.Stop:input_type -> functions.core.container.v1.StopRequest
-	6, // 6: functions.core.container.v1.Container.Status:input_type -> functions.core.container.v1.StatusRequest
-	3, // 7: functions.core.container.v1.Container.Run:output_type -> functions.core.container.v1.RunResponse
-	5, // 8: functions.core.container.v1.Container.Stop:output_type -> functions.core.container.v1.StopResponse
-	7, // 9: functions.core.container.v1.Container.Status:output_type -> functions.core.container.v1.StatusResponse
-	7, // [7:10] is the sub-list for method output_type
-	4, // [4:7] is the sub-list for method input_type
-	4, // [4:4] is the sub-list for extension type_name
-	4, // [4:4] is the sub-list for extension extendee
-	0, // [0:4] is the sub-list for field type_name
+	2, // 3: functions.core.container.v1.RunRequest.ports:type_name -> functions.core.container.v1.PortMapping
+	1, // 4: functions.core.container.v1.RunResponse.collected:type_name -> functions.core.container.v1.File
+	3, // 5: functions.core.container.v1.Container.Run:input_type -> functions.core.container.v1.RunRequest
+	5, // 6: functions.core.container.v1.Container.Stop:input_type -> functions.core.container.v1.StopRequest
+	7, // 7: functions.core.container.v1.Container.Status:input_type -> functions.core.container.v1.StatusRequest
+	4, // 8: functions.core.container.v1.Container.Run:output_type -> functions.core.container.v1.RunResponse
+	6, // 9: functions.core.container.v1.Container.Stop:output_type -> functions.core.container.v1.StopResponse
+	8, // 10: functions.core.container.v1.Container.Status:output_type -> functions.core.container.v1.StatusResponse
+	8, // [8:11] is the sub-list for method output_type
+	5, // [5:8] is the sub-list for method input_type
+	5, // [5:5] is the sub-list for extension type_name
+	5, // [5:5] is the sub-list for extension extendee
+	0, // [0:5] is the sub-list for field type_name
 }
 
 func init() { file_functions_core_container_v1_container_proto_init() }
@@ -605,7 +680,7 @@ func file_functions_core_container_v1_container_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_functions_core_container_v1_container_proto_rawDesc), len(file_functions_core_container_v1_container_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   9,
+			NumMessages:   10,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

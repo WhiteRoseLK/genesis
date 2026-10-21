@@ -89,6 +89,11 @@ func (m *chronyModule) Check(_ context.Context, req *modulev1.StepRequest) (*mod
 	if !boolFlag(flags, "verified") {
 		return &modulev1.CheckResult{Status: modulev1.CheckResult_STATUS_TODO}, nil
 	}
+	m.mu.Lock()
+	if ip, ok := flags["vm_ip"].(string); ok && ip != "" {
+		m.ntpEndpoint = &timentpv1.EndpointInfo{Address: ip, Port: 123}
+	}
+	m.mu.Unlock()
 	return &modulev1.CheckResult{Status: modulev1.CheckResult_STATUS_COMPLIANT}, nil
 }
 

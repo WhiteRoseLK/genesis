@@ -333,6 +333,18 @@ func (e *Engine) Destroy(ctx context.Context, resolved *resolver.Resolved, plan 
 		return err
 	}
 
+	for _, name := range plan.Order {
+		m := resolved.Modules[name]
+		client := clients[m.Name]
+		req, err := e.buildStepRequest(runID, m, client, st)
+		if err != nil {
+			return err
+		}
+		if _, err := client.Module().Check(ctx, req); err != nil {
+			return modulehost.WrapModuleError("check", err)
+		}
+	}
+
 	for i := len(plan.Order) - 1; i >= 0; i-- {
 		name := plan.Order[i]
 		m := resolved.Modules[name]

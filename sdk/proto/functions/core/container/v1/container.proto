@@ -27,6 +27,12 @@ message File {
   bytes content = 2;
 }
 
+message PortMapping {
+  int32 host_port = 1;
+  int32 container_port = 2;
+  string protocol = 3; // "tcp" or "udp", defaults to "tcp"
+}
+
 message RunRequest {
   string name = 1; // optional, generated when empty
   string image = 2;
@@ -43,6 +49,7 @@ message RunRequest {
   // Blocking mode (detach=false) only.
   repeated File files = 7;
   repeated string collect = 8;
+  repeated PortMapping ports = 9;
 }
 
 message RunResponse {

@@ -28,6 +28,10 @@
       register: agent_ssh
       changed_when: false
 
+    - name: agent ssh confirmed ok
+      ansible.builtin.debug:
+        msg: "AGENT_SSH_OK"
+
     - name: place the direct service private key
       ansible.builtin.copy:
         content: "{{ direct_private_key_pem }}"

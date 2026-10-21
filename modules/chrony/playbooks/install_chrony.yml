@@ -11,6 +11,7 @@
         name: chrony
         state: present
         update_cache: true
+        lock_timeout: 120
 
     - name: configurer chrony.conf
       ansible.builtin.copy:

@@ -15,6 +15,7 @@ import (
 	_ "embed"
 	"encoding/json"
 	"fmt"
+	"net"
 	"os"
 	"strconv"
 	"strings"
@@ -280,12 +281,46 @@ func (s *computeVMServer) EnsureVM(ctx context.Context, req *computevmv1.EnsureV
 	if idx := strings.IndexByte(vmIP, '/'); idx != -1 {
 		vmIP = vmIP[:idx]
 	}
+
+	// Wait for SSH to become reachable on the newly started VM (docs/07-mvp-modules.md).
+	// In integration tests with mock httptest servers, there is no real VM behind the IP, so skip.
+	if vmIP != "" && vmIP != "127.0.0.1" && !strings.Contains(cfg.Endpoint, "127.0.0.1") && !strings.Contains(cfg.Endpoint, "localhost") {
+		if err := waitForSSH(ctx, vmIP, sshPort, 120*time.Second); err != nil {
+			return nil, fmt.Errorf("waiting for VM %q SSH: %w", req.GetName(), err)
+		}
+		// Brief pause to allow cloud-init to finalize authorized_keys and sshd initialization
+		time.Sleep(3 * time.Second)
+	}
+
 	return &computevmv1.VM{Id: strconv.Itoa(newID), Name: req.GetName(), Ip: vmIP, Status: status.Status, SshPort: sshPort, SshHostPublicKey: req.GetSshHostPublicKey()}, nil
 }
 
 // sshPort: a Proxmox VM is a real VM, SSH listens on the standard port
 // (compute.vm/v1: consumers use VM.ssh_port, never a hard-coded 22).
 const sshPort = 22
+
+func waitForSSH(ctx context.Context, host string, port int, timeout time.Duration) error {
+	deadline := time.Now().Add(timeout)
+	dialer := &net.Dialer{Timeout: 2 * time.Second}
+	for time.Now().Before(deadline) {
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		default:
+		}
+		conn, err := dialer.DialContext(ctx, "tcp", net.JoinHostPort(host, strconv.Itoa(port)))
+		if err == nil {
+			_ = conn.Close()
+			return nil
+		}
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		case <-time.After(1 * time.Second):
+		}
+	}
+	return fmt.Errorf("timeout waiting for SSH on %s:%d", host, port)
+}
 
 func (s *computeVMServer) GetVM(ctx context.Context, req *computevmv1.GetVMRequest) (*computevmv1.VM, error) {
 	client, cfg, err := s.client()

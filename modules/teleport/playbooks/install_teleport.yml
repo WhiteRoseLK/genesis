@@ -14,6 +14,8 @@
         name: [gnupg, curl, ca-certificates]
         state: present
         update_cache: true
+        cache_valid_time: 3600
+        lock_timeout: 120
 
     - name: create the APT keys directory
       ansible.builtin.file:
@@ -29,7 +31,7 @@
 
     - name: add the Teleport repository
       ansible.builtin.apt_repository:
-        repo: "deb [signed-by=/usr/share/keyrings/teleport-archive-keyring.asc] https://apt.releases.teleport.dev/debian/ {{ ansible_distribution_release | default('bookworm') }} stable/v17"
+        repo: "deb [signed-by=/usr/share/keyrings/teleport-archive-keyring.asc] https://apt.releases.teleport.dev/{{ (ansible_distribution | lower == 'ubuntu') | ternary('ubuntu', 'debian') }}/ {{ ansible_distribution_release | default('bookworm') }} stable/v17"
         state: present
         filename: teleport
 
@@ -38,6 +40,8 @@
         name: teleport
         state: present
         update_cache: true
+        cache_valid_time: 3600
+        lock_timeout: 120
 
     - name: create the TLS directory
       ansible.builtin.file:
@@ -94,6 +98,13 @@
         dest: /etc/teleport/teleport.yaml
         mode: "0640"
       register: teleport_conf
+
+    - name: link /etc/teleport.yaml to /etc/teleport/teleport.yaml
+      ansible.builtin.file:
+        src: /etc/teleport/teleport.yaml
+        dest: /etc/teleport.yaml
+        state: link
+        force: true
 
     - name: enable and (re)start teleport if the configuration changed
       ansible.builtin.systemd:
