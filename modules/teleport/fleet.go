@@ -40,7 +40,7 @@ func (s *teleportFleetServer) Install(ctx context.Context, req *fleetagentv1.Ins
 		return nil, fmt.Errorf("fleet.agent/v1.Install: missing target")
 	}
 
-	if err := m.installAgent(ctx, ownTarget, t); err != nil {
+	if err := m.installAgent(ctx, ownTarget, t, false); err != nil {
 		return nil, fmt.Errorf("fleet.agent/v1.Install(%s): %w", t.GetHost(), err)
 	}
 	return &fleetagentv1.InstallResponse{}, nil
@@ -49,7 +49,7 @@ func (s *teleportFleetServer) Install(ctx context.Context, req *fleetagentv1.Ins
 // installAgent generates an enrolment token then deploys/enrols the Teleport
 // agent on the target -- factored out to be called both by Install (real
 // consumers) and by Verify (disposable test VM).
-func (m *teleportModule) installAgent(ctx context.Context, ownTarget connTarget, t *fleetagentv1.Target) error {
+func (m *teleportModule) installAgent(ctx context.Context, ownTarget connTarget, t *fleetagentv1.Target, disableNativeSSHD bool) error {
 	m.mu.Lock()
 	caPin := m.caPin
 	m.mu.Unlock()
@@ -67,10 +67,11 @@ func (m *teleportModule) installAgent(ctx context.Context, ownTarget connTarget,
 		SshHostKey:    t.GetSshHostKey(),
 	}
 	vars, err := sdk.NewState(map[string]any{
-		"node_name":   t.GetHost(),
-		"join_token":  joinToken,
-		"ca_pin":      caPin,
-		"auth_server": fmt.Sprintf("%s:%d", ownTarget.Host, authPort),
+		"node_name":           t.GetHost(),
+		"join_token":          joinToken,
+		"ca_pin":              caPin,
+		"auth_server":         fmt.Sprintf("%s:%d", ownTarget.Host, authPort),
+		"disable_native_sshd": disableNativeSSHD,
 	})
 	if err != nil {
 		return err

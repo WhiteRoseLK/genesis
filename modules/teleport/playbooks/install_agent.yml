@@ -106,3 +106,4 @@
         - ssh.socket
         - sshd
       failed_when: false
+      when: disable_native_sshd | default(false)

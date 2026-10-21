@@ -230,6 +230,10 @@ func (e *Engine) Run(ctx context.Context, resolved *resolver.Resolved, plan *pla
 		}
 	}
 
+	if err := e.enrollFleetConsumers(ctx, runID, resolved, plan, clients, st); err != nil {
+		return err
+	}
+
 	return e.retireSeed(ctx, runID, resolved, plan, clients, st)
 }
 
@@ -491,7 +495,7 @@ func (e *Engine) retireSeed(ctx context.Context, runID string, resolved *resolve
 
 	for _, name := range targetModules {
 		if err := e.action(ctx, runID, resolved.Modules[name], clients[name], st, "verify.final", clients[name].Module().Verify); err != nil {
-			return fmt.Errorf("seed kept, final verification failed: %w", err)
+			return fmt.Errorf("seed kept, module %q: %w", name, err)
 		}
 	}
 
@@ -636,6 +640,83 @@ func (e *Engine) repoint(
 				}
 			}
 			e.audit(consumerName, "repoint", p.Function)
+		}
+	}
+	return nil
+}
+
+// enrollFleetConsumers triggers Repoint with the fleet function for all consumers of fleet functions
+// that have already executed (docs/09-decisions.md ADR-017).
+func (e *Engine) enrollFleetConsumers(
+	ctx context.Context,
+	runID string,
+	resolved *resolver.Resolved,
+	plan *planner.Plan,
+	clients map[string]*modulehost.Client,
+	st *state.State,
+) error {
+	for _, name := range plan.Order {
+		m := resolved.Modules[name]
+		if m == nil || m.Manifest == nil {
+			continue
+		}
+		for _, p := range m.Manifest.Provides {
+			if !p.Fleet {
+				continue
+			}
+			// Only enroll if provider module has succeeded and has state
+			if _, hasState := st.Modules[name]; !hasState {
+				continue
+			}
+			for _, consumerName := range resolved.ConsumersFor(p.Function) {
+				if consumerName == name {
+					continue
+				}
+				consumerClient, ok := clients[consumerName]
+				if !ok {
+					continue
+				}
+				consumerState, hasState := st.Modules[consumerName]
+				if !hasState {
+					continue
+				}
+				// Skip if consumer is already enrolled
+				if p.Function == "fleet.agent/v1" && len(consumerState.StateJSON) > 0 {
+					var raw map[string]any
+					if err := json.Unmarshal(consumerState.StateJSON, &raw); err == nil {
+						if raw["admin_method"] == "teleport" {
+							continue
+						}
+					}
+				}
+				consumerMod := resolved.Modules[consumerName]
+				if consumerMod == nil {
+					continue
+				}
+				req, err := e.buildStepRequest(runID, consumerMod, consumerClient, st)
+				if err != nil {
+					return fmt.Errorf("building repoint request for %q: %w", consumerName, err)
+				}
+				result, err := consumerClient.Module().Repoint(ctx, &modulev1.RepointRequest{
+					Step:     req,
+					Function: p.Function,
+				})
+				if err != nil {
+					if status.Code(err) == codes.Unimplemented {
+						continue
+					}
+					return modulehost.WrapModuleError("repoint", err)
+				}
+				if result.GetStatus() != modulev1.StepResult_STATUS_OK {
+					return fmt.Errorf("module %q, step repoint (%s): failed (%s)", consumerName, p.Function, diagnosticsString(result.GetDiagnostics()))
+				}
+				if result.GetState() != nil {
+					if err := e.saveModuleState(consumerName, result.GetState(), st); err != nil {
+						return err
+					}
+				}
+				e.audit(consumerName, "fleet.enroll", "ok")
+			}
 		}
 	}
 	return nil

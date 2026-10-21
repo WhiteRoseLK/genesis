@@ -59,7 +59,7 @@ func (m *teleportModule) Verify(ctx context.Context, req *modulev1.StepRequest) 
 		User:          sshUser,
 		SshPrivateKey: agentPair.PrivateKeyOpenSSH,
 		SshHostKey:    agentVM.GetSshHostPublicKey(),
-	}); err != nil {
+	}, true); err != nil {
 		return nil, fmt.Errorf("Verify(teleport): installing the agent on the test target: %w", err)
 	}
 
