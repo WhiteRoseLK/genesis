@@ -26,3 +26,9 @@ module-darwin-*
 .idea/
 *.swp
 /.bin/
+
+# Runtime state and lock files
+/.state/
+/genesis.lock
+spec-*.yaml
+
