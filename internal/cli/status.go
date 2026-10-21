@@ -10,6 +10,7 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"github.com/WhiteRoseLK/genesis/internal/spec"
 	"github.com/WhiteRoseLK/genesis/internal/state"
 )
 
@@ -23,6 +24,12 @@ func newStatusCmd() *cobra.Command {
 		stateDir, err := cmd.Flags().GetString("state-dir")
 		if err != nil {
 			return err
+		}
+		file, _ := cmd.Flags().GetString("file")
+		if file != "" && !cmd.Flags().Changed("state-dir") {
+			if env, err := spec.Load(file); err == nil && env.Seed.StateDir != "" {
+				stateDir = env.Seed.StateDir
+			}
 		}
 		st, err := state.Load(stateDir)
 		if err != nil {
@@ -76,7 +83,6 @@ func newStatusCmd() *cobra.Command {
 			}
 		}
 
-		file, _ := cmd.Flags().GetString("file")
 		if file != "" {
 			resolved, _, err := resolveAndPlan(file)
 			if err != nil {
