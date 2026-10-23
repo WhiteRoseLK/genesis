@@ -334,12 +334,17 @@ func TestCloneVMFullAndStorageOptions(t *testing.T) {
 
 func TestCloneVMFallbackToFullClone(t *testing.T) {
 	attempts := 0
+	forms := []string{}
 	client, _ := newTestServer(t, func(w http.ResponseWriter, r *http.Request) {
 		attempts++
 		body := make([]byte, r.ContentLength)
 		_, _ = r.Body.Read(body)
 		form := string(body)
+		forms = append(forms, form)
 		if strings.Contains(form, "full=0") {
+			if strings.Contains(form, "storage=") {
+				t.Errorf("linked clone request must not contain storage parameter, got: %q", form)
+			}
 			http.Error(w, `{"data":null,"message":"Linked clone feature is not supported for 'SSD:vm-3000-disk-0'"}`, http.StatusBadRequest)
 			return
 		}
@@ -351,12 +356,19 @@ func TestCloneVMFallbackToFullClone(t *testing.T) {
 		NewID:      3001,
 		Name:       "infra01",
 		Full:       false,
+		Storage:    "SSD",
 	})
 	if err != nil {
 		t.Fatalf("CloneVM fallback: %v", err)
 	}
 	if attempts != 2 {
-		t.Errorf("attempts = %d, want 2 (linked clone then full clone fallback)", attempts)
+		t.Fatalf("attempts = %d, want 2 (linked clone then full clone fallback)", attempts)
+	}
+	if strings.Contains(forms[0], "storage=") {
+		t.Errorf("attempt 1 (linked clone) sent storage parameter: %s", forms[0])
+	}
+	if !strings.Contains(forms[1], "full=1") || !strings.Contains(forms[1], "storage=SSD") {
+		t.Errorf("attempt 2 (fallback) missing full=1 or storage=SSD: %s", forms[1])
 	}
 }
 
