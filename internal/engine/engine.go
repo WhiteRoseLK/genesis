@@ -33,6 +33,7 @@ import (
 	"slices"
 	"sort"
 	"strings"
+	"sync"
 
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
@@ -70,6 +71,8 @@ type Engine struct {
 	Secrets   secrets.Store
 	Router    *secrets.Router
 	Allocator broker.Allocator
+
+	mu sync.Mutex // protects in-memory State modifications and state.Save
 }
 
 // New builds an engine: a broker registry with core.secrets/v1 already
@@ -131,6 +134,8 @@ func (e *Engine) Run(ctx context.Context, resolved *resolver.Resolved, plan *pla
 			Reserved:  []string{resolved.Network.Gateway, resolved.Seed.Address},
 			Allocated: st.AllocatedIPs,
 			OnChange: func(allocated map[string]string) error {
+				e.mu.Lock()
+				defer e.mu.Unlock()
 				st.AllocatedIPs = allocated
 				return state.Save(e.StateDir, st)
 			},
@@ -223,10 +228,17 @@ func (e *Engine) Run(ctx context.Context, resolved *resolver.Resolved, plan *pla
 		return err
 	}
 
+	var targetPreprovisioned bool
 	for _, name := range plan.Order {
 		m := resolved.Modules[name]
 		if err := e.runModule(ctx, runID, resolved, m, clients, providers, st); err != nil {
 			return err
+		}
+		if providesFunction(m, "compute.vm/v1") && !targetPreprovisioned {
+			targetPreprovisioned = true
+			if err := e.preprovisionTargetModules(ctx, runID, resolved, plan, clients, st); err != nil {
+				return err
+			}
 		}
 	}
 
@@ -263,6 +275,8 @@ func (e *Engine) Destroy(ctx context.Context, resolved *resolver.Resolved, plan 
 			Reserved:  []string{resolved.Network.Gateway, resolved.Seed.Address},
 			Allocated: st.AllocatedIPs,
 			OnChange: func(allocated map[string]string) error {
+				e.mu.Lock()
+				defer e.mu.Unlock()
 				st.AllocatedIPs = allocated
 				return state.Save(e.StateDir, st)
 			},
@@ -366,18 +380,24 @@ func (e *Engine) Destroy(ctx context.Context, resolved *resolver.Resolved, plan 
 		if result.GetStatus() != modulev1.StepResult_STATUS_OK {
 			return fmt.Errorf("module %q, step destroy: failed (%s)", m.Name, diagnosticsString(result.GetDiagnostics()))
 		}
+		e.mu.Lock()
 		delete(st.Modules, m.Name)
-		if err := state.Save(e.StateDir, st); err != nil {
+		err = state.Save(e.StateDir, st)
+		e.mu.Unlock()
+		if err != nil {
 			return err
 		}
 		e.audit(m.Name, "destroy", "ok")
 	}
 
+	e.mu.Lock()
 	if len(st.Modules) == 0 {
 		st.AllocatedIPs = map[string]string{}
-		if err := state.Save(e.StateDir, st); err != nil {
-			return err
-		}
+		err = state.Save(e.StateDir, st)
+	}
+	e.mu.Unlock()
+	if err != nil {
+		return err
 	}
 
 	return nil
@@ -429,8 +449,14 @@ func (e *Engine) runModule(
 		return e.action(ctx, runID, m, client, st, "verify", client.Module().Verify)
 	}
 
-	if err := e.action(ctx, runID, m, client, st, "provision", client.Module().Provision); err != nil {
-		return err
+	e.mu.Lock()
+	ms := st.Modules[m.Name]
+	e.mu.Unlock()
+
+	if !requiresComputeVM(m) || !isVMProvisioned(ms) {
+		if err := e.action(ctx, runID, m, client, st, "provision", client.Module().Provision); err != nil {
+			return err
+		}
 	}
 	if err := e.action(ctx, runID, m, client, st, "configure", client.Module().Configure); err != nil {
 		return err
@@ -506,8 +532,11 @@ func (e *Engine) retireSeed(ctx context.Context, runID string, resolved *resolve
 		}
 	}
 
+	e.mu.Lock()
 	st.SeedRetired = true
-	if err := state.Save(e.StateDir, st); err != nil {
+	err := state.Save(e.StateDir, st)
+	e.mu.Unlock()
+	if err != nil {
 		return fmt.Errorf("persisting the seed retirement: %w", err)
 	}
 	if fs, ok := e.fileStore(); ok {
@@ -775,8 +804,11 @@ func (e *Engine) migrateSecretsIfNeeded(ctx context.Context, resolved *resolver.
 		migrated++
 	}
 
+	e.mu.Lock()
 	st.SecretsBackend = "vault"
-	if err := state.Save(e.StateDir, st); err != nil {
+	err = state.Save(e.StateDir, st)
+	e.mu.Unlock()
+	if err != nil {
 		return fmt.Errorf("persisting the secret backend after migration: %w", err)
 	}
 	if e.Router != nil {
@@ -832,9 +864,18 @@ func (e *Engine) buildStepRequest(runID string, m *resolver.Module, client *modu
 	token := e.Registry.OpenSession(client.Broker(), m.Name, requiredFunctions(m.Manifest))
 
 	var stateStruct *structpb.Struct
-	if ms, ok := st.Modules[m.Name]; ok && len(ms.StateJSON) > 0 {
+	e.mu.Lock()
+	ms, ok := st.Modules[m.Name]
+	var rawJSON []byte
+	if ok && len(ms.StateJSON) > 0 {
+		rawJSON = make([]byte, len(ms.StateJSON))
+		copy(rawJSON, ms.StateJSON)
+	}
+	e.mu.Unlock()
+
+	if len(rawJSON) > 0 {
 		var raw map[string]any
-		if err := json.Unmarshal(ms.StateJSON, &raw); err != nil {
+		if err := json.Unmarshal(rawJSON, &raw); err != nil {
 			return nil, fmt.Errorf("invalid persisted state for %q: %w", m.Name, err)
 		}
 		s, err := structpb.NewStruct(raw)
@@ -870,6 +911,8 @@ func (e *Engine) saveModuleState(moduleName string, s *structpb.Struct, st *stat
 	if err != nil {
 		return fmt.Errorf("encoding the state of %q: %w", moduleName, err)
 	}
+	e.mu.Lock()
+	defer e.mu.Unlock()
 	st.Modules[moduleName] = state.ModuleState{StateJSON: raw}
 	if err := state.Save(e.StateDir, st); err != nil {
 		return fmt.Errorf("persisting the state after the step of %q: %w", moduleName, err)
@@ -928,4 +971,98 @@ func newRunID() (string, error) {
 		return "", fmt.Errorf("generating the run ID: %w", err)
 	}
 	return "run-" + hex.EncodeToString(buf), nil
+}
+
+// preprovisionTargetModules provisions all target modules requiring compute.vm/v1
+// concurrently as soon as the compute provider is ready. This parallelizes VM
+// cloning and cloud-init booting across all target nodes.
+func (e *Engine) preprovisionTargetModules(
+	ctx context.Context,
+	runID string,
+	resolved *resolver.Resolved,
+	plan *planner.Plan,
+	clients map[string]*modulehost.Client,
+	st *state.State,
+) error {
+	var targets []*resolver.Module
+	for _, name := range plan.Order {
+		m := resolved.Modules[name]
+		if m == nil || !providesInPhase(m, "target") || !requiresComputeVM(m) {
+			continue
+		}
+		e.mu.Lock()
+		ms := st.Modules[m.Name]
+		e.mu.Unlock()
+		if isVMProvisioned(ms) {
+			continue
+		}
+		targets = append(targets, m)
+	}
+
+	if len(targets) == 0 {
+		return nil
+	}
+
+	var names []string
+	for _, t := range targets {
+		names = append(names, t.Name)
+	}
+	e.Logger.Info("pre-provisioning target VMs in parallel", "modules", strings.Join(names, ", "))
+
+	var wg sync.WaitGroup
+	errCh := make(chan error, len(targets))
+
+	for _, m := range targets {
+		wg.Add(1)
+		go func(targetMod *resolver.Module) {
+			defer wg.Done()
+			client, ok := clients[targetMod.Name]
+			if !ok || client == nil {
+				errCh <- fmt.Errorf("module %q: host client not found", targetMod.Name)
+				return
+			}
+			if err := e.action(ctx, runID, targetMod, client, st, "provision", client.Module().Provision); err != nil {
+				errCh <- fmt.Errorf("module %q: %w", targetMod.Name, err)
+			}
+		}(m)
+	}
+
+	wg.Wait()
+	close(errCh)
+
+	var errs []error
+	for err := range errCh {
+		errs = append(errs, err)
+	}
+	if len(errs) > 0 {
+		return errors.Join(errs...)
+	}
+	return nil
+}
+
+func requiresComputeVM(m *resolver.Module) bool {
+	if m == nil || m.Manifest == nil {
+		return false
+	}
+	for _, reqs := range m.Manifest.Requires {
+		for _, r := range reqs {
+			fn, _ := resolver.SplitFunctionPhase(r.Function)
+			if fn == "compute.vm/v1" {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+func isVMProvisioned(ms state.ModuleState) bool {
+	if len(ms.StateJSON) == 0 {
+		return false
+	}
+	var raw map[string]any
+	if err := json.Unmarshal(ms.StateJSON, &raw); err != nil {
+		return false
+	}
+	ip, _ := raw["vm_ip"].(string)
+	return ip != ""
 }
