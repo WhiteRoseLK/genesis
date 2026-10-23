@@ -663,16 +663,6 @@ func (s *computeVMServer) EnsureVM(ctx context.Context, req *computevmv1.EnsureV
 		return nil, fmt.Errorf("template %q not found", cfg.Image)
 	}
 
-	var newID int
-	if cfg.VMIDMin > 0 {
-		newID, err = client.NextID(ctx, cfg.VMIDMin)
-	} else {
-		newID, err = client.NextID(ctx)
-	}
-	if err != nil {
-		return nil, fmt.Errorf("getting a VM ID: %w", err)
-	}
-
 	fullClone := false
 	if cfg.FullClone != nil {
 		fullClone = *cfg.FullClone
@@ -683,14 +673,42 @@ func (s *computeVMServer) EnsureVM(ctx context.Context, req *computevmv1.EnsureV
 	if isEphemeralVM(req) {
 		fullClone = false
 	}
-	if err := client.CloneVM(ctx, cfg.Node, proxmoxapi.CloneVMOptions{
+
+	var newID int
+	var upid string
+
+	// Allocate VM ID and initiate the clone under lock so concurrent provisioning
+	// requests receive strictly distinct IDs before asynchronous cloning starts.
+	s.module.mu.Lock()
+	if cfg.VMIDMin > 0 {
+		newID, err = client.NextID(ctx, cfg.VMIDMin)
+	} else {
+		newID, err = client.NextID(ctx)
+	}
+	if err != nil {
+		s.module.mu.Unlock()
+		return nil, fmt.Errorf("getting a VM ID: %w", err)
+	}
+
+	upid, err = client.InitiateCloneVM(ctx, cfg.Node, proxmoxapi.CloneVMOptions{
 		TemplateID: template.VMID,
 		NewID:      newID,
 		Name:       req.GetName(),
 		Full:       fullClone,
 		Storage:    cfg.Storage,
-	}); err != nil {
+	})
+	s.module.mu.Unlock()
+
+	if err != nil {
 		return nil, fmt.Errorf("cloning %q: %w", req.GetName(), err)
+	}
+
+	// Wait for the asynchronous clone task outside the lock so multiple VM
+	// clones proceed concurrently on Proxmox.
+	if upid != "" {
+		if err := client.WaitForTask(ctx, cfg.Node, upid); err != nil {
+			return nil, fmt.Errorf("waiting for clone of %q: %w", req.GetName(), err)
+		}
 	}
 
 	tag := "genesis"

@@ -122,8 +122,8 @@ type CloneVMOptions struct {
 	Storage    string
 }
 
-// CloneVM makes a clone of the template into a new VM.
-func (c *Client) CloneVM(ctx context.Context, node string, opts CloneVMOptions) error {
+// InitiateCloneVM starts the clone operation on Proxmox and returns the UPID without waiting.
+func (c *Client) InitiateCloneVM(ctx context.Context, node string, opts CloneVMOptions) (string, error) {
 	form := url.Values{}
 	form.Set("newid", strconv.Itoa(opts.NewID))
 	form.Set("name", opts.Name)
@@ -137,7 +137,8 @@ func (c *Client) CloneVM(ctx context.Context, node string, opts CloneVMOptions) 
 		// Proxmox API rejects the 'storage' parameter for linked clones (full=0).
 	}
 	path := fmt.Sprintf("/nodes/%s/qemu/%d/clone", node, opts.TemplateID)
-	err := c.doMaybeAsync(ctx, node, http.MethodPost, path, form)
+	var raw json.RawMessage
+	err := c.do(ctx, http.MethodPost, path, form, &raw)
 	if err != nil && !opts.Full && (strings.Contains(err.Error(), "Linked clone feature is not supported") ||
 		strings.Contains(err.Error(), "not allowed for linked clones") ||
 		strings.Contains(err.Error(), "snapshot")) {
@@ -147,9 +148,26 @@ func (c *Client) CloneVM(ctx context.Context, node string, opts CloneVMOptions) 
 		if opts.Storage != "" {
 			form.Set("storage", opts.Storage)
 		}
-		return c.doMaybeAsync(ctx, node, http.MethodPost, path, form)
+		err = c.do(ctx, http.MethodPost, path, form, &raw)
 	}
-	return err
+	if err != nil {
+		return "", err
+	}
+	var upid string
+	_ = json.Unmarshal(raw, &upid)
+	return upid, nil
+}
+
+// CloneVM makes a clone of the template into a new VM.
+func (c *Client) CloneVM(ctx context.Context, node string, opts CloneVMOptions) error {
+	upid, err := c.InitiateCloneVM(ctx, node, opts)
+	if err != nil {
+		return err
+	}
+	if upid != "" {
+		return c.WaitForTask(ctx, node, upid)
+	}
+	return nil
 }
 
 // CloudInitOptions configures cloud-init on a VM (docs/07: "IP, service SSH
