@@ -129,17 +129,24 @@ func (c *Client) CloneVM(ctx context.Context, node string, opts CloneVMOptions) 
 	form.Set("name", opts.Name)
 	if opts.Full {
 		form.Set("full", "1")
+		if opts.Storage != "" {
+			form.Set("storage", opts.Storage)
+		}
 	} else {
 		form.Set("full", "0")
-	}
-	if opts.Storage != "" {
-		form.Set("storage", opts.Storage)
+		// Proxmox API rejects the 'storage' parameter for linked clones (full=0).
 	}
 	path := fmt.Sprintf("/nodes/%s/qemu/%d/clone", node, opts.TemplateID)
 	err := c.doMaybeAsync(ctx, node, http.MethodPost, path, form)
-	if err != nil && !opts.Full && strings.Contains(err.Error(), "Linked clone feature is not supported") {
-		// Fallback to full clone if linked clone is unsupported on this storage (e.g. standard LVM).
+	if err != nil && !opts.Full && (strings.Contains(err.Error(), "Linked clone feature is not supported") ||
+		strings.Contains(err.Error(), "not allowed for linked clones") ||
+		strings.Contains(err.Error(), "snapshot")) {
+		// Fallback to full clone if linked clone is unsupported on this storage (e.g. standard LVM)
+		// or if storage/snapshot constraints prevent linked cloning.
 		form.Set("full", "1")
+		if opts.Storage != "" {
+			form.Set("storage", opts.Storage)
+		}
 		return c.doMaybeAsync(ctx, node, http.MethodPost, path, form)
 	}
 	return err
