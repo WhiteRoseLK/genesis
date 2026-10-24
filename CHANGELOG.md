@@ -1,5 +1,57 @@
 # Changelog
 
+## [0.2.1](https://github.com/WhiteRoseLK/genesis/compare/v0.2.0...v0.2.1) (2026-10-24)
+
+
+### Features
+
+* **ansible:** verify SSH host key via known_hosts in core.ansible/v1 ([#89](https://github.com/WhiteRoseLK/genesis/issues/89)) ([fc0e21a](https://github.com/WhiteRoseLK/genesis/commit/fc0e21aceb937673e457f4ee61dda76476b17e30))
+* **cli:** enhance plan table output and support spec file in init ([#97](https://github.com/WhiteRoseLK/genesis/issues/97)) ([#98](https://github.com/WhiteRoseLK/genesis/issues/98)) ([e102663](https://github.com/WhiteRoseLK/genesis/commit/e10266353056a9ff581e0cf27677f087639fe4d4))
+* **cli:** implement validate, status and destroy commands ([#77](https://github.com/WhiteRoseLK/genesis/issues/77)) ([6d92130](https://github.com/WhiteRoseLK/genesis/commit/6d921301023816683ee1e43d6d09ccec509bdaad))
+* **dns:** automatic reverse zone and ptr derivation in dns.zone/v1 ([#86](https://github.com/WhiteRoseLK/genesis/issues/86)) ([6d0b537](https://github.com/WhiteRoseLK/genesis/commit/6d0b537b1c1a52b620b3f7a2f6d77980ffa4dba0))
+* **dns:** persist connection parameters in coredns and powerdns step state and redial broker ([#82](https://github.com/WhiteRoseLK/genesis/issues/82)) ([8418480](https://github.com/WhiteRoseLK/genesis/commit/8418480d1905d7d1f1219b668c474a512754d8a8)), closes [#10](https://github.com/WhiteRoseLK/genesis/issues/10)
+* **engine:** parallelize target VM provisioning to decouple compute from application configuration ([#107](https://github.com/WhiteRoseLK/genesis/issues/107)) ([#108](https://github.com/WhiteRoseLK/genesis/issues/108)) ([df7cfe0](https://github.com/WhiteRoseLK/genesis/commit/df7cfe086d61996db648e3b4b5d52494a1a97bec))
+* **engine:** trigger explicit Repoint on handover and update consumer session caching ([#83](https://github.com/WhiteRoseLK/genesis/issues/83)) ([015b4a1](https://github.com/WhiteRoseLK/genesis/commit/015b4a114f8e88d627594455b87f9778b4140d40))
+* **ipam:** allocate VM IPs from network pool in compute.vm/v1 ([#87](https://github.com/WhiteRoseLK/genesis/issues/87)) ([74a5379](https://github.com/WhiteRoseLK/genesis/commit/74a53796ed192da37f0674c179c39cb9f70f408c))
+* **modules:** add minimal bind module providing target dns functions ([#85](https://github.com/WhiteRoseLK/genesis/issues/85)) ([04c06d9](https://github.com/WhiteRoseLK/genesis/commit/04c06d9abceccbb8409c3d1892e93e1a83c56ef8)), closes [#46](https://github.com/WhiteRoseLK/genesis/issues/46)
+* **modules:** chrony/powerdns/vault remember Teleport enrolment and switch their own core.ansible/v1 calls ([#78](https://github.com/WhiteRoseLK/genesis/issues/78)) ([f746f47](https://github.com/WhiteRoseLK/genesis/commit/f746f4731b3dccba6c46ce5b11cbdd7b87eec862))
+* **modules:** teleport implements access.ssh/v1.SignUserKey ([#69](https://github.com/WhiteRoseLK/genesis/issues/69)) ([8d5885e](https://github.com/WhiteRoseLK/genesis/commit/8d5885e4d3cdf10dc980ce4f6391ffad32655082))
+* **modules:** teleport turns off sshd once enrolment is confirmed, Verify restores "direct SSH refused" ([#79](https://github.com/WhiteRoseLK/genesis/issues/79)) ([232b372](https://github.com/WhiteRoseLK/genesis/commit/232b372476f2bd640fafdd74e22439cf5de287f1)), closes [#16](https://github.com/WhiteRoseLK/genesis/issues/16)
+* **proxmox:** add tls_insecure and custom CA support in schema and REST client ([#74](https://github.com/WhiteRoseLK/genesis/issues/74)) ([56a2a12](https://github.com/WhiteRoseLK/genesis/commit/56a2a127994b407d24c0dd888fa58e41b2b4337b))
+* **proxmox:** support autonomous golden template creation and lifecycle management ([#95](https://github.com/WhiteRoseLK/genesis/issues/95)) ([#96](https://github.com/WhiteRoseLK/genesis/issues/96)) ([234e044](https://github.com/WhiteRoseLK/genesis/commit/234e0441b324be9582eed8df618ff3cce961fdbf))
+* **resolver:** base module compatibility on protocol version (ADR-0039) ([#90](https://github.com/WhiteRoseLK/genesis/issues/90)) ([290c632](https://github.com/WhiteRoseLK/genesis/commit/290c63267268f599e7e9ed103996b65f40278a49)), closes [#39](https://github.com/WhiteRoseLK/genesis/issues/39)
+* **runner:** enable container NAT port mapping and end-to-end module execution ([#47](https://github.com/WhiteRoseLK/genesis/issues/47)) ([#94](https://github.com/WhiteRoseLK/genesis/issues/94)) ([eb3d8e3](https://github.com/WhiteRoseLK/genesis/commit/eb3d8e3fc4e3f9519398cc54c15428cf967bad58))
+* **secrets:** switch file store to read-only after migration and route core.secrets/v1 ([#80](https://github.com/WhiteRoseLK/genesis/issues/80)) ([dc31c32](https://github.com/WhiteRoseLK/genesis/commit/dc31c326263fac031b98e0b19a377de7ddaee23e)), closes [#27](https://github.com/WhiteRoseLK/genesis/issues/27)
+* **teleport:** enroll target VMs into fleet and use linked clones for test VMs ([#99](https://github.com/WhiteRoseLK/genesis/issues/99)) ([#100](https://github.com/WhiteRoseLK/genesis/issues/100)) ([81eedec](https://github.com/WhiteRoseLK/genesis/commit/81eedecad98943a4a40d112ab20dddf41a0cb35f))
+* **teleport:** persist ownTarget and caPin in step state and redial broker on each call ([#81](https://github.com/WhiteRoseLK/genesis/issues/81)) ([2643ff5](https://github.com/WhiteRoseLK/genesis/commit/2643ff5462139033039335ad6d2870e9855e83b2)), closes [#26](https://github.com/WhiteRoseLK/genesis/issues/26)
+* **test:** real multi-module end-to-end with fake-compute (M9) ([#91](https://github.com/WhiteRoseLK/genesis/issues/91)) ([fe07cca](https://github.com/WhiteRoseLK/genesis/commit/fe07cca9ca1ecb9946dfb16bb4c9cd00f7df1c95)), closes [#45](https://github.com/WhiteRoseLK/genesis/issues/45)
+* **vault:** implement secrets.kv/v1.List ([#76](https://github.com/WhiteRoseLK/genesis/issues/76)) ([f1f1c31](https://github.com/WhiteRoseLK/genesis/commit/f1f1c319b6de31b5d4deca63255c124a19b8373e))
+* **verifier:** mutualize verifier VM across module verification steps ([#109](https://github.com/WhiteRoseLK/genesis/issues/109)) ([#110](https://github.com/WhiteRoseLK/genesis/issues/110)) ([ac470ce](https://github.com/WhiteRoseLK/genesis/commit/ac470cec2bb814ffa687413d65bb4570d278aa4c))
+
+
+### Bug Fixes
+
+* **broker:** write the SSH certificate next to the private key when supplied ([#68](https://github.com/WhiteRoseLK/genesis/issues/68)) ([2409438](https://github.com/WhiteRoseLK/genesis/commit/2409438de300e42a9b9df3e4aaa450f673bf4aec))
+* **modules:** Check inspects state rather than unconditionally returning COMPLIANT ([#75](https://github.com/WhiteRoseLK/genesis/issues/75)) ([0a869b9](https://github.com/WhiteRoseLK/genesis/commit/0a869b96f70c9465a82bc6589538efdabd7159ea))
+* **proxmox:** omit storage parameter on linked clones and handle fallback ([#106](https://github.com/WhiteRoseLK/genesis/issues/106)) ([014e31f](https://github.com/WhiteRoseLK/genesis/commit/014e31f5b9639f204ae8444ebf55eb771a5088d7)), closes [#105](https://github.com/WhiteRoseLK/genesis/issues/105)
+* **proxmox:** support real Proxmox infrastructure and add e2e integration test ([#92](https://github.com/WhiteRoseLK/genesis/issues/92)) ([16180c7](https://github.com/WhiteRoseLK/genesis/commit/16180c70fb09e27197aaab94ea446b920d884af2))
+
+
+### Refactoring
+
+* switch the core code to English ([#56](https://github.com/WhiteRoseLK/genesis/issues/56)) ([53973eb](https://github.com/WhiteRoseLK/genesis/commit/53973eb1b42f954a4cb0f119bde8590b625b8f64))
+* switch the modules and tests to English ([#57](https://github.com/WhiteRoseLK/genesis/issues/57)) ([fcd5607](https://github.com/WhiteRoseLK/genesis/commit/fcd560771fb1a957849a7f7f97877cd3d7112d2d))
+
+
+### Documentation
+
+* add a code of conduct (Contributor Covenant 2.1) ([#53](https://github.com/WhiteRoseLK/genesis/issues/53)) ([ead8d40](https://github.com/WhiteRoseLK/genesis/commit/ead8d405ce33e9dc3bb92832a3c94a487d3710a2))
+* add user guide and update module authoring documentation ([#84](https://github.com/WhiteRoseLK/genesis/issues/84)) ([0f4bde8](https://github.com/WhiteRoseLK/genesis/commit/0f4bde826ea6beb9de6d87ce49d52ca12eb42e9d)), closes [#48](https://github.com/WhiteRoseLK/genesis/issues/48)
+* jalons suivis sur GitHub, ADR en fichiers numérotés par issue ([#50](https://github.com/WhiteRoseLK/genesis/issues/50)) ([8807d60](https://github.com/WhiteRoseLK/genesis/commit/8807d60455dc6db61b0a4f14b05435a3d5d41a45)), closes [#49](https://github.com/WhiteRoseLK/genesis/issues/49)
+* **proxmox:** document cloud-init template requirements and add creation script ([#93](https://github.com/WhiteRoseLK/genesis/issues/93)) ([cc53ac5](https://github.com/WhiteRoseLK/genesis/commit/cc53ac5eb508c58d1512cc923311a10f1cbd5f57)), closes [#8](https://github.com/WhiteRoseLK/genesis/issues/8)
+* README plus accueillant (bandeau, schémas, exemple, feuille de route) ([#42](https://github.com/WhiteRoseLK/genesis/issues/42)) ([9f59a50](https://github.com/WhiteRoseLK/genesis/commit/9f59a503f233a0d38fe55393e2b2424f2130951e))
+* switch the documentation and repository metadata to English ([#55](https://github.com/WhiteRoseLK/genesis/issues/55)) ([c8dad54](https://github.com/WhiteRoseLK/genesis/commit/c8dad5467f7839a95b0724c8cdc28fe2f6193f0e)), closes [#54](https://github.com/WhiteRoseLK/genesis/issues/54)
+
 ## [0.2.0](https://github.com/WhiteRoseLK/genesis/compare/v0.1.0...v0.2.0) (2026-09-27)
 
 
