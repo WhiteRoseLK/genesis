@@ -134,6 +134,6 @@ licenses:
 			--allowed_licenses=$(ALLOWED_LICENSES) 2>&1) || { echo "$$out" | grep -v '^W0\|\.s$$'; exit 1; }; \
 	done
 
-# Needs a Proxmox: never run without an explicit request (CLAUDE.md).
+# Needs a Proxmox: never run without an explicit request (AGENTS.md).
 e2e:
 	go test -tags integration ./test/e2e/...

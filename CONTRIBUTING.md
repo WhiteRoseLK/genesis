@@ -1,6 +1,6 @@
 # Contributing to Genesis
 
-The architecture rules and the non-negotiable rules are in [`CLAUDE.md`](CLAUDE.md) and [`docs/`](docs/): this document only describes the development process (ADR-021).
+The architecture rules and the non-negotiable rules are in [`AGENTS.md`](AGENTS.md) and [`docs/`](docs/): this document only describes the development process (ADR-021).
 
 By participating, you agree to abide by the [code of conduct](CODE_OF_CONDUCT.md).
 

@@ -1,4 +1,6 @@
 ---
+trigger: model_decision
+description: "SDK rules. Read before reading or changing any file under sdk/."
 paths:
   - "sdk/**"
 ---

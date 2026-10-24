@@ -1,5 +1,7 @@
 ---
-description: Audit Genesis's modular architecture rules
+name: check-architecture
+description: "Read-only audit of Genesis's modular architecture rules (forbidden imports, hard-coded products, requires/provides gaps, exposed secrets, contract drift). Use for /check-architecture or when the user asks for an architecture audit."
+disable-model-invocation: true
 ---
 Audit the repository without changing anything:
 1. Forbidden imports: `internal/` → `modules/` or product libraries; `modules/*` → `internal/` or another module; `sdk/` → `internal/`.

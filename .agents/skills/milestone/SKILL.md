@@ -1,12 +1,14 @@
 ---
-description: Start or resume the implementation of a Genesis milestone
+name: milestone
+description: "Start or resume the implementation of a Genesis milestone (e.g. M9): read its GitHub tracking, plan atomic PRs, wait for approval, implement and close it. Use for /milestone or when the user asks to work on a milestone."
+disable-model-invocation: true
 argument-hint: <milestone number, e.g. M9>
 ---
-Requested milestone: $ARGUMENTS
+The requested milestone is the one the user names (e.g. `M9`); if none is named, ask.
 
 Milestones are tracked on GitHub (ADR-049): one GitHub milestone per project milestone, a parent issue (label `milestone`) and one sub-issue per atomic PR.
 
-1. Read `docs/PROGRESS.md`, the $ARGUMENTS section of `docs/08-milestones.md`, then its parent issue and its sub-issues on GitHub (GitHub milestone with the same name).
+1. Read `docs/PROGRESS.md`, the requested milestone's section in `docs/08-milestones.md`, then its parent issue and its sub-issues on GitHub (GitHub milestone with the same name).
 2. Check that the previous milestones are finished (GitHub milestones closed or marked "done"); otherwise, report it and stop.
 3. Read only the design documents and ADRs (`docs/adr/`) this milestone needs.
 4. Propose a plan: a split into **atomic PRs** (one topic each, ADR-021), with for each one the Conventional Commits title, the files, interfaces and tests, and how it maps to each acceptance criterion. Flag any ambiguity. **Wait for my approval before coding.**

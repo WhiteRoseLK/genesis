@@ -1,4 +1,6 @@
 ---
+trigger: model_decision
+description: "Core rules. Read before reading or changing any file under internal/ or cmd/."
 paths:
   - "internal/**"
   - "cmd/**"
