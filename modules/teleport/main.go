@@ -217,6 +217,27 @@ func clusterNameFromConfig(req *modulev1.StepRequest) string {
 	return defaultClusterName
 }
 
+func verifierVMName(req *modulev1.StepRequest) (string, bool) {
+	cfg := sdk.StateMap(req.GetConfig())
+	if v, ok := cfg["verifier_vm"].(string); ok && v != "" {
+		return v, true
+	}
+	return vmName(req) + verifierSuffix, false
+}
+
+func (m *teleportModule) verifierSSHKeyPair(ctx context.Context, verifierName string, shared bool) (sshKeyPair, error) {
+	if shared && m.secretsClient != nil {
+		resp, err := m.secretsClient.Get(ctx, &secretsv1.GetRequest{Ref: "verifier/ssh-key"})
+		if err == nil {
+			var pair sshKeyPair
+			if err := json.Unmarshal([]byte(resp.GetValue()), &pair); err == nil && pair.PrivateKeyOpenSSH != "" {
+				return pair, nil
+			}
+		}
+	}
+	return m.sshKeyPair(ctx, verifierName)
+}
+
 func (m *teleportModule) sshKeyPair(ctx context.Context, name string) (sshKeyPair, error) {
 	if m.secretsClient == nil {
 		return sshKeyPair{}, fmt.Errorf("secrets client not connected")

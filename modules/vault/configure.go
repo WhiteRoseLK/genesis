@@ -417,7 +417,6 @@ func (m *vaultModule) Verify(ctx context.Context, req *modulev1.StepRequest) (*m
 	if err := m.dialWithToken(req.GetBrokerToken()); err != nil {
 		return nil, err
 	}
-	name := vmName(req)
 	state := sdk.StateMap(req.GetState())
 	vmIP := fmt.Sprint(state["vm_ip"])
 
@@ -430,8 +429,8 @@ func (m *vaultModule) Verify(ctx context.Context, req *modulev1.StepRequest) (*m
 		return nil, fmt.Errorf("Verify(vault): %w", err)
 	}
 
-	verifierName := name + verifierSuffix
-	pair, err := m.sshKeyPair(ctx, verifierName)
+	verifierName, shared := verifierVMName(req)
+	pair, err := m.verifierSSHKeyPair(ctx, verifierName, shared)
 	if err != nil {
 		return nil, err
 	}
@@ -441,9 +440,11 @@ func (m *vaultModule) Verify(ctx context.Context, req *modulev1.StepRequest) (*m
 	if err != nil {
 		return nil, fmt.Errorf("EnsureVM(%q) (verifier): %w", verifierName, err)
 	}
-	defer func() {
-		_, _ = m.vmClient.DeleteVM(context.Background(), &computevmv1.DeleteVMRequest{Name: verifierName})
-	}()
+	if !shared {
+		defer func() {
+			_, _ = m.vmClient.DeleteVM(context.Background(), &computevmv1.DeleteVMRequest{Name: verifierName})
+		}()
+	}
 
 	target := &ansiblev1.Target{
 		Host:          verifierVM.GetIp(),

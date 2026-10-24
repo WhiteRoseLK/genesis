@@ -48,8 +48,14 @@ import (
 	"github.com/WhiteRoseLK/genesis/internal/secrets"
 	"github.com/WhiteRoseLK/genesis/internal/state"
 	sdk "github.com/WhiteRoseLK/genesis/sdk/go"
+	computevmv1 "github.com/WhiteRoseLK/genesis/sdk/go/gen/functions/compute/vm/v1"
 	secretskvv1 "github.com/WhiteRoseLK/genesis/sdk/go/gen/functions/secrets/kv/v1"
 	modulev1 "github.com/WhiteRoseLK/genesis/sdk/go/gen/module/v1"
+)
+
+const (
+	sharedVerifierVMName = "genesis-verifier"
+	sharedVerifierKeyRef = "verifier/ssh-key"
 )
 
 // providerConn is the connection dispensed by a module for a function it
@@ -125,6 +131,14 @@ func (e *Engine) Run(ctx context.Context, resolved *resolver.Resolved, plan *pla
 		if fs, ok := e.fileStore(); ok {
 			fs.SetReadOnly(true)
 		}
+	}
+
+	if !st.SeedRetired {
+		_ = e.Secrets.Ensure(ctx, sharedVerifierKeyRef, secrets.GenerateSSHKeyPair(), secrets.Meta{
+			Owner:     "genesis",
+			Consumers: []string{"chrony", "powerdns", "vault", "teleport", "bind"},
+			Kind:      "ssh_keypair",
+		})
 	}
 
 	alloc := e.Allocator
@@ -236,7 +250,7 @@ func (e *Engine) Run(ctx context.Context, resolved *resolver.Resolved, plan *pla
 		}
 		if providesFunction(m, "compute.vm/v1") && !targetPreprovisioned {
 			targetPreprovisioned = true
-			if err := e.preprovisionTargetModules(ctx, runID, resolved, plan, clients, st); err != nil {
+			if err := e.preprovisionTargetModules(ctx, runID, resolved, plan, clients, providers, alloc, st); err != nil {
 				return err
 			}
 		}
@@ -246,7 +260,7 @@ func (e *Engine) Run(ctx context.Context, resolved *resolver.Resolved, plan *pla
 		return err
 	}
 
-	return e.retireSeed(ctx, runID, resolved, plan, clients, st)
+	return e.retireSeed(ctx, runID, resolved, plan, clients, providers, alloc, st)
 }
 
 // Destroy deletes the target resources created by the modules in reverse plan
@@ -266,6 +280,14 @@ func (e *Engine) Destroy(ctx context.Context, resolved *resolver.Resolved, plan 
 		if fs, ok := e.fileStore(); ok {
 			fs.SetReadOnly(true)
 		}
+	}
+
+	if !st.SeedRetired {
+		_ = e.Secrets.Ensure(ctx, sharedVerifierKeyRef, secrets.GenerateSSHKeyPair(), secrets.Meta{
+			Owner:     "genesis",
+			Consumers: []string{"chrony", "powerdns", "vault", "teleport", "bind"},
+			Kind:      "ssh_keypair",
+		})
 	}
 
 	alloc := e.Allocator
@@ -400,6 +422,7 @@ func (e *Engine) Destroy(ctx context.Context, resolved *resolver.Resolved, plan 
 		return err
 	}
 
+	e.cleanupVerifierVM(ctx, providers, alloc)
 	return nil
 }
 
@@ -492,7 +515,7 @@ func (e *Engine) runModule(
 //
 // Seed modules are stopped in reverse plan order (a seed service may depend
 // on another, e.g. step-ca on coredns's DNS).
-func (e *Engine) retireSeed(ctx context.Context, runID string, resolved *resolver.Resolved, plan *planner.Plan, clients map[string]*modulehost.Client, st *state.State) error {
+func (e *Engine) retireSeed(ctx context.Context, runID string, resolved *resolver.Resolved, plan *planner.Plan, clients map[string]*modulehost.Client, providers map[string]map[string]providerConn, alloc broker.Allocator, st *state.State) error {
 	if st.SeedRetired {
 		return nil
 	}
@@ -542,6 +565,7 @@ func (e *Engine) retireSeed(ctx context.Context, runID string, resolved *resolve
 	if fs, ok := e.fileStore(); ok {
 		fs.SetReadOnly(true)
 	}
+	e.cleanupVerifierVM(ctx, providers, alloc)
 	e.audit("seed", "seed.retire", "seed retired")
 	return nil
 }
@@ -893,6 +917,11 @@ func (e *Engine) buildStepRequest(runID string, m *resolver.Module, client *modu
 	if err != nil {
 		return nil, fmt.Errorf("resolving the references of %q: %w", m.Name, err)
 	}
+	if requiresComputeVM(m) {
+		if _, ok := resolvedConfig["verifier_vm"]; !ok {
+			resolvedConfig["verifier_vm"] = sharedVerifierVMName
+		}
+	}
 	config, err := structpb.NewStruct(resolvedConfig)
 	if err != nil {
 		return nil, fmt.Errorf("encoding the config of %q: %w", m.Name, err)
@@ -982,6 +1011,8 @@ func (e *Engine) preprovisionTargetModules(
 	resolved *resolver.Resolved,
 	plan *planner.Plan,
 	clients map[string]*modulehost.Client,
+	providers map[string]map[string]providerConn,
+	alloc broker.Allocator,
 	st *state.State,
 ) error {
 	var targets []*resolver.Module
@@ -1027,6 +1058,47 @@ func (e *Engine) preprovisionTargetModules(
 		}(m)
 	}
 
+	var verifierPubKey string
+	if secret, err := e.Secrets.Get(ctx, sharedVerifierKeyRef); err == nil {
+		var pair secrets.SSHKeyPair
+		if err := json.Unmarshal([]byte(secret.ExposeSecret()), &pair); err == nil {
+			verifierPubKey = pair.PublicKeyAuthorized
+		}
+	}
+
+	if verifierPubKey != "" && len(targets) > 0 {
+		if pc, ok := providers["compute.vm/v1"]; ok {
+			for _, p := range pc {
+				computeConn := p.conn
+				wg.Add(1)
+				go func() {
+					defer wg.Done()
+					var ip, gw string
+					if alloc != nil {
+						if allocatedIP, err := alloc.Allocate(sharedVerifierVMName); err == nil {
+							ip = allocatedIP
+						}
+						gw = alloc.Gateway()
+					}
+					vmClient := computevmv1.NewComputeVMClient(computeConn)
+					if _, err := vmClient.EnsureVM(ctx, &computevmv1.EnsureVMRequest{
+						Name:         sharedVerifierVMName,
+						Env:          sharedVerifierVMName,
+						Ip:           ip,
+						Gateway:      gw,
+						SshPublicKey: verifierPubKey,
+						User:         "genesis",
+					}); err != nil {
+						e.Logger.Warn("pre-provisioning shared verifier VM failed (will retry on demand)", "err", err)
+					} else {
+						e.Logger.Info("pre-provisioned shared verifier VM", "name", sharedVerifierVMName)
+					}
+				}()
+				break
+			}
+		}
+	}
+
 	wg.Wait()
 	close(errCh)
 
@@ -1038,6 +1110,26 @@ func (e *Engine) preprovisionTargetModules(
 		return errors.Join(errs...)
 	}
 	return nil
+}
+
+func (e *Engine) cleanupVerifierVM(
+	ctx context.Context,
+	providers map[string]map[string]providerConn,
+	alloc broker.Allocator,
+) {
+	pc, ok := providers["compute.vm/v1"]
+	if !ok {
+		return
+	}
+	for _, p := range pc {
+		vmClient := computevmv1.NewComputeVMClient(p.conn)
+		_, _ = vmClient.DeleteVM(ctx, &computevmv1.DeleteVMRequest{Name: sharedVerifierVMName})
+		if alloc != nil {
+			_ = alloc.Release(sharedVerifierVMName)
+		}
+		e.audit("verifier", "cleanup", "ok")
+		return
+	}
 }
 
 func requiresComputeVM(m *resolver.Module) bool {

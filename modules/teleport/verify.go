@@ -68,8 +68,8 @@ func (m *teleportModule) Verify(ctx context.Context, req *modulev1.StepRequest) 
 		return nil, fmt.Errorf("Verify(teleport): %w", err)
 	}
 
-	verifierName := name + verifierSuffix
-	verifierPair, err := m.sshKeyPair(ctx, verifierName)
+	verifierName, shared := verifierVMName(req)
+	verifierPair, err := m.verifierSSHKeyPair(ctx, verifierName, shared)
 	if err != nil {
 		return nil, err
 	}
@@ -79,9 +79,11 @@ func (m *teleportModule) Verify(ctx context.Context, req *modulev1.StepRequest) 
 	if err != nil {
 		return nil, fmt.Errorf("EnsureVM(%q) (verifier): %w", verifierName, err)
 	}
-	defer func() {
-		_, _ = m.vmClient.DeleteVM(context.Background(), &computevmv1.DeleteVMRequest{Name: verifierName})
-	}()
+	if !shared {
+		defer func() {
+			_, _ = m.vmClient.DeleteVM(context.Background(), &computevmv1.DeleteVMRequest{Name: verifierName})
+		}()
+	}
 
 	verifierTarget := &ansiblev1.Target{
 		Host:          verifierVM.GetIp(),

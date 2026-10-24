@@ -11,6 +11,7 @@ import (
 
 	"github.com/WhiteRoseLK/genesis/internal/planner"
 	"github.com/WhiteRoseLK/genesis/internal/resolver"
+	"github.com/WhiteRoseLK/genesis/internal/secrets"
 	"github.com/WhiteRoseLK/genesis/internal/state"
 	sdk "github.com/WhiteRoseLK/genesis/sdk/go"
 )
@@ -142,6 +143,8 @@ func TestPreprovisionTargetModulesConcurrency(t *testing.T) {
 		res,
 		plan,
 		nil, // clients nil because we will override with simulated behavior if needed
+		nil,
+		nil,
 		st,
 	)
 	// With nil clients it would fail calling action, so verify error handling works
@@ -179,5 +182,33 @@ func TestPreprovisionTargetModulesConcurrency(t *testing.T) {
 
 	if maxActive.Load() < 2 {
 		t.Logf("Note: maxActive was %d (goroutines may have run sequentially)", maxActive.Load())
+	}
+}
+
+func TestSharedVerifierSecret(t *testing.T) {
+	stateDir := t.TempDir()
+	store := newTestSecretsStore(t)
+	e := New(stateDir, store)
+
+	ctx := context.Background()
+	err := e.Secrets.Ensure(ctx, sharedVerifierKeyRef, secrets.GenerateSSHKeyPair(), secrets.Meta{
+		Owner:     "genesis",
+		Consumers: []string{"chrony", "powerdns", "vault", "teleport", "bind"},
+		Kind:      "ssh_keypair",
+	})
+	if err != nil {
+		t.Fatalf("Ensure verifier key: %v", err)
+	}
+
+	secret, err := e.Secrets.Get(ctx, sharedVerifierKeyRef)
+	if err != nil {
+		t.Fatalf("Get verifier key: %v", err)
+	}
+	var pair secrets.SSHKeyPair
+	if err := json.Unmarshal([]byte(secret.ExposeSecret()), &pair); err != nil {
+		t.Fatalf("Unmarshal key pair: %v", err)
+	}
+	if pair.PrivateKeyOpenSSH == "" || pair.PublicKeyAuthorized == "" {
+		t.Errorf("expected valid SSH key pair in secret, got %+v", pair)
 	}
 }

@@ -343,6 +343,27 @@ func (m *chronyModule) Configure(ctx context.Context, req *modulev1.StepRequest)
 
 var systemTimeRe = regexp.MustCompile(`System time\s*:\s*([-\d.]+) seconds`)
 
+func verifierVMName(req *modulev1.StepRequest) (string, bool) {
+	cfg := sdk.StateMap(req.GetConfig())
+	if v, ok := cfg["verifier_vm"].(string); ok && v != "" {
+		return v, true
+	}
+	return vmName(req) + verifierSuffix, false
+}
+
+func (m *chronyModule) verifierSSHKeyPair(ctx context.Context, verifierName string, shared bool) (sshKeyPair, error) {
+	if shared {
+		resp, err := m.secretsClient.Get(ctx, &secretsv1.GetRequest{Ref: "verifier/ssh-key"})
+		if err == nil {
+			var pair sshKeyPair
+			if err := json.Unmarshal([]byte(resp.GetValue()), &pair); err == nil && pair.PrivateKeyOpenSSH != "" {
+				return pair, nil
+			}
+		}
+	}
+	return m.sshKeyPair(ctx, verifierName)
+}
+
 // Verify proves a real synchronisation from a disposable third-party VM
 // pointed at the chrony server (docs/03-module-contract.md rule 2: a test from
 // a consumer's point of view, not the state of a process).
@@ -350,10 +371,9 @@ func (m *chronyModule) Verify(ctx context.Context, req *modulev1.StepRequest) (*
 	if err := m.dialWithToken(req.GetBrokerToken()); err != nil {
 		return nil, err
 	}
-	name := vmName(req)
-	verifierName := name + verifierSuffix
+	verifierName, shared := verifierVMName(req)
 
-	pair, err := m.sshKeyPair(ctx, verifierName)
+	pair, err := m.verifierSSHKeyPair(ctx, verifierName, shared)
 	if err != nil {
 		return nil, err
 	}
@@ -366,9 +386,11 @@ func (m *chronyModule) Verify(ctx context.Context, req *modulev1.StepRequest) (*
 	if err != nil {
 		return nil, fmt.Errorf("EnsureVM(%q) (verifier): %w", verifierName, err)
 	}
-	defer func() {
-		_, _ = m.vmClient.DeleteVM(context.Background(), &computevmv1.DeleteVMRequest{Name: verifierName})
-	}()
+	if !shared {
+		defer func() {
+			_, _ = m.vmClient.DeleteVM(context.Background(), &computevmv1.DeleteVMRequest{Name: verifierName})
+		}()
+	}
 
 	serverState := sdk.StateMap(req.GetState())
 	target := &ansiblev1.Target{
