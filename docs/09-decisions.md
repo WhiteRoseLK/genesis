@@ -31,9 +31,10 @@ A superseded decision is not deleted: its status becomes "superseded by ADR-NNN"
 | [ADR-018](adr/0018-core-ansible-v1-via-openssh-certificate-not-tsh.md) | `core.ansible/v1` via an OpenSSH certificate, not via `tsh` | accepted |
 | [ADR-019](adr/0019-ssh-repoint-to-teleport-agent-deferred-beyond-m8.md) | SSH repoint to the Teleport agent deferred beyond M8 | accepted |
 | [ADR-020](adr/0020-seed-stays-active-until-the-end-automatic-retirement.md) | The seed stays active until the end, automatic retirement if everything is green | accepted |
-| [ADR-021](adr/0021-development-process-atomic-squash-merged-prs.md) | Development process: atomic PRs merged with squash, Release Please | accepted; milestone and debt tracking completed by ADR-049 |
+| [ADR-021](adr/0021-development-process-atomic-squash-merged-prs.md) | Development process: atomic PRs merged with squash, Release Please | accepted; milestone and debt tracking completed by ADR-049; assistant instructions superseded by ADR-111 |
 | [ADR-022](adr/0022-module-paths-github-com-whiteroselk-genesis-self-contained-go-mod.md) | Module paths `github.com/WhiteRoseLK/genesis`, self-contained go.mod files | accepted |
 | [ADR-0028](adr/0028-core-ansible-v1-ssh-host-key-verification.md) | `core.ansible/v1` SSH host key verification via `known_hosts` | accepted |
 | [ADR-0039](adr/0039-module-compatibility-via-protocol-version.md) | Module compatibility via protocol version rather than core release version | accepted |
 | [ADR-049](adr/0049-milestones-on-github-adrs-numbered-by-issue.md) | Milestones tracked on GitHub, ADRs as files numbered by their issue | accepted |
 | [ADR-054](adr/0054-english-as-the-project-language.md) | English as the project language | accepted |
+| [ADR-111](adr/0111-agents-md-as-the-single-source-of-assistant-instructions.md) | `AGENTS.md` as the single source of AI assistant instructions | accepted |

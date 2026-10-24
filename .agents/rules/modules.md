@@ -1,4 +1,6 @@
 ---
+trigger: model_decision
+description: "Module rules. Read before reading or changing any file under modules/ or test/modules/."
 paths:
   - "modules/**"
   - "test/modules/**"

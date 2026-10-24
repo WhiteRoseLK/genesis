@@ -12,6 +12,6 @@ Closes #
 ## Checklist
 
 - [ ] Tests added or updated (`make test`, plus `make test-docker` when containers are involved); SDK conformance suite green for every module touched.
-- [ ] Non-negotiable rules of `CLAUDE.md` respected: no plaintext secret, idempotence (`Check` before any action), no forbidden import, no change outside the directory of an added module.
+- [ ] Non-negotiable rules of `AGENTS.md` respected: no plaintext secret, idempotence (`Check` before any action), no forbidden import, no change outside the directory of an added module.
 - [ ] ADR (`docs/adr/`, linked "Decision" issue) and design documents updated if a decision, the contract, the spec or the lifecycle changes.
 - [ ] New debt → `tech-debt` issue.

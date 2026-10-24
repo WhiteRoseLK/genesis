@@ -45,7 +45,7 @@ linters:
             - "**/sdk/**"
           deny:
             - pkg: "github.com/WhiteRoseLK/genesis/internal"
-              desc: "the SDK never depends on internal/ (docs/03-module-contract.md, .claude/rules/sdk.md)"
+              desc: "the SDK never depends on internal/ (docs/03-module-contract.md, .agents/rules/sdk.md)"
             - pkg: "github.com/WhiteRoseLK/genesis/cmd"
               desc: "the SDK never depends on cmd/ (docs/03-module-contract.md)"
         modules-must-not-import-core:
@@ -54,7 +54,7 @@ linters:
             - "**/test/modules/**"
           deny:
             - pkg: "github.com/WhiteRoseLK/genesis/internal"
-              desc: "a module imports only sdk/ and third-party libraries, never internal/ (docs/03-module-contract.md, .claude/rules/modules.md)"
+              desc: "a module imports only sdk/ and third-party libraries, never internal/ (docs/03-module-contract.md, .agents/rules/modules.md)"
             - pkg: "github.com/WhiteRoseLK/genesis/cmd"
               desc: "a module imports only sdk/ and third-party libraries, never cmd/ (docs/03-module-contract.md)"
 
