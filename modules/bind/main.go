@@ -216,6 +216,27 @@ func domain(req *modulev1.StepRequest) string {
 	return defaultDomain
 }
 
+func verifierVMName(req *modulev1.StepRequest) (string, bool) {
+	cfg := sdk.StateMap(req.GetConfig())
+	if v, ok := cfg["verifier_vm"].(string); ok && v != "" {
+		return v, true
+	}
+	return vmName(req) + verifierSuffix, false
+}
+
+func (m *bindModule) verifierSSHKeyPair(ctx context.Context, verifierName string, shared bool) (sshKeyPair, error) {
+	if shared {
+		resp, err := m.secretsClient.Get(ctx, &secretsv1.GetRequest{Ref: "verifier/ssh-key"})
+		if err == nil {
+			var pair sshKeyPair
+			if err := json.Unmarshal([]byte(resp.GetValue()), &pair); err == nil && pair.PrivateKeyOpenSSH != "" {
+				return pair, nil
+			}
+		}
+	}
+	return m.sshKeyPair(ctx, verifierName)
+}
+
 func (m *bindModule) sshKeyPair(ctx context.Context, name string) (sshKeyPair, error) {
 	ref := fmt.Sprintf(sshKeyRefFmt, name)
 	if _, err := m.secretsClient.Ensure(ctx, &secretsv1.EnsureRequest{
@@ -505,7 +526,6 @@ func (m *bindModule) Verify(ctx context.Context, req *modulev1.StepRequest) (*mo
 		return nil, err
 	}
 	dom := domain(req)
-	name := vmName(req)
 
 	probeName := verifyProbeName
 	probeIP := verifyProbeIP
@@ -515,8 +535,8 @@ func (m *bindModule) Verify(ctx context.Context, req *modulev1.StepRequest) (*mo
 		return nil, fmt.Errorf("inserting probe record: %w", err)
 	}
 
-	verifierName := name + verifierSuffix
-	verifierPair, err := m.sshKeyPair(ctx, verifierName)
+	verifierName, shared := verifierVMName(req)
+	verifierPair, err := m.verifierSSHKeyPair(ctx, verifierName, shared)
 	if err != nil {
 		return nil, err
 	}
@@ -526,9 +546,11 @@ func (m *bindModule) Verify(ctx context.Context, req *modulev1.StepRequest) (*mo
 	if err != nil {
 		return nil, fmt.Errorf("EnsureVM(%q) (verifier): %w", verifierName, err)
 	}
-	defer func() {
-		_, _ = m.vmClient.DeleteVM(ctx, &computevmv1.DeleteVMRequest{Name: verifierName})
-	}()
+	if !shared {
+		defer func() {
+			_, _ = m.vmClient.DeleteVM(ctx, &computevmv1.DeleteVMRequest{Name: verifierName})
+		}()
+	}
 
 	verifierTarget := connTarget{
 		Host:       verifierVM.GetIp(),
