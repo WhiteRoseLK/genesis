@@ -46,6 +46,7 @@ const (
 	intermediateCertRef        = "step-ca/intermediate-cert"
 	intermediateKeyRef         = "step-ca/intermediate-key"
 	defaultIntermediateTTLDays = 30
+	defaultRootTTLYears        = 30
 	// expiryMargin: regenerates the intermediate a little before its real
 	// expiry rather than waiting for the exact deadline (debt: no
 	// scheduled/periodic renewal, only detected on the next call —
@@ -331,9 +332,12 @@ func (m *stepCAModule) ensureRoot(ctx context.Context, password string) (certPEM
 	cert, certErr := m.getSecret(ctx, rootCertRef)
 	key, keyErr := m.getSecret(ctx, rootKeyRef)
 	if certErr == nil && keyErr == nil {
-		return cert, key, nil
+		if expired, err := certExpiresWithin(cert, expiryMargin); err == nil && !expired {
+			return cert, key, nil
+		}
 	}
 
+	ttl := fmt.Sprintf("%dh", defaultRootTTLYears*365*24)
 	// --profile root-ca (the default) sets pathlen:1 on the root, which is
 	// enough to sign ONE intermediate but not for a third-party pki.issuer/v1
 	// (e.g. vault) to get an intermediate signed in turn by step-ca's —
@@ -345,7 +349,7 @@ func (m *stepCAModule) ensureRoot(ctx context.Context, password string) (certPEM
 		[]string{"root_ca.crt", "root_ca_key"},
 		[]string{
 			"step", "certificate", "create", "Genesis Root CA", "/pki/root_ca.crt", "/pki/root_ca_key",
-			"--template", "/pki/root.tpl", "--password-file", "/pki/password", "--force",
+			"--template", "/pki/root.tpl", "--not-after", ttl, "--password-file", "/pki/password", "--force",
 		})
 	if err != nil {
 		return "", "", fmt.Errorf("generating the root CA: %w", err)
@@ -365,7 +369,9 @@ func (m *stepCAModule) ensureIntermediate(ctx context.Context, rootCert, rootKey
 	key, keyErr := m.getSecret(ctx, intermediateKeyRef)
 	if certErr == nil && keyErr == nil {
 		if expired, err := certExpiresWithin(cert, expiryMargin); err == nil && !expired {
-			return cert, key, nil
+			if verifyChain(cert, rootCert) == nil {
+				return cert, key, nil
+			}
 		}
 	}
 
@@ -426,7 +432,9 @@ func (m *stepCAModule) ensurePKI(ctx context.Context) (pkiMaterial, error) {
 	if m.pki != nil {
 		cached := *m.pki
 		m.mu.Unlock()
-		if expired, err := certExpiresWithin(cached.IntermediateCertPEM, expiryMargin); err == nil && !expired {
+		rootExpired, _ := certExpiresWithin(cached.RootCertPEM, expiryMargin)
+		intExpired, _ := certExpiresWithin(cached.IntermediateCertPEM, expiryMargin)
+		if !rootExpired && !intExpired && verifyChain(cached.IntermediateCertPEM, cached.RootCertPEM) == nil {
 			return cached, nil
 		}
 	} else {
