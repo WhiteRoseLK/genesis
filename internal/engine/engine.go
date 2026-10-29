@@ -544,10 +544,26 @@ func (e *Engine) retireSeed(ctx context.Context, runID string, resolved *resolve
 		return nil
 	}
 
+	var verifyWg sync.WaitGroup
+	verifyErrCh := make(chan error, len(targetModules))
 	for _, name := range targetModules {
-		if err := e.action(ctx, runID, resolved.Modules[name], clients[name], st, "verify.final", clients[name].Module().Verify); err != nil {
-			return fmt.Errorf("seed kept, module %q: %w", name, err)
-		}
+		verifyWg.Add(1)
+		go func(modName string) {
+			defer verifyWg.Done()
+			if err := e.action(ctx, runID, resolved.Modules[modName], clients[modName], st, "verify.final", clients[modName].Module().Verify); err != nil {
+				verifyErrCh <- fmt.Errorf("seed kept, module %q: %w", modName, err)
+			}
+		}(name)
+	}
+	verifyWg.Wait()
+	close(verifyErrCh)
+
+	var verifyErrs []error
+	for err := range verifyErrCh {
+		verifyErrs = append(verifyErrs, err)
+	}
+	if len(verifyErrs) > 0 {
+		return errors.Join(verifyErrs...)
 	}
 
 	for i := len(seedModules) - 1; i >= 0; i-- {
@@ -720,18 +736,23 @@ func (e *Engine) enrollFleetConsumers(
 				continue
 			}
 			// Only enroll if provider module has succeeded and has state
-			if _, hasState := st.Modules[name]; !hasState {
+			e.mu.Lock()
+			_, hasState := st.Modules[name]
+			e.mu.Unlock()
+			if !hasState {
 				continue
 			}
+			var consumersToEnroll []string
 			for _, consumerName := range resolved.ConsumersFor(p.Function) {
 				if consumerName == name {
 					continue
 				}
-				consumerClient, ok := clients[consumerName]
-				if !ok {
+				if _, ok := clients[consumerName]; !ok {
 					continue
 				}
+				e.mu.Lock()
 				consumerState, hasState := st.Modules[consumerName]
+				e.mu.Unlock()
 				if !hasState {
 					continue
 				}
@@ -744,33 +765,63 @@ func (e *Engine) enrollFleetConsumers(
 						}
 					}
 				}
-				consumerMod := resolved.Modules[consumerName]
-				if consumerMod == nil {
+				if resolved.Modules[consumerName] == nil {
 					continue
 				}
-				req, err := e.buildStepRequest(runID, consumerMod, consumerClient, st)
-				if err != nil {
-					return fmt.Errorf("building repoint request for %q: %w", consumerName, err)
-				}
-				result, err := consumerClient.Module().Repoint(ctx, &modulev1.RepointRequest{
-					Step:     req,
-					Function: p.Function,
-				})
-				if err != nil {
-					if status.Code(err) == codes.Unimplemented {
-						continue
+				consumersToEnroll = append(consumersToEnroll, consumerName)
+			}
+
+			if len(consumersToEnroll) == 0 {
+				continue
+			}
+
+			var enrollWg sync.WaitGroup
+			enrollErrCh := make(chan error, len(consumersToEnroll))
+
+			for _, consumerName := range consumersToEnroll {
+				enrollWg.Add(1)
+				go func(cName string) {
+					defer enrollWg.Done()
+					cClient := clients[cName]
+					cMod := resolved.Modules[cName]
+					req, err := e.buildStepRequest(runID, cMod, cClient, st)
+					if err != nil {
+						enrollErrCh <- fmt.Errorf("building repoint request for %q: %w", cName, err)
+						return
 					}
-					return modulehost.WrapModuleError("repoint", err)
-				}
-				if result.GetStatus() != modulev1.StepResult_STATUS_OK {
-					return fmt.Errorf("module %q, step repoint (%s): failed (%s)", consumerName, p.Function, diagnosticsString(result.GetDiagnostics()))
-				}
-				if result.GetState() != nil {
-					if err := e.saveModuleState(consumerName, result.GetState(), st); err != nil {
-						return err
+					result, err := cClient.Module().Repoint(ctx, &modulev1.RepointRequest{
+						Step:     req,
+						Function: p.Function,
+					})
+					if err != nil {
+						if status.Code(err) != codes.Unimplemented {
+							enrollErrCh <- modulehost.WrapModuleError("repoint", err)
+						}
+						return
 					}
-				}
-				e.audit(consumerName, "fleet.enroll", "ok")
+					if result.GetStatus() != modulev1.StepResult_STATUS_OK {
+						enrollErrCh <- fmt.Errorf("module %q, step repoint (%s): failed (%s)", cName, p.Function, diagnosticsString(result.GetDiagnostics()))
+						return
+					}
+					if result.GetState() != nil {
+						if err := e.saveModuleState(cName, result.GetState(), st); err != nil {
+							enrollErrCh <- err
+							return
+						}
+					}
+					e.audit(cName, "fleet.enroll", "ok")
+				}(consumerName)
+			}
+
+			enrollWg.Wait()
+			close(enrollErrCh)
+
+			var enrollErrs []error
+			for err := range enrollErrCh {
+				enrollErrs = append(enrollErrs, err)
+			}
+			if len(enrollErrs) > 0 {
+				return errors.Join(enrollErrs...)
 			}
 		}
 	}
