@@ -415,6 +415,8 @@ func (e *Engine) Destroy(ctx context.Context, resolved *resolver.Resolved, plan 
 	e.mu.Lock()
 	if len(st.Modules) == 0 {
 		st.AllocatedIPs = map[string]string{}
+		st.SeedRetired = false
+		st.SecretsBackend = "file"
 		err = state.Save(e.StateDir, st)
 	}
 	e.mu.Unlock()
@@ -1124,11 +1126,65 @@ func (e *Engine) cleanupVerifierVM(
 	for _, p := range pc {
 		vmClient := computevmv1.NewComputeVMClient(p.conn)
 		_, _ = vmClient.DeleteVM(ctx, &computevmv1.DeleteVMRequest{Name: sharedVerifierVMName})
+		_, _ = vmClient.DeleteVM(ctx, &computevmv1.DeleteVMRequest{Name: "teleport01-agent-target"})
 		if alloc != nil {
 			_ = alloc.Release(sharedVerifierVMName)
+			_ = alloc.Release("teleport01-agent-target")
 		}
 		e.audit("verifier", "cleanup", "ok")
 		return
+	}
+}
+
+// CleanVerifierVMs cleans ephemeral verifier VMs from the hypervisor.
+func (e *Engine) CleanVerifierVMs(
+	ctx context.Context,
+	resolved *resolver.Resolved,
+	plan *planner.Plan,
+) {
+	st, err := state.Load(e.StateDir)
+	if err != nil {
+		st = state.New()
+	}
+
+	alloc := e.Allocator
+	if alloc == nil && resolved.Network.Pool != "" {
+		if ipamAlloc, err := ipam.New(resolved.Network.Pool, ipam.Options{
+			Gateway:   resolved.Network.Gateway,
+			Reserved:  []string{resolved.Network.Gateway, resolved.Seed.Address},
+			Allocated: st.AllocatedIPs,
+		}); err == nil {
+			alloc = ipamAlloc
+		}
+	}
+
+	for _, name := range plan.Order {
+		m := resolved.Modules[name]
+		if m == nil || m.Manifest == nil || m.Installed.BinaryPath == "" {
+			continue
+		}
+		for _, prov := range m.Manifest.Provides {
+			if prov.Function == "compute.vm/v1" {
+				client, err := modulehost.Launch(m.Installed.BinaryPath, m.Manifest)
+				if err != nil {
+					return
+				}
+				defer client.Close()
+
+				conn, err := client.DispenseFunction("compute.vm/v1")
+				if err != nil {
+					return
+				}
+				vmClient := computevmv1.NewComputeVMClient(conn)
+				_, _ = vmClient.DeleteVM(ctx, &computevmv1.DeleteVMRequest{Name: sharedVerifierVMName})
+				_, _ = vmClient.DeleteVM(ctx, &computevmv1.DeleteVMRequest{Name: "teleport01-agent-target"})
+				if alloc != nil {
+					_ = alloc.Release(sharedVerifierVMName)
+					_ = alloc.Release("teleport01-agent-target")
+				}
+				return
+			}
+		}
 	}
 }
 
