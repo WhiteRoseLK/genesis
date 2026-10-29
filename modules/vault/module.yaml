@@ -1,7 +1,7 @@
 apiVersion: genesis/module/v1
 name: vault
 version: 0.1.0
-description: "Target PKI + secrets (docs/07-mvp-modules.md): pki.issuer/v1 and secrets.kv/v1, single-node Raft, pki_int signed by step-ca, KV v2, genesis AppRole"
+description: "Target PKI + secrets (docs/07-mvp-modules.md): pki.issuer/v1 and secrets.kv/v1, single-node Raft, exportable 10-year root CA (pki) and intermediate (pki_int), KV v2, genesis AppRole"
 layer: foundation
 core: ">=0.1.0"
 protocol: 1
@@ -33,6 +33,11 @@ config_schema: schema.json
 secrets:
   - { name: root-token, kind: token, rotation: on-handover, recovery: true }
   - { name: unseal-keys, kind: shamir-shares, recovery: true }
+  - { name: pki-root-key, kind: private-key, recovery: true }
+  - { name: pki-root-cert, kind: certificate, recovery: true }
+  - { name: pki-intermediate-cert, kind: certificate, recovery: false }
+  - { name: approle-role-id, kind: role-id, recovery: true }
+  - { name: approle-secret-id, kind: secret-id, recovery: true }
 
 resources:
   - { role: vault, count: 1, size: medium }

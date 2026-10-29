@@ -55,7 +55,10 @@ const (
 	approleRoleIDRef       = "vault/approle-role-id"
 	approleSecretIDRef     = "vault/approle-secret-id"
 	pkiIntermediateCertRef = "vault/pki-intermediate-cert"
+	pkiRootCertRef         = "vault/pki-root-cert"
+	pkiRootKeyRef          = "vault/pki-root-key"
 	vaultAPIPort           = 8200
+	pkiRootMount           = "pki"
 	pkiMount               = "pki_int"
 	pkiRole                = "genesis"
 	kvMount                = "genesis"
@@ -116,11 +119,12 @@ type vaultModule struct {
 
 	// Active once Configure has passed (docs/PROGRESS.md: debt, in memory
 	// only).
-	api          *vaultClient
-	vmIP         string
-	approleToken string
-	rootCAPEM    string // step-ca root + intermediate, TLS trust pool
-	pkiIntPEM    string // vault's own active pki_int certificate
+	api           *vaultClient
+	vmIP          string
+	approleToken  string
+	rootCAPEM     string // vault's own active root CA certificate
+	pkiIntPEM     string // vault's own active pki_int certificate
+	seedRootCAPEM string // step-ca root for early bootstrap phase
 }
 
 func (m *vaultModule) SetBroker(b *sdk.BrokerClient) { m.broker = b }
@@ -166,6 +170,8 @@ func (m *vaultModule) rehydrate(ctx context.Context, req *modulev1.StepRequest) 
 	var rootCAPEM string
 	if rca, ok := state["root_ca_pem"].(string); ok && rca != "" {
 		rootCAPEM = rca
+	} else if ca, err := m.getSecret(ctx, pkiRootCertRef); err == nil && ca != "" {
+		rootCAPEM = ca
 	} else if ca, err := m.getSecret(ctx, "vault/root-ca"); err == nil && ca != "" {
 		rootCAPEM = ca
 	} else if m.pkiSeedClient != nil {
