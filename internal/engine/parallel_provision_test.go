@@ -212,3 +212,52 @@ func TestSharedVerifierSecret(t *testing.T) {
 		t.Errorf("expected valid SSH key pair in secret, got %+v", pair)
 	}
 }
+
+func TestEnrollFleetConsumersNoOpWhenAlreadyEnrolled(t *testing.T) {
+	stateDir := t.TempDir()
+	e := New(stateDir, newTestSecretsStore(t))
+	st := state.New()
+
+	st.Modules["provider"] = state.ModuleState{StateJSON: []byte(`{"ok": true}`)}
+	st.Modules["consumer-1"] = state.ModuleState{StateJSON: []byte(`{"admin_method": "teleport"}`)}
+	st.Modules["consumer-2"] = state.ModuleState{StateJSON: []byte(`{"admin_method": "teleport"}`)}
+
+	plan := &planner.Plan{Order: []string{"provider", "consumer-1", "consumer-2"}}
+	res := &resolver.Resolved{
+		Modules: map[string]*resolver.Module{
+			"provider": {
+				Name: "provider",
+				Manifest: &sdk.ManifestFile{
+					Name: "provider",
+					Provides: []sdk.FunctionRef{
+						{Function: "fleet.agent/v1", Fleet: true, Phases: []string{"target"}},
+					},
+				},
+			},
+			"consumer-1": {
+				Name: "consumer-1",
+				Manifest: &sdk.ManifestFile{
+					Name: "consumer-1",
+					Requires: map[string][]sdk.RequireEntry{
+						"target": {{Function: "fleet.agent/v1"}},
+					},
+				},
+			},
+			"consumer-2": {
+				Name: "consumer-2",
+				Manifest: &sdk.ManifestFile{
+					Name: "consumer-2",
+					Requires: map[string][]sdk.RequireEntry{
+						"target": {{Function: "fleet.agent/v1"}},
+					},
+				},
+			},
+		},
+	}
+
+	// Because all consumers have admin_method == "teleport", enrollFleetConsumers should return nil without attempting repoints
+	err := e.enrollFleetConsumers(context.Background(), "run-1", res, plan, nil, st)
+	if err != nil {
+		t.Errorf("expected nil error for already enrolled consumers, got %v", err)
+	}
+}
