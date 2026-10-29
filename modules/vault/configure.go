@@ -19,21 +19,31 @@ import (
 	modulev1 "github.com/WhiteRoseLK/genesis/sdk/go/gen/module/v1"
 )
 
-// intermediateTTLSeconds (pki_int, signed by step-ca) must strictly exceed
-// leafTTLSeconds (issued leaf TLS certificates, whether by step-ca or by
-// pki_int itself) — an issuer can never sign a certificate that expires after
-// itself. A real bug met while testing Handover: both used the same lifetime,
-// exceeded by a few seconds because of the gap between the creation of pki_int
-// (Configure) and the reissuance of the TLS cert (Handover, later). No
-// scheduled automatic renewal for either (debt, docs/PROGRESS.md).
+// rootTTLString is the 10-year validity of Vault's own Root CA.
+// intermediateTTLString is the validity of pki_int (signed by Vault's root).
+// leafTTLSeconds is 90 days for issued leaf certificates.
 const (
-	intermediateTTLSeconds = int64(365 * 24 * time.Hour / time.Second) // 1 an
-	leafTTLSeconds         = int64(90 * 24 * time.Hour / time.Second)  // 90 days
+	rootTTLString         = "87600h"                                 // 10 years
+	intermediateTTLString = "26280h"                                 // 3 years (strictly shorter than root)
+	leafTTLSeconds        = int64(90 * 24 * time.Hour / time.Second) // 90 days
 )
 
-// Configure installs Vault, bootstraps it (init/unseal), mounts pki_int
-// (signed by step-ca) and KV v2, enables AppRole — all the administration work
-// needs the root token, never exposed beyond this step (revoked in Handover).
+func joinPEMs(pems ...string) string {
+	var sb strings.Builder
+	for _, p := range pems {
+		trimmed := strings.TrimSpace(p)
+		if trimmed != "" {
+			sb.WriteString(trimmed)
+			sb.WriteString("\n")
+		}
+	}
+	return sb.String()
+}
+
+// Configure installs Vault, bootstraps it (init/unseal), mounts pki (10-year
+// exportable root CA) and pki_int (signed by Vault's root), mounts KV v2,
+// enables AppRole — all the administration work needs the root token, never
+// exposed beyond this step (revoked in Handover).
 func (m *vaultModule) Configure(ctx context.Context, req *modulev1.StepRequest) (*modulev1.StepResult, error) {
 	if err := m.dialWithToken(req.GetBrokerToken()); err != nil {
 		return nil, err
@@ -68,9 +78,8 @@ func (m *vaultModule) Configure(ctx context.Context, req *modulev1.StepRequest) 
 		return nil, fmt.Errorf("reading pki.issuer/v1@seed.CAChain: %w", err)
 	}
 	m.mu.Lock()
-	m.rootCAPEM = rootChain.GetChainPem()
+	m.seedRootCAPEM = rootChain.GetChainPem()
 	m.mu.Unlock()
-	_ = m.putSecret(ctx, "vault/root-ca", rootChain.GetChainPem(), "root-ca", true)
 
 	tlsCert, err := m.pkiSeedClient.IssueCert(ctx, &pkiissuerv1.IssueCertRequest{
 		CommonName: target.Host, Sans: []string{target.Host}, TtlSeconds: leafTTLSeconds,
@@ -79,11 +88,11 @@ func (m *vaultModule) Configure(ctx context.Context, req *modulev1.StepRequest) 
 		return nil, fmt.Errorf("issuing vault's TLS certificate through pki.issuer/v1@seed: %w", err)
 	}
 
-	if err := m.deployVault(ctx, target, tlsCert); err != nil {
+	if err := m.deployVault(ctx, target, tlsCert, m.seedRootCAPEM); err != nil {
 		return nil, err
 	}
 
-	api, err := newVaultClient(fmt.Sprintf("https://%s:%d", target.Host, vaultAPIPort), rootChain.GetChainPem())
+	api, err := newVaultClient(fmt.Sprintf("https://%s:%d", target.Host, vaultAPIPort), m.seedRootCAPEM)
 	if err != nil {
 		return nil, err
 	}
@@ -104,11 +113,11 @@ func (m *vaultModule) Configure(ctx context.Context, req *modulev1.StepRequest) 
 		return nil, err
 	}
 
-	if err := m.ensurePKIEngine(ctx, api, rootToken, target.Host); err != nil {
-		return nil, err
-	}
 	if err := api.ensureMount(ctx, rootToken, kvMount, "kv", map[string]any{"version": "2"}); err != nil {
 		return nil, fmt.Errorf("mounting the KV engine: %w", err)
+	}
+	if err := m.ensurePKIEngine(ctx, api, rootToken, target.Host); err != nil {
+		return nil, err
 	}
 	roleID, secretID, err := m.ensureAppRole(ctx, api, rootToken)
 	if err != nil {
@@ -147,9 +156,9 @@ func (m *vaultModule) Configure(ctx context.Context, req *modulev1.StepRequest) 
 // deployVault installs/configures Vault through ansible and places the
 // provided TLS certificate — replayed as is in Handover to redeploy a new
 // certificate (idempotent playbook, only restarts if the TLS changed).
-func (m *vaultModule) deployVault(ctx context.Context, target connTarget, cert *pkiissuerv1.Certificate) error {
+func (m *vaultModule) deployVault(ctx context.Context, target connTarget, cert *pkiissuerv1.Certificate, rootCAPEM string) error {
 	vars, err := sdk.NewState(map[string]any{
-		"tls_cert_pem": cert.GetChainPem() + "\n" + m.currentRootCAPEM(),
+		"tls_cert_pem": joinPEMs(cert.GetChainPem(), rootCAPEM),
 		"tls_key_pem":  cert.GetPrivateKeyPem(),
 		"vm_ip":        target.Host,
 	})
@@ -171,7 +180,16 @@ func (m *vaultModule) deployVault(ctx context.Context, target connTarget, cert *
 func (m *vaultModule) currentRootCAPEM() string {
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	return m.rootCAPEM
+	if m.rootCAPEM != "" {
+		return m.rootCAPEM
+	}
+	if m.broker != nil && m.secretsClient != nil {
+		if ca, err := m.getSecret(context.Background(), pkiRootCertRef); err == nil && ca != "" {
+			m.rootCAPEM = ca
+			return ca
+		}
+	}
+	return ""
 }
 
 // waitForVault waits for the vault service to answer — the package has just
@@ -260,51 +278,104 @@ func (m *vaultModule) ensureInitializedAndUnsealed(ctx context.Context, api *vau
 	return rootToken, nil
 }
 
-// ensurePKIEngine mounts pki_int, generates its CSR, has it signed by
-// pki.issuer/v1@seed (is_ca=true — exactly the scenario proven by
-// internal/modulehost/stepca_test.go, TestStepCASignsThirdPartyIntermediate),
-// imports it, configures the URLs and the issuing role (doc 07: "pki_int
-// signed by the root").
+// ensurePKIEngine mounts both pki (10-year root CA, exportable) and pki_int
+// (intermediate CA signed by Vault's root), configures roles and URLs, and
+// backs up the root CA key and certificate into recovery secrets and Vault KV.
 func (m *vaultModule) ensurePKIEngine(ctx context.Context, api *vaultClient, rootToken, vmIP string) error {
-	if pemCA, err := m.getSecret(ctx, "vault/pki-intermediate-cert"); err == nil {
-		m.mu.Lock()
-		m.pkiIntPEM = pemCA
-		m.mu.Unlock()
-		return nil // already configured (idempotent).
+	rootCert, rootKey, err := m.ensureRootPKI(ctx, api, rootToken, vmIP)
+	if err != nil {
+		return fmt.Errorf("configuring root PKI: %w", err)
+	}
+	m.mu.Lock()
+	m.rootCAPEM = rootCert
+	m.mu.Unlock()
+
+	intCert, err := m.ensureIntermediatePKI(ctx, api, rootToken, vmIP)
+	if err != nil {
+		return fmt.Errorf("configuring intermediate PKI: %w", err)
+	}
+	m.mu.Lock()
+	m.pkiIntPEM = intCert
+	m.mu.Unlock()
+
+	// Backup root CA key & certificate in Vault KV for extraction / disaster recovery
+	if rootKey != "" {
+		if err := api.kvWrite(ctx, rootToken, kvMount, "pki/root-ca-key", rootKey); err != nil {
+			return fmt.Errorf("backing up root CA key to KV: %w", err)
+		}
+	}
+	if rootCert != "" {
+		if err := api.kvWrite(ctx, rootToken, kvMount, "pki/root-ca-cert", rootCert); err != nil {
+			return fmt.Errorf("backing up root CA cert to KV: %w", err)
+		}
+	}
+	return nil
+}
+
+func (m *vaultModule) ensureRootPKI(ctx context.Context, api *vaultClient, rootToken, vmIP string) (certPEM, keyPEM string, err error) {
+	if cert, err := m.getSecret(ctx, pkiRootCertRef); err == nil && cert != "" {
+		key, _ := m.getSecret(ctx, pkiRootKeyRef)
+		return cert, key, nil
+	}
+
+	if err := api.ensureMount(ctx, rootToken, pkiRootMount, "pki", nil); err != nil {
+		return "", "", fmt.Errorf("mounting root PKI engine: %w", err)
+	}
+	if err := api.tuneMaxLeaseTTL(ctx, rootToken, pkiRootMount, rootTTLString); err != nil {
+		return "", "", fmt.Errorf("setting max TTL of root PKI: %w", err)
+	}
+	cert, key, err := api.generateExportedRoot(ctx, rootToken, pkiRootMount, "Genesis Root CA", rootTTLString)
+	if err != nil {
+		return "", "", fmt.Errorf("generating exported root CA: %w", err)
+	}
+	if err := api.configurePKIURLs(ctx, rootToken, pkiRootMount, fmt.Sprintf("https://%s:%d", vmIP, vaultAPIPort)); err != nil {
+		return "", "", fmt.Errorf("configuring root PKI URLs: %w", err)
+	}
+
+	if err := m.putSecret(ctx, pkiRootCertRef, cert, "certificate", true); err != nil {
+		return "", "", fmt.Errorf("saving root CA certificate: %w", err)
+	}
+	if err := m.putSecret(ctx, pkiRootKeyRef, key, "private_key", true); err != nil {
+		return "", "", fmt.Errorf("saving root CA private key: %w", err)
+	}
+	_ = m.putSecret(ctx, "vault/root-ca", cert, "root-ca", true)
+
+	return cert, key, nil
+}
+
+func (m *vaultModule) ensureIntermediatePKI(ctx context.Context, api *vaultClient, rootToken, vmIP string) (string, error) {
+	if pemCA, err := m.getSecret(ctx, pkiIntermediateCertRef); err == nil && pemCA != "" {
+		return pemCA, nil
 	}
 
 	if err := api.ensureMount(ctx, rootToken, pkiMount, "pki", nil); err != nil {
-		return fmt.Errorf("mounting the PKI engine: %w", err)
+		return "", fmt.Errorf("mounting intermediate PKI engine: %w", err)
 	}
-	if err := api.tuneMaxLeaseTTL(ctx, rootToken, pkiMount, "87600h"); err != nil {
-		return fmt.Errorf("setting the max TTL of pki_int: %w", err)
+	if err := api.tuneMaxLeaseTTL(ctx, rootToken, pkiMount, intermediateTTLString); err != nil {
+		return "", fmt.Errorf("setting max TTL of intermediate PKI: %w", err)
 	}
 	csr, err := api.generateIntermediateCSR(ctx, rootToken, pkiMount, "Genesis Vault Intermediate CA")
 	if err != nil {
-		return fmt.Errorf("generating the CSR of the vault intermediate: %w", err)
+		return "", fmt.Errorf("generating intermediate CSR: %w", err)
 	}
-	signed, err := m.pkiSeedClient.SignCSR(ctx, &pkiissuerv1.SignCSRRequest{
-		CsrPem: csr, IsCa: true, PathLenConstraint: 0, TtlSeconds: intermediateTTLSeconds,
-	})
+	signedCert, issuingCA, err := api.signIntermediate(ctx, rootToken, pkiRootMount, csr, "Genesis Vault Intermediate CA", intermediateTTLString)
 	if err != nil {
-		return fmt.Errorf("signing the CSR of the vault intermediate with pki.issuer/v1@seed: %w", err)
+		return "", fmt.Errorf("signing intermediate CSR with Vault root PKI: %w", err)
 	}
-	if err := api.setSignedIntermediate(ctx, rootToken, pkiMount, signed.GetChainPem()); err != nil {
-		return fmt.Errorf("importing the signed intermediate: %w", err)
+	if err := api.setSignedIntermediate(ctx, rootToken, pkiMount, joinPEMs(signedCert, issuingCA)); err != nil {
+		return "", fmt.Errorf("importing signed intermediate: %w", err)
 	}
 	if err := api.configurePKIURLs(ctx, rootToken, pkiMount, fmt.Sprintf("https://%s:%d", vmIP, vaultAPIPort)); err != nil {
-		return fmt.Errorf("configuring the PKI URLs: %w", err)
+		return "", fmt.Errorf("configuring intermediate PKI URLs: %w", err)
 	}
-	if err := api.ensurePKIRole(ctx, rootToken, pkiMount, pkiRole, "87600h"); err != nil {
-		return fmt.Errorf("creating the PKI role: %w", err)
+	if err := api.ensurePKIRole(ctx, rootToken, pkiMount, pkiRole, intermediateTTLString); err != nil {
+		return "", fmt.Errorf("creating PKI role: %w", err)
 	}
-	if err := m.putSecret(ctx, "vault/pki-intermediate-cert", signed.GetCertPem(), "certificate", false); err != nil {
-		return err
+	if err := m.putSecret(ctx, pkiIntermediateCertRef, signedCert, "certificate", false); err != nil {
+		return "", fmt.Errorf("saving intermediate certificate: %w", err)
 	}
-	m.mu.Lock()
-	m.pkiIntPEM = signed.GetCertPem()
-	m.mu.Unlock()
-	return nil
+
+	return signedCert, nil
 }
 
 // ensureAppRole enables AppRole, writes the "genesis" policy (KV access to
@@ -362,7 +433,6 @@ func (m *vaultModule) Handover(ctx context.Context, req *modulev1.StepRequest) (
 		return nil, err
 	}
 
-	api := m.currentAPI()
 	rootToken, err := m.getSecret(ctx, rootTokenRef)
 	if err != nil {
 		return nil, fmt.Errorf("Handover(vault): reading the root token: %w", err)
@@ -374,29 +444,39 @@ func (m *vaultModule) Handover(ctx context.Context, req *modulev1.StepRequest) (
 	if err != nil {
 		return nil, fmt.Errorf("Handover(vault): reissuing the certificate through its own pki_int: %w", err)
 	}
-	if err := m.deployVault(ctx, target, selfIssued); err != nil {
+	if err := m.deployVault(ctx, target, selfIssued, m.currentRootCAPEM()); err != nil {
 		return nil, fmt.Errorf("Handover(vault): redeploying the certificate: %w", err)
 	}
-	if err := m.waitForVault(ctx, api); err != nil {
+
+	newAPI, err := newVaultClient(fmt.Sprintf("https://%s:%d", target.Host, vaultAPIPort), m.currentRootCAPEM())
+	if err != nil {
+		return nil, fmt.Errorf("Handover(vault): updating API client with vault root CA: %w", err)
+	}
+	m.mu.Lock()
+	m.api = newAPI
+	m.mu.Unlock()
+
+	if err := m.waitForVault(ctx, newAPI); err != nil {
 		return nil, fmt.Errorf("Handover(vault): %w", err)
 	}
 	// Redeploying restarts the Vault process: the seal state always lives in
 	// memory (disable_mlock changes nothing there), so it is lost on every
 	// restart — a real bug found while testing Handover, where revoking the
 	// root token failed right afterwards with "Vault is sealed".
-	if _, err := m.ensureInitializedAndUnsealed(ctx, api); err != nil {
+	if _, err := m.ensureInitializedAndUnsealed(ctx, newAPI); err != nil {
 		return nil, fmt.Errorf("Handover(vault): unsealing again after the redeployment: %w", err)
 	}
-	if err := m.waitForActive(ctx, api); err != nil {
+	if err := m.waitForActive(ctx, newAPI); err != nil {
 		return nil, fmt.Errorf("Handover(vault): %w", err)
 	}
 
-	if err := api.revokeSelf(ctx, rootToken); err != nil {
+	if err := newAPI.revokeSelf(ctx, rootToken); err != nil {
 		return nil, fmt.Errorf("Handover(vault): revoking the root token: %w", err)
 	}
 
 	state := sdk.StateMap(req.GetState())
 	state["handed_over"] = true
+	state["root_ca_pem"] = m.currentRootCAPEM()
 	s, err := sdk.NewState(state)
 	if err != nil {
 		return nil, err
@@ -404,10 +484,19 @@ func (m *vaultModule) Handover(ctx context.Context, req *modulev1.StepRequest) (
 	return &modulev1.StepResult{Status: modulev1.StepResult_STATUS_OK, State: s}, nil
 }
 
-func (m *vaultModule) currentAPI() *vaultClient {
+func (m *vaultModule) currentSeedRootCAPEM() string {
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	return m.api
+	if m.seedRootCAPEM != "" {
+		return m.seedRootCAPEM
+	}
+	if m.broker != nil && m.pkiSeedClient != nil {
+		if rootChain, err := m.pkiSeedClient.CAChain(context.Background(), &pkiissuerv1.Empty{}); err == nil {
+			m.seedRootCAPEM = rootChain.GetChainPem()
+			return m.seedRootCAPEM
+		}
+	}
+	return ""
 }
 
 // Verify proves, from a disposable third-party VM, a real issuance + chain
@@ -463,7 +552,7 @@ func (m *vaultModule) Verify(ctx context.Context, req *modulev1.StepRequest) (*m
 		"kv_mount":          kvMount,
 		"kv_test_path":      "verify-probe",
 		"kv_test_value":     "ok",
-		"root_ca_pem":       m.currentRootCAPEM(),
+		"root_ca_pem":       joinPEMs(m.currentRootCAPEM(), m.currentSeedRootCAPEM()),
 	})
 	if err != nil {
 		return nil, err

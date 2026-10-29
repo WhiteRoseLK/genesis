@@ -412,6 +412,31 @@ func TestVaultConfiguresAndIssuesRealCertificates(t *testing.T) {
 	if h.ansibleServer.calls < 1 {
 		t.Error("install_vault.yml was never sent")
 	}
+
+	rootCertSec, err := h.store.Get(ctx, secrets.Ref("vault/pki-root-cert"))
+	if err != nil {
+		t.Fatalf("reading vault/pki-root-cert from store: %v", err)
+	}
+	rootKeySec, err := h.store.Get(ctx, secrets.Ref("vault/pki-root-key"))
+	if err != nil {
+		t.Fatalf("reading vault/pki-root-key from store: %v", err)
+	}
+	if rootCertSec.ExposeSecret() == "" || rootKeySec.ExposeSecret() == "" {
+		t.Fatal("empty root CA cert or key in secrets store")
+	}
+
+	block, _ := pem.Decode([]byte(rootCertSec.ExposeSecret()))
+	if block == nil {
+		t.Fatal("failed to decode root CA PEM from store")
+	}
+	cert, err := x509.ParseCertificate(block.Bytes)
+	if err != nil {
+		t.Fatalf("failed to parse root certificate: %v", err)
+	}
+	validity := cert.NotAfter.Sub(cert.NotBefore)
+	if validity < 9*365*24*time.Hour {
+		t.Errorf("expected root CA validity of ~10 years, got %v", validity)
+	}
 }
 
 // TestVaultVerifyPassesFromThirdPartyVM runs the real Verify step of the
@@ -477,6 +502,15 @@ func TestVaultSecretsKVReadWriteList(t *testing.T) {
 	}
 	if !slices.Contains(listSub.GetRefs(), "sub/secret-two") {
 		t.Errorf("kv.List('sub') = %v, want to contain sub/secret-two", listSub.GetRefs())
+	}
+
+	rRootCert, err := kv.Read(ctx, &secretskvv1.ReadRequest{Ref: "pki/root-ca-cert"})
+	if err != nil || !rRootCert.GetFound() || rRootCert.GetValue() == "" {
+		t.Errorf("kv.Read(pki/root-ca-cert) = (%v, %v), want non-empty found", rRootCert, err)
+	}
+	rRootKey, err := kv.Read(ctx, &secretskvv1.ReadRequest{Ref: "pki/root-ca-key"})
+	if err != nil || !rRootKey.GetFound() || rRootKey.GetValue() == "" {
+		t.Errorf("kv.Read(pki/root-ca-key) = (%v, %v), want non-empty found", rRootKey, err)
 	}
 }
 

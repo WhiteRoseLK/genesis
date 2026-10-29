@@ -64,7 +64,7 @@ func (m *vaultModule) CAChain(context.Context, *pkiissuerv1.Empty) (*pkiissuerv1
 	if m.pkiIntPEM == "" {
 		return nil, fmt.Errorf("CAChain: vault not configured yet (Configure has not succeeded yet)")
 	}
-	return &pkiissuerv1.CAChainResponse{ChainPem: m.pkiIntPEM + m.rootCAPEM}, nil
+	return &pkiissuerv1.CAChainResponse{ChainPem: joinPEMs(m.pkiIntPEM, m.rootCAPEM)}, nil
 }
 
 // vaultPkiServer adapts pki.issuer/v1 to vaultModule's methods (the same

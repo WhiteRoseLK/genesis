@@ -183,6 +183,58 @@ func (c *vaultClient) tuneMaxLeaseTTL(ctx context.Context, token, path, ttl stri
 	return nil
 }
 
+func (c *vaultClient) generateExportedRoot(ctx context.Context, token, pkiPath, commonName, ttl string) (certPEM, privateKeyPEM string, err error) {
+	body := map[string]any{
+		"common_name": commonName,
+		"key_type":    "ec",
+		"key_bits":    256,
+	}
+	if ttl != "" {
+		body["ttl"] = ttl
+	}
+	status, parsed, err := c.request(ctx, http.MethodPost, "/v1/"+pkiPath+"/root/generate/exported", token, body)
+	if err != nil {
+		return "", "", err
+	}
+	if status != http.StatusOK {
+		return "", "", fmt.Errorf("generating the exported root CA: status %d: %v", status, parsed)
+	}
+	d := dataField(parsed)
+	cert, _ := d["certificate"].(string)
+	key, _ := d["private_key"].(string)
+	if cert == "" || key == "" {
+		return "", "", fmt.Errorf("generating the exported root CA: missing certificate or private_key in response")
+	}
+	return cert, key, nil
+}
+
+func (c *vaultClient) signIntermediate(ctx context.Context, token, pkiRootPath, csrPEM, commonName, ttl string) (certPEM, issuingCAPEM string, err error) {
+	body := map[string]any{
+		"csr":             csrPEM,
+		"max_path_length": 0,
+	}
+	if commonName != "" {
+		body["common_name"] = commonName
+	}
+	if ttl != "" {
+		body["ttl"] = ttl
+	}
+	status, parsed, err := c.request(ctx, http.MethodPost, "/v1/"+pkiRootPath+"/root/sign-intermediate", token, body)
+	if err != nil {
+		return "", "", err
+	}
+	if status != http.StatusOK {
+		return "", "", fmt.Errorf("signing intermediate CA with root: status %d: %v", status, parsed)
+	}
+	d := dataField(parsed)
+	cert, _ := d["certificate"].(string)
+	issuingCA, _ := d["issuing_ca"].(string)
+	if cert == "" {
+		return "", "", fmt.Errorf("signing intermediate CA with root: missing certificate in response")
+	}
+	return cert, issuingCA, nil
+}
+
 func (c *vaultClient) generateIntermediateCSR(ctx context.Context, token, pkiPath, commonName string) (string, error) {
 	status, parsed, err := c.request(ctx, http.MethodPost, "/v1/"+pkiPath+"/intermediate/generate/internal", token, map[string]any{
 		"common_name": commonName, "key_type": "ec", "key_bits": 256,

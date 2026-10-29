@@ -40,7 +40,7 @@ Each module lives in `modules/<name>/` with its `module.yaml`, its code, its Ans
 
 ## `vault` (foundation)
 - **Provides**: `pki.issuer/v1`, `secrets.kv/v1` (target). **Requires**: see the manifest in doc 03.
-- Single-node Raft, TLS via `pki.issuer@seed`, init 5/3, unsealing by the module, `pki_int` signed by the root, KV v2, `genesis` AppRole.
+- Single-node Raft, TLS via `pki.issuer@seed`, init 5/3, unsealing by the module, exportable 10-year root CA (`pki`) and intermediate CA (`pki_int`) signed by the root, KV v2, `genesis` AppRole.
 - **Handover**: switches `pki.issuer`, reissues its own certificate, migrates the secrets from the file backend (orchestrated by the core through `core.secrets`), revokes the root token.
 - **Verify**: issuance and chain validation from a third-party VM; KV read through the AppRole.
 
