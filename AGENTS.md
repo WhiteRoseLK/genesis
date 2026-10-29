@@ -48,3 +48,17 @@ Do not load everything up front: read the document relevant to the task at hand.
 ## Known pitfalls
 - Never test against a real Proxmox or run `genesis apply`/`destroy` on real infrastructure without an explicit request.
 - Each module has its own `go.mod`: run Go commands from the right directory or through the `Makefile` (`go.work` workspace).
+
+## Agent skills
+
+### Issue tracker
+
+GitHub Issues of `WhiteRoseLK/genesis`, via `gh`. See `docs/agents/issue-tracker.md`.
+
+### Triage labels
+
+Default roles (`needs-triage`, `needs-info`, `ready-for-agent`, `ready-for-human`, `wontfix`), plus `bug`/`enhancement` as categories. See `docs/agents/triage-labels.md`.
+
+### Domain docs
+
+Single-context: vocabulary in `docs/02-architecture.md`, decisions in `docs/09-decisions.md` + `docs/adr/`. See `docs/agents/domain.md`.
