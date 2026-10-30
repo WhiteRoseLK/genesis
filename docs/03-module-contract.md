@@ -87,7 +87,7 @@ Iteration 1 functions:
 | `core.ansible/v1` | RunPlaybook(assets, inventory, vars) | core |
 | `core.container/v1` | Run, Stop, Status (on the seed) | core |
 | `core.ssh/v1` | Exec, Copy | core |
-| `compute.vm/v1` | EnsureImage, EnsureVM, GetVM, DeleteVM, Now | `proxmox`, `fake-compute` |
+| `compute.vm/v1` | EnsureImage, EnsureVM, GetVM, DeleteVM, Now | `proxmox`, `fake-compute` (integration tests only, ADR-129) |
 | `os.base/v1` | Harden(vm), TrustCA, SetResolver, SetNTP | `base-os` |
 | `time.ntp/v1` | Endpoint | `chrony` |
 | `dns.zone/v1` | UpsertRecord, DeleteRecord, ListRecords, Endpoint | `coredns` (seed), `powerdns` |

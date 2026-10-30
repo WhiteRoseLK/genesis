@@ -12,7 +12,7 @@ The maintained list of what a Genesis user can do from the CLI, and how to prove
 
 - Every command goes through `scripts/g.sh <run-id> …`. Commands below omit that prefix: `genesis plan -f spec.yaml` means `scripts/g.sh <run-id> plan -f spec.yaml`.
 - Treat commands, flags and quoted messages as literal.
-- After a mutation (`apply`, `destroy`, `clean`, `secrets`, spec edit), check the result from a second, read-only command.
+- After a mutation (`init`, `clean`, `modules install`, spec edit), check the result from a second, read-only command.
 
 ## Proof and skip reporting
 
@@ -25,4 +25,3 @@ The maintained list of what a Genesis user can do from the CLI, and how to prove
 - [Modules](./modules.md): list, install, verify the lock, scaffold a new module.
 - [Spec validation and plan](./validate-plan.md): `validate` and `plan`, valid and rejected specs.
 - [Seed state](./seed-state.md): `init`, `status`, `secrets list|get`, `clean`.
-- [Apply and destroy](./apply-destroy.md): full lifecycle on fake-compute. **Currently fails** (#124, #125).

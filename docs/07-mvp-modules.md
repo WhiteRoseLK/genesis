@@ -4,7 +4,7 @@ Each module lives in `modules/<name>/` with its `module.yaml`, its code, its Ans
 
 ## `fake-compute` (platform layer, tests)
 - **Provides**: `compute.vm/v1`.
-- "VM" = systemd containers on the seed, reachable over SSH. Allows testing the whole core and the service modules without a hypervisor.
+- "VM" = plain SSH containers on the seed (no systemd). A test double for the integration tests (`test/integration/`), which fake the service playbooks; not meant to run a `genesis apply` from the CLI (ADR-129).
 
 ## `proxmox` (platform layer)
 - **Provides**: `compute.vm/v1`. **Requires**: `core.secrets/v1`.
