@@ -1,13 +1,13 @@
 ---
 name: verify-genesis
-description: "Drive the real genesis CLI end to end like a user (modules install, validate, plan, init, status, secrets, apply/destroy on fake-compute) in a disposable run, and keep transcripts as proof. Use before declaring a Genesis change done, to reproduce a bug from the CLI, or when asked to verify Genesis behaviour. Never touches Proxmox."
+description: "Drive the real genesis CLI end to end like a user (modules install/verify, validate, plan, init, status, secrets, clean) in a disposable run, and keep transcripts as proof. Use before declaring a Genesis change done, to reproduce a bug from the CLI, or when asked to verify Genesis behaviour. Never runs apply and never touches Proxmox."
 ---
 
 # verify-genesis
 
 Genesis is a CLI (`cmd/genesis`) that turns a YAML spec into infrastructure through plugin modules. A user installs modules, writes a spec, then runs `init`, `validate`, `plan`, `apply`, `status`, `secrets`, `destroy`, `clean`. This skill drives that real binary, built from the current checkout, inside a disposable **run**: its own `HOME` (module search path), its own `state_dir`, `NO_COLOR=1`, and the `fake-compute` module instead of a hypervisor.
 
-Never point a run at Proxmox or real infrastructure: that needs an explicit request from the user (`AGENTS.md`). `make e2e` is out of scope here.
+This skill never runs `apply` or `destroy`. fake-compute is an integration-test double and cannot run a CLI `apply` (ADR-129); it is only there so `validate` and `plan` resolve a compute provider. A real `apply` is verified on a dedicated Proxmox test VM, and only on the user's explicit request (`AGENTS.md`). `make e2e` is out of scope here.
 
 All paths below are relative to this skill's directory. Helpers must be run from inside the Genesis checkout.
 
@@ -40,7 +40,7 @@ Read-only. Checks the binary and its version, that it was built from the current
 
 ## Isolation
 
-Container names are fixed by the code (`genesis-coredns`, `genesis-step-ca`, `genesis-vm-<name>`), so **two runs that reach `apply` cannot run side by side**, nor alongside `make test-docker` (its cleanup removes every `genesis-*` container). Runs that stop before `apply` are independent. If the doctor reports foreign `genesis-*` containers, stop and ask the user: they are not yours.
+A run starts no container, so runs are independent of each other. The doctor still reports `genesis-*` containers that predate the run (left by `make test-docker` or another tool): they are not yours, never remove them.
 
 ## Drive
 
@@ -65,4 +65,4 @@ What to drive for each feature: [features/README.md](features/README.md).
 .agents/skills/verify-genesis/scripts/cleanup.sh <run-id>
 ```
 
-Runs `genesis destroy` and `genesis clean` through the CLI (transcripts kept), then removes the `genesis-*` containers that appeared during this run and only those, then deletes `runs/<run-id>`. Containers still present after `destroy` are written to `evidence/<run-id>/leftover-containers-after-destroy.txt`: that is a finding, report it. Evidence stays in `evidence/<run-id>/`. Run cleanup after every run, including failed ones.
+Runs `genesis clean` through the CLI (transcript kept), removes any `genesis-*` container that appeared during this run and only those (listed in `evidence/<run-id>/leftover-containers.txt`: a run should start none, so report it), then deletes `runs/<run-id>`. Evidence stays in `evidence/<run-id>/`. Run cleanup after every run, including failed ones.

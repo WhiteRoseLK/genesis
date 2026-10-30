@@ -79,7 +79,7 @@ flowchart LR
 | `secrets` | encrypted files (age) | **vault** | `secrets.kv/v1` |
 | `bastion` | — | **teleport** | `access.ssh/v1`, agent on every VM |
 
-On top of these come `base-os` (common configuration of every VM: CA, resolver, NTP) and `fake-compute` (VMs simulated as containers, for end-to-end tests).
+On top of these come `base-os` (common configuration of every VM: CA, resolver, NTP) and `fake-compute` (VMs simulated as containers, for the integration tests only).
 
 ## 📄 What a spec looks like
 
