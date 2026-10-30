@@ -12,6 +12,7 @@ import (
 	"context"
 	_ "embed"
 	"fmt"
+	"net"
 	"sync"
 
 	"google.golang.org/grpc"
@@ -207,8 +208,12 @@ func (s *computeVMServer) EnsureVM(ctx context.Context, req *computevmv1.EnsureV
 		}
 	}
 
+	// A container cannot take the requested pool address: report the one it
+	// actually has, so SSH and service calls reach it (#124). A loopback
+	// request is kept: it means the services are published on the seed itself
+	// (test/integration/e2e_fakecompute_test.go).
 	ip := resp.GetIp()
-	if req.GetIp() != "" {
+	if requested := net.ParseIP(req.GetIp()); requested != nil && requested.IsLoopback() {
 		ip = req.GetIp()
 	}
 

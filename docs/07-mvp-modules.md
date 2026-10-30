@@ -5,6 +5,7 @@ Each module lives in `modules/<name>/` with its `module.yaml`, its code, its Ans
 ## `fake-compute` (platform layer, tests)
 - **Provides**: `compute.vm/v1`.
 - "VM" = systemd containers on the seed, reachable over SSH. Allows testing the whole core and the service modules without a hypervisor.
+- A container cannot take a pool address: each VM is reported at the address `core.container/v1` returns for its container, not at the requested one (a loopback request is kept: services published on the seed itself).
 
 ## `proxmox` (platform layer)
 - **Provides**: `compute.vm/v1`. **Requires**: `core.secrets/v1`.

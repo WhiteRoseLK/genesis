@@ -11,6 +11,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -115,12 +116,23 @@ func TestFakeComputeProvidesComputeVM(t *testing.T) {
 
 	first, err := vmClient.EnsureVM(ctx, &computevmv1.EnsureVMRequest{
 		Name: "infra01", Env: "lab", User: "genesis", SshPublicKey: generateAuthorizedKey(t),
+		Ip: "10.10.0.77", // a pool address the container cannot take (#124)
 	})
 	if err != nil {
 		t.Fatalf("EnsureVM (first time): %v", err)
 	}
 	if first.GetId() == "" || first.GetIp() == "" {
 		t.Fatalf("EnsureVM returned an incomplete VM: %+v", first)
+	}
+	// The VM is reported at the container's real address, not at the pool
+	// address it cannot take: otherwise nothing can reach it (#124).
+	inspected, err := exec.Command("docker", "inspect", "--format",
+		"{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}", first.GetId()).Output()
+	if err != nil {
+		t.Fatalf("docker inspect: %v", err)
+	}
+	if want := strings.TrimSpace(string(inspected)); first.GetIp() != want {
+		t.Errorf("VM.Ip = %q, want the container address %q", first.GetIp(), want)
 	}
 	if first.GetSshPort() != 22 {
 		t.Errorf("SshPort = %d, want 22", first.GetSshPort())

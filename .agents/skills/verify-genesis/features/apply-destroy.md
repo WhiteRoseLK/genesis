@@ -22,7 +22,7 @@ Preconditions:
 
 - Launched run, doctor passes (in particular: no foreign `genesis-*` container), no other run or `make test-docker` using Docker.
 
-- **Apply.** Run `genesis apply -f spec.yaml --auto-approve` (a few minutes; images are pulled on first use). Expected: one `INFO step module=<m> step=<step> outcome=ok` line per step and exit `0`. Today: exit `1` after `module=chrony step=provision outcome=ok`, with Ansible `UNREACHABLE … connect to host 10.10.0.5x port 22` (#124).
+- **Apply.** Run `genesis apply -f spec.yaml --auto-approve` (a few minutes; images are pulled on first use). Expected: one `INFO step module=<m> step=<step> outcome=ok` line per step and exit `0`. Today: exit `1` after `module=chrony step=provision outcome=ok`, with Ansible `UNREACHABLE … connect to host 10.10.0.10 port 22`: the CLI's `core.container/v1` reports the seed address for every detached container, so fake-compute cannot learn its container's address (#124).
 - **Side effects.** Run `docker ps --filter name=genesis- --format '{{.Names}} {{.Status}}'`: `genesis-coredns` and one `genesis-vm-<name>` per target VM (`chrony01`, `powerdns01`, `vault01`, `teleport01`, `genesis-verifier`). Save the output next to the transcripts: `docker ps … > "$GENESIS_VERIFY_ROOT/evidence/<run-id>/docker-after-apply.txt"`.
 - **State.** Run `genesis status -f spec.yaml`: each module listed with its state.
 - **Idempotence.** Run `genesis apply -f spec.yaml --auto-approve` again: every step `compliant, no action`.
