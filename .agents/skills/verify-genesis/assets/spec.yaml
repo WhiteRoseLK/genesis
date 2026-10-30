@@ -1,0 +1,19 @@
+# Spec used by verify-genesis: fake-compute instead of a hypervisor, so no
+# Proxmox is touched. Modules are explicit: `time: {}` does not resolve (#126).
+apiVersion: genesis/v1alpha1
+kind: Environment
+metadata:
+  name: verify
+network:
+  cidr: 10.10.0.0/24
+  gateway: 10.10.0.1
+  pool: 10.10.0.50-10.10.0.99
+  domain: verify.internal
+seed:
+  address: 10.10.0.10
+  state_dir: @STATE_DIR@
+  container_runtime: docker
+capabilities:
+  compute: { module: fake-compute }
+  time: { module: chrony }
+  dns: { module: powerdns }

@@ -44,6 +44,7 @@ Do not load everything up front: read the document relevant to the task at hand.
 - Stable Go, `CGO_ENABLED=0`, linux/amd64 and linux/arm64 targets. `cobra`, `yaml.v3`, `log/slog`, `buf` for protobuf, `hashicorp/go-plugin`, `filippo.io/age`.
 - `make tools` (pinned tools in `.bin/`) · `make build` · `make test` · `make test-race` · `make test-docker` · `make lint` · `make mod-check` · `make proto` / `make proto-check` · `make vuln` · `make licenses` · `make e2e` (`integration` build tag, needs a Proxmox: never run without an explicit request).
 - Unit tests without network or container daemon (`make test`); tests against real containers under the `docker` build tag (`make test-docker`), images pinned by version and digest; tests of a module through the core in `test/integration/`; `fake-compute` module for end-to-end tests; SDK conformance suite mandatory for every module.
+- Before declaring a change done, drive the real CLI with the `verify-genesis` skill (`.agents/skills/verify-genesis/`): disposable run on fake-compute, transcripts kept as proof, never Proxmox.
 
 ## Known pitfalls
 - Never test against a real Proxmox or run `genesis apply`/`destroy` on real infrastructure without an explicit request.
