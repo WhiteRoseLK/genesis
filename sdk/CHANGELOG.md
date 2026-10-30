@@ -1,5 +1,27 @@
 # Changelog
 
+## [0.2.1](https://github.com/WhiteRoseLK/genesis/compare/sdk/v0.2.0...sdk/v0.2.1) (2026-10-24)
+
+
+### Features
+
+* **ansible:** verify SSH host key via known_hosts in core.ansible/v1 ([#89](https://github.com/WhiteRoseLK/genesis/issues/89)) ([fc0e21a](https://github.com/WhiteRoseLK/genesis/commit/fc0e21aceb937673e457f4ee61dda76476b17e30))
+* **dns:** automatic reverse zone and ptr derivation in dns.zone/v1 ([#86](https://github.com/WhiteRoseLK/genesis/issues/86)) ([6d0b537](https://github.com/WhiteRoseLK/genesis/commit/6d0b537b1c1a52b620b3f7a2f6d77980ffa4dba0))
+* **engine:** trigger explicit Repoint on handover and update consumer session caching ([#83](https://github.com/WhiteRoseLK/genesis/issues/83)) ([015b4a1](https://github.com/WhiteRoseLK/genesis/commit/015b4a114f8e88d627594455b87f9778b4140d40))
+* **modules:** teleport implements access.ssh/v1.SignUserKey ([#69](https://github.com/WhiteRoseLK/genesis/issues/69)) ([8d5885e](https://github.com/WhiteRoseLK/genesis/commit/8d5885e4d3cdf10dc980ce4f6391ffad32655082))
+* **resolver:** base module compatibility on protocol version (ADR-0039) ([#90](https://github.com/WhiteRoseLK/genesis/issues/90)) ([290c632](https://github.com/WhiteRoseLK/genesis/commit/290c63267268f599e7e9ed103996b65f40278a49)), closes [#39](https://github.com/WhiteRoseLK/genesis/issues/39)
+* **runner:** enable container NAT port mapping and end-to-end module execution ([#47](https://github.com/WhiteRoseLK/genesis/issues/47)) ([#94](https://github.com/WhiteRoseLK/genesis/issues/94)) ([eb3d8e3](https://github.com/WhiteRoseLK/genesis/commit/eb3d8e3fc4e3f9519398cc54c15428cf967bad58))
+
+
+### Refactoring
+
+* switch the core code to English ([#56](https://github.com/WhiteRoseLK/genesis/issues/56)) ([53973eb](https://github.com/WhiteRoseLK/genesis/commit/53973eb1b42f954a4cb0f119bde8590b625b8f64))
+
+
+### Documentation
+
+* switch the documentation and repository metadata to English ([#55](https://github.com/WhiteRoseLK/genesis/issues/55)) ([c8dad54](https://github.com/WhiteRoseLK/genesis/commit/c8dad5467f7839a95b0724c8cdc28fe2f6193f0e)), closes [#54](https://github.com/WhiteRoseLK/genesis/issues/54)
+
 ## [0.2.0](https://github.com/WhiteRoseLK/genesis/compare/sdk/v0.1.0...sdk/v0.2.0) (2026-09-27)
 
 
