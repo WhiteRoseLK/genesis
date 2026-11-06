@@ -39,3 +39,4 @@ A superseded decision is not deleted: its status becomes "superseded by ADR-NNN"
 | [ADR-054](adr/0054-english-as-the-project-language.md) | English as the project language | accepted |
 | [ADR-111](adr/0111-agents-md-as-the-single-source-of-assistant-instructions.md) | `AGENTS.md` as the single source of AI assistant instructions | accepted |
 | [ADR-129](adr/0129-fake-compute-is-an-integration-test-double.md) | fake-compute is an integration-test double, not a CLI provider | accepted |
+| [ADR-135](adr/0135-default-modules-per-capability.md) | Default modules per capability | accepted |

@@ -27,6 +27,6 @@ Preconditions:
 
 ## Gotchas
 
-- `time: {}` and the other module-less capabilities from the README do not resolve (`no installed module provides it`, #126). The baseline spec names every module on purpose; a journey that tests defaults reports #126.
+- Capabilities without `module:` resolve to their default module (ADR-135), but a module-less `bastion: {}` still fails when a required function has several providers (#136).
 - `validate` prints the structure line even when the module validation that follows fails: read the exit code and the last line.
 - Without `NO_COLOR=1` (set by `g.sh`) the plan contains ANSI escapes.

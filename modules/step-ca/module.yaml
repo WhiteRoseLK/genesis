@@ -6,7 +6,7 @@ layer: foundation
 core: ">=0.1.0"
 protocol: 1
 
-capabilities: []
+capabilities: [pki]
 
 provides:
   - function: pki.issuer/v1
