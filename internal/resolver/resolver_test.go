@@ -136,6 +136,17 @@ func TestResolveAmbiguousCapabilityWithDefaultSucceeds(t *testing.T) {
 	}
 }
 
+func TestResolveTwoDefaultsForSameCapabilityFails(t *testing.T) {
+	env := &spec.Environment{Capabilities: map[string]spec.Capability{"dns": {}}}
+	installed := []modulehost.Installed{
+		installedModule("powerdns", withCapabilities("dns"), withDefault("dns")),
+		installedModule("bind", withCapabilities("dns"), withDefault("dns")),
+	}
+	if _, err := Resolve(env, installed); err == nil {
+		t.Fatal("two defaults for the same capability: unexpected success")
+	}
+}
+
 func TestResolveAutoAddsRequiredFunctionProvider(t *testing.T) {
 	env := specWithCapability("bastion", "bastion-mod")
 	installed := []modulehost.Installed{
