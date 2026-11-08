@@ -11,6 +11,57 @@ import (
 	"github.com/WhiteRoseLK/genesis/internal/state"
 )
 
+// #152: a failure while cleaning the verifier VMs must be reported, the local
+// cleanup must still run, and the command must not claim success.
+func TestCleanReportsVerifierVMFailure(t *testing.T) {
+	t.Setenv("GENESIS_MODULE_PATH", t.TempDir())
+	t.Setenv("HOME", t.TempDir())
+
+	stateDir := filepath.Join(t.TempDir(), "state")
+	if _, err := runCLI(t, "init", "--state-dir", stateDir); err != nil {
+		t.Fatalf("init: %v", err)
+	}
+	leftover := filepath.Join(stateDir, "secrets", "dummy")
+	if err := os.MkdirAll(leftover, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	specFile := writeStateDirSpec(t, stateDir)
+
+	out, errOut, err := runCLISplit(t, "clean", "-f", specFile, "--auto-approve")
+	if err == nil {
+		t.Fatalf("clean succeeded although the modules are not installed\n%s", out)
+	}
+	if !strings.Contains(err.Error(), "clean incomplete") {
+		t.Errorf("error = %q, want it to start with 'clean incomplete'", err)
+	}
+	if !strings.Contains(errOut, "verifier VMs") || !strings.Contains(errOut, "genesis modules install") {
+		t.Errorf("stderr = %q, want the failed step and a hint", errOut)
+	}
+	if strings.Contains(out, "clean complete") || strings.Contains(out, "cleaned cluster verifier VMs") {
+		t.Errorf("stdout = %q, must not claim success", out)
+	}
+	if _, statErr := os.Stat(leftover); !os.IsNotExist(statErr) {
+		t.Errorf("local cleanup did not run after the failure: %v", statErr)
+	}
+}
+
+func TestCleanReportsSecretsStoreFailure(t *testing.T) {
+	t.Setenv("GENESIS_MODULE_PATH", t.TempDir())
+	t.Setenv("HOME", t.TempDir())
+
+	// No `genesis init`: the master key is missing.
+	stateDir := filepath.Join(t.TempDir(), "state")
+	specFile := writeStateDirSpec(t, stateDir)
+
+	out, _, err := runCLISplit(t, "clean", "-f", specFile, "--auto-approve")
+	if err == nil || !strings.Contains(err.Error(), "clean incomplete") {
+		t.Fatalf("err = %v, want 'clean incomplete'\n%s", err, out)
+	}
+	if strings.Contains(out, "clean complete") {
+		t.Errorf("stdout = %q, must not print 'clean complete'", out)
+	}
+}
+
 func TestCleanCommand(t *testing.T) {
 	stateDir := filepath.Join(t.TempDir(), "state")
 	if _, err := runCLI(t, "init", "--state-dir", stateDir); err != nil {

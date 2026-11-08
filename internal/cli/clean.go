@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/spf13/cobra"
 
@@ -51,6 +52,15 @@ func newCleanCmd() *cobra.Command {
 			}
 		}
 
+		// Failures are collected: the local cleanup always runs, but the
+		// command must not claim success when a step failed (#152).
+		errOut := cmd.ErrOrStderr()
+		var failures []string
+		fail := func(what string, err error, hint string) {
+			failures = append(failures, what)
+			_, _ = fmt.Fprintf(errOut, "Error: %s: %v\n  hint: %s\n", what, err, hint)
+		}
+
 		// 1. Stop any seed containers recorded in state
 		if st, err := state.Load(stateDir); err == nil {
 			preferredRuntime := "auto"
@@ -63,8 +73,11 @@ func newCleanCmd() *cobra.Command {
 						var raw map[string]any
 						if err := json.Unmarshal(ms.StateJSON, &raw); err == nil {
 							if cid, ok := raw["container_id"].(string); ok && cid != "" {
-								_ = rt.Stop(cmd.Context(), cid)
-								_, _ = fmt.Fprintf(out, "stopped seed container %s\n", cid)
+								if err := rt.Stop(cmd.Context(), cid); err != nil {
+									fail("could not stop seed container "+cid, err, "stop it manually with your container runtime")
+								} else {
+									_, _ = fmt.Fprintf(out, "stopped seed container %s\n", cid)
+								}
 							}
 						}
 					}
@@ -74,16 +87,22 @@ func newCleanCmd() *cobra.Command {
 
 		// 2. If spec is given, clean verifier VMs on the hypervisor
 		if file != "" {
-			if resolved, p, err := resolveAndPlan(file); err == nil {
-				store, err := openSecretsStore(cmd, stateDir)
-				if err == nil {
-					e := engine.New(stateDir, store)
-					preferredRuntime := resolved.Seed.ContainerRuntime
-					if rt, err := runner.DetectContainerRuntime(preferredRuntime); err == nil {
-						e.Registry.SetNative("core.container/v1", broker.NativeContainer(rt, resolved.Seed.Address))
-						e.Registry.SetNative("core.ansible/v1", broker.NativeAnsible(rt))
-					}
-					e.CleanVerifierVMs(cmd.Context(), resolved, p)
+			const what = "could not clean the cluster verifier VMs"
+			resolved, p, err := resolveAndPlan(file)
+			if err != nil {
+				fail(what, err, "install the modules the spec needs (genesis modules install) and re-run genesis clean -f "+file)
+			} else if store, err := openSecretsStore(cmd, stateDir); err != nil {
+				fail(what, err, "run genesis init to create the master key, then re-run genesis clean")
+			} else {
+				e := engine.New(stateDir, store)
+				preferredRuntime := resolved.Seed.ContainerRuntime
+				if rt, err := runner.DetectContainerRuntime(preferredRuntime); err == nil {
+					e.Registry.SetNative("core.container/v1", broker.NativeContainer(rt, resolved.Seed.Address))
+					e.Registry.SetNative("core.ansible/v1", broker.NativeAnsible(rt))
+				}
+				if err := e.CleanVerifierVMs(cmd.Context(), resolved, p); err != nil {
+					fail(what, err, "check the compute module is installed and reachable, then re-run genesis clean")
+				} else {
 					_, _ = fmt.Fprintln(out, "cleaned cluster verifier VMs.")
 				}
 			}
@@ -92,18 +111,30 @@ func newCleanCmd() *cobra.Command {
 		// 3. Purge intermediate secrets directory (keep master.key)
 		secretsDir := filepath.Join(stateDir, "secrets")
 		if entries, err := os.ReadDir(secretsDir); err == nil {
+			removed := true
 			for _, entry := range entries {
-				_ = os.RemoveAll(filepath.Join(secretsDir, entry.Name()))
+				if err := os.RemoveAll(filepath.Join(secretsDir, entry.Name())); err != nil {
+					removed = false
+					fail("could not remove intermediate secret "+entry.Name(), err, "check the permissions of "+secretsDir)
+				}
 			}
-			_, _ = fmt.Fprintf(out, "cleaned intermediate secrets in %s (master key preserved)\n", secretsDir)
+			if removed {
+				_, _ = fmt.Fprintf(out, "cleaned intermediate secrets in %s (master key preserved)\n", secretsDir)
+			}
 		}
 
 		// 4. Remove state.lock if present
 		_ = os.Remove(filepath.Join(stateDir, "state.lock"))
 
 		// 5. Reset state.json to fresh empty state
-		_ = state.Save(stateDir, state.New())
-		_, _ = fmt.Fprintf(out, "reset state in %s\n", filepath.Join(stateDir, "state.json"))
+		if err := state.Save(stateDir, state.New()); err != nil {
+			fail("could not reset the state", err, "check the permissions of "+stateDir)
+		} else {
+			_, _ = fmt.Fprintf(out, "reset state in %s\n", filepath.Join(stateDir, "state.json"))
+		}
+		if len(failures) > 0 {
+			return fmt.Errorf("clean incomplete: %s", strings.Join(failures, "; "))
+		}
 		_, _ = fmt.Fprintln(out, "clean complete.")
 		return nil
 	}
