@@ -13,7 +13,6 @@ import (
 	"github.com/WhiteRoseLK/genesis/internal/broker"
 	"github.com/WhiteRoseLK/genesis/internal/engine"
 	"github.com/WhiteRoseLK/genesis/internal/runner"
-	"github.com/WhiteRoseLK/genesis/internal/spec"
 	"github.com/WhiteRoseLK/genesis/internal/state"
 )
 
@@ -31,14 +30,9 @@ func newCleanCmd() *cobra.Command {
 			return err
 		}
 
-		stateDir, err := cmd.Flags().GetString("state-dir")
+		stateDir, env, err := resolveStateDir(cmd)
 		if err != nil {
 			return err
-		}
-		if file != "" && !cmd.Flags().Changed("state-dir") {
-			if env, err := spec.Load(file); err == nil && env.Seed.StateDir != "" {
-				stateDir = env.Seed.StateDir
-			}
 		}
 
 		out := cmd.OutOrStdout()
@@ -60,10 +54,8 @@ func newCleanCmd() *cobra.Command {
 		// 1. Stop any seed containers recorded in state
 		if st, err := state.Load(stateDir); err == nil {
 			preferredRuntime := "auto"
-			if file != "" {
-				if env, err := spec.Load(file); err == nil && env.Seed.ContainerRuntime != "" {
-					preferredRuntime = env.Seed.ContainerRuntime
-				}
+			if env != nil && env.Seed.ContainerRuntime != "" {
+				preferredRuntime = env.Seed.ContainerRuntime
 			}
 			if rt, err := runner.DetectContainerRuntime(preferredRuntime); err == nil {
 				for _, ms := range st.Modules {

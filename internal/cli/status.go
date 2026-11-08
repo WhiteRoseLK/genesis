@@ -10,7 +10,6 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/WhiteRoseLK/genesis/internal/spec"
 	"github.com/WhiteRoseLK/genesis/internal/state"
 )
 
@@ -21,16 +20,11 @@ func newStatusCmd() *cobra.Command {
 	}
 	cmd.Flags().StringP("file", "f", "", "path of the YAML spec (optional)")
 	cmd.RunE = func(cmd *cobra.Command, args []string) error {
-		stateDir, err := cmd.Flags().GetString("state-dir")
+		stateDir, _, err := resolveStateDir(cmd)
 		if err != nil {
 			return err
 		}
 		file, _ := cmd.Flags().GetString("file")
-		if file != "" && !cmd.Flags().Changed("state-dir") {
-			if env, err := spec.Load(file); err == nil && env.Seed.StateDir != "" {
-				stateDir = env.Seed.StateDir
-			}
-		}
 		st, err := state.Load(stateDir)
 		if err != nil {
 			return err

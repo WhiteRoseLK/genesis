@@ -86,7 +86,7 @@ capabilities:
 		t.Fatalf("Put: %v", err)
 	}
 
-	out, err := runCLI(t, "secrets", "get", "-f", specFile, "pki/root-ca")
+	out, _, err := runCLISplit(t, "secrets", "get", "-f", specFile, "pki/root-ca")
 	if err != nil {
 		t.Fatalf("secrets get -f: %v", err)
 	}

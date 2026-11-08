@@ -156,6 +156,8 @@ What `genesis init` does:
 - Creates `/var/lib/genesis/state.json` initialized with an empty environment state.
 - Generates an age X25519 identity in `/var/lib/genesis/master.key` with strict `0600` permissions.
 
+`init`, `status`, `secrets` and `clean` accept `-f <spec>`: the state directory is then the `seed.state_dir` of the spec (made absolute), unless `--state-dir` is given. In that case Genesis prints `state directory: <absolute path> (from <spec>)` on stderr, and an unreadable or invalid spec is an error rather than a silent fallback to the default directory.
+
 ---
 
 ### Step 2: Write an Environment Specification (`spec.yaml`)

@@ -8,7 +8,6 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/WhiteRoseLK/genesis/internal/secrets"
-	"github.com/WhiteRoseLK/genesis/internal/spec"
 	"github.com/WhiteRoseLK/genesis/internal/state"
 )
 
@@ -31,21 +30,9 @@ func newSecretsCmd() *cobra.Command {
 func openSecretsStore(cmd *cobra.Command, stateDir string) (*secrets.FileStore, error) {
 	if stateDir == "" {
 		var err error
-		stateDir, err = cmd.Flags().GetString("state-dir")
+		stateDir, _, err = resolveStateDir(cmd)
 		if err != nil {
 			return nil, err
-		}
-		// Like status, init and clean: the spec gives the state directory
-		// unless --state-dir is explicit. An unreadable spec is an error here,
-		// since falling back to the default directory would read the wrong secrets.
-		if file, _ := cmd.Flags().GetString("file"); file != "" && !cmd.Flags().Changed("state-dir") {
-			env, loadErr := spec.Load(file)
-			if loadErr != nil {
-				return nil, loadErr
-			}
-			if env.Seed.StateDir != "" {
-				stateDir = env.Seed.StateDir
-			}
 		}
 	}
 	provider := secrets.FileMasterKeyProvider{StateDir: stateDir}
