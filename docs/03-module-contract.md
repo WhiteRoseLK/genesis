@@ -79,6 +79,8 @@ The module persists nothing itself: **the core alone owns the state**.
 ## 3. Functions (`sdk/proto/functions/...`)
 A module that provides a function implements its gRPC service; a module that requires it calls it through the SDK's broker client.
 
+Every function listed in `provides` must really be served. The module's gRPC server (go-plugin) exposes the standard gRPC reflection service, and `TestModulesServeTheirProvides` (`test/integration/`) launches each `modules/*` binary and checks, without calling any function, that a service of the proto package of each declared function (`dns.zone/v1` maps to `functions.dns.zone.v1.*`) is listed.
+
 Iteration 1 functions:
 
 | Function | Main operations | MVP providers |
