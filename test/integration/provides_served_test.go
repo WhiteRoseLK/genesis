@@ -171,21 +171,22 @@ func buildModuleAt(t *testing.T, sourceDir string) string {
 }
 
 // TestProvidesCheckDetectsUnservedFunction proves the check can fail: test-kv
-// is run with a manifest that also declares a function it does not register.
+// is run with a manifest that also declares a real SDK function it does not
+// register (its descriptors exist, so the descriptor path is exercised).
 func TestProvidesCheckDetectsUnservedFunction(t *testing.T) {
 	dir := filepath.Join("..", "modules", "test-kv")
 	manifest, err := sdk.LoadManifest(filepath.Join(dir, "module.yaml"))
 	if err != nil {
 		t.Fatal(err)
 	}
-	manifest.Provides = append(manifest.Provides, sdk.FunctionRef{Function: "bogus.thing/v1"})
+	manifest.Provides = append(manifest.Provides, sdk.FunctionRef{Function: "dns.zone/v1"})
 
 	problems, err := unservedProvides(buildModuleAt(t, dir), manifest)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(problems) != 1 || !strings.HasPrefix(problems[0], "bogus.thing/v1 ") {
-		t.Fatalf("want exactly bogus.thing/v1 reported, got %q", problems)
+	if len(problems) != 1 || !strings.HasPrefix(problems[0], "dns.zone/v1 ") {
+		t.Fatalf("want exactly dns.zone/v1 reported, got %q", problems)
 	}
 }
 
@@ -248,5 +249,26 @@ func TestFunctionServicesFromDescriptors(t *testing.T) {
 	}
 	if functionServed(files, "missing.thing/v1", []string{"functions.missing.thing.v1.X"}) {
 		t.Error("a function without descriptors must not be served")
+	}
+}
+
+// TestEveryProtoFunctionIsImported fails when a function directory of
+// sdk/proto/functions has no descriptors in the registry, i.e. when a new
+// function was added to the SDK without adding its generated package to the
+// blank imports of this file. Without this, a module providing that function
+// would fail with a misleading "not served".
+func TestEveryProtoFunctionIsImported(t *testing.T) {
+	dirs, err := filepath.Glob(filepath.Join("..", "..", "sdk", "proto", "functions", "*", "*", "v*"))
+	if err != nil || len(dirs) == 0 {
+		t.Fatalf("no function directory found under sdk/proto/functions: %v", err)
+	}
+	for _, dir := range dirs {
+		version := filepath.Base(dir)
+		name := filepath.Base(filepath.Dir(dir))
+		family := filepath.Base(filepath.Dir(filepath.Dir(dir)))
+		function := family + "." + name + "/" + version
+		if len(functionServices(protoregistry.GlobalFiles, function)) == 0 {
+			t.Errorf("%s (%s) has no service in the registry: add its generated package to the blank imports of this file", function, dir)
+		}
 	}
 }
