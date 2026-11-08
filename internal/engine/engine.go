@@ -1175,16 +1175,22 @@ func (e *Engine) cleanupVerifierVM(
 		return
 	}
 	for _, p := range pc {
-		vmClient := computevmv1.NewComputeVMClient(p.conn)
-		_, _ = vmClient.DeleteVM(ctx, &computevmv1.DeleteVMRequest{Name: sharedVerifierVMName})
-		_, _ = vmClient.DeleteVM(ctx, &computevmv1.DeleteVMRequest{Name: "teleport01-agent-target"})
-		if alloc != nil {
-			_ = alloc.Release(sharedVerifierVMName)
-			_ = alloc.Release("teleport01-agent-target")
-		}
-		e.audit("verifier", "cleanup", "ok")
+		e.finishVerifierCleanup(ctx, computevmv1.NewComputeVMClient(p.conn), alloc)
 		return
 	}
+}
+
+// finishVerifierCleanup deletes the verifier VMs at the end of a run. A
+// failure does not fail the run (the environment itself is built): it is
+// logged as a warning with a hint and audited as failed.
+func (e *Engine) finishVerifierCleanup(ctx context.Context, vmClient computevmv1.ComputeVMClient, alloc broker.Allocator) {
+	if err := deleteVerifierVMs(ctx, vmClient, alloc); err != nil {
+		e.Logger.Warn("verifier VM cleanup failed; run `genesis clean` to remove the leftovers",
+			"vms", sharedVerifierVMName+", teleport01-agent-target", "err", err)
+		e.audit("verifier", "cleanup", "failed")
+		return
+	}
+	e.audit("verifier", "cleanup", "ok")
 }
 
 // CleanVerifierVMs cleans ephemeral verifier VMs from the hypervisor. It

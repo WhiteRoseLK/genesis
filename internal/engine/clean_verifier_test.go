@@ -3,8 +3,10 @@
 package engine
 
 import (
+	"bytes"
 	"context"
 	"errors"
+	"log/slog"
 	"strings"
 	"testing"
 
@@ -66,6 +68,39 @@ func TestDeleteVerifierVMsReportsErrorsAndContinues(t *testing.T) {
 	}
 	if len(a.released) != 2 {
 		t.Errorf("released=%v: both releases must still be attempted", a.released)
+	}
+}
+
+func newTestEngine(buf *bytes.Buffer) *Engine {
+	return &Engine{Logger: slog.New(slog.NewTextHandler(buf, &slog.HandlerOptions{Level: slog.LevelInfo}))}
+}
+
+func TestFinishVerifierCleanupOK(t *testing.T) {
+	var buf bytes.Buffer
+	c, a := &fakeDeleteClient{}, &fakeReleaser{}
+	newTestEngine(&buf).finishVerifierCleanup(context.Background(), c, a)
+	out := buf.String()
+	if !strings.Contains(out, "outcome=ok") || strings.Contains(out, "level=WARN") {
+		t.Errorf("want an ok audit and no warning, got %q", out)
+	}
+}
+
+func TestFinishVerifierCleanupFailureWarnsAndAuditsFailed(t *testing.T) {
+	var buf bytes.Buffer
+	c := &fakeDeleteClient{errs: map[string]error{sharedVerifierVMName: errors.New("api down")}}
+	a := &fakeReleaser{errs: map[string]error{"teleport01-agent-target": errors.New("disk full")}}
+	newTestEngine(&buf).finishVerifierCleanup(context.Background(), c, a)
+	out := buf.String()
+	for _, want := range []string{"level=WARN", "api down", "disk full", "genesis clean", "outcome=failed"} {
+		if !strings.Contains(out, want) {
+			t.Errorf("log %q does not contain %q", out, want)
+		}
+	}
+	if strings.Contains(out, "outcome=ok") {
+		t.Errorf("a failed cleanup must not be audited ok: %q", out)
+	}
+	if len(c.deleted) != 2 {
+		t.Errorf("deleted=%v: the other VM must still be deleted", c.deleted)
 	}
 }
 
