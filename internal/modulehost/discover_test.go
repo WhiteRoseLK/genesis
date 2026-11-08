@@ -54,7 +54,7 @@ func writeFakeInstalledModule(t *testing.T, searchPath, name, version string) {
 	manifest := "apiVersion: genesis/module/v1\n" +
 		"name: " + name + "\n" +
 		"version: " + version + "\n" +
-		"description: \"module de test\"\n" +
+		"description: \"test module\"\n" +
 		"layer: foundation\n" +
 		"core: \">=0.1.0\"\n" +
 		"protocol: 1\n" +
