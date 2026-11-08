@@ -5,7 +5,7 @@ Goal: prove that the architecture is extensible. **Adding a product changes neit
 ## Steps
 1. `genesis modules scaffold <name> --provides dns.zone/v1,dns.resolver/v1`
    Generates `modules/<name>/`: `module.yaml`, `main.go` with `sdk.Serve`, stubs for each RPC, `schema.json`, conformance test.
-2. Fill in the manifest: `provides`, `requires`, `capabilities`, secrets, resources, ports. Declare the capability the module implements (`capabilities: [dns]`); set `defaults: { dns: true }` only if it must be chosen when the spec gives no `module:` (the default table is in `docs/04-spec.md`, ADR-135). A default must be one of the module's own capabilities.
+2. Fill in the manifest: `provides`, `requires`, `capabilities`, secrets, resources, ports. Declare the capability the module implements (`capabilities: [dns]`); set `defaults: { dns: true }` only if it must be chosen when the spec gives no `module:` (the default table is in `docs/04-spec.md`, ADR-135). A default for a capability the module does not declare is ignored.
 3. Implement the lifecycle and the services of the provided functions:
    - **Broker session tokens**: Always dial required dependencies using `req.GetBrokerToken()` received on each lifecycle call (`Check`, `Provision`, `Configure`, `Verify`, `Handover`). Because the core issues fresh broker sessions per step, re-dialing only when the token changes ensures your module dynamically observes repointed services (e.g. DNS or PKI handover).
    - **Repoint handler**: Implement `Repoint(ctx, &modulev1.RepointRequest{...})` so your module reconfigures its consumers if an active required dependency shifts to a new provider during handover.

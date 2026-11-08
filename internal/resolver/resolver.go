@@ -189,7 +189,7 @@ func defaultModuleFor(capability string, installed []modulehost.Installed) (stri
 	default:
 		var defaults []modulehost.Installed
 		for _, m := range candidates {
-			if m.Manifest.Defaults[capability] {
+			if isDefaultFor(m, capability) {
 				defaults = append(defaults, m)
 			}
 		}
@@ -346,8 +346,46 @@ func pickCandidate(function string, candidates []modulehost.Installed) (*moduleh
 	case 1:
 		return &candidates[0], nil
 	default:
+		// A function is not tied to a capability, so among several providers
+		// the one that is the default of a capability shared with the others wins (ADR-135).
+		var defaults []modulehost.Installed
+		for _, m := range candidates {
+			if isContestedDefault(m, candidates) {
+				defaults = append(defaults, m)
+			}
+		}
+		if len(defaults) == 1 {
+			return &defaults[0], nil
+		}
+		if len(defaults) > 1 {
+			return nil, fmt.Errorf("several installed modules provide %q and several are marked default (%s), explicit choice required", function, strings.Join(moduleNames(defaults), ", "))
+		}
 		return nil, fmt.Errorf("several installed modules provide %q (%s), explicit choice required", function, strings.Join(moduleNames(candidates), ", "))
 	}
+}
+
+// isDefaultFor reports whether the module declares the capability and is
+// marked as its default; a default for an undeclared capability is ignored.
+func isDefaultFor(m modulehost.Installed, capability string) bool {
+	return m.Manifest.Defaults[capability] && containsString(m.Manifest.Capabilities, capability)
+}
+
+// isContestedDefault reports whether the module is the default of a capability
+// that another candidate also declares. A module cannot win a function by
+// inventing a capability of its own: the default must settle a real
+// competition between providers.
+func isContestedDefault(m modulehost.Installed, candidates []modulehost.Installed) bool {
+	for _, capability := range m.Manifest.Capabilities {
+		if !isDefaultFor(m, capability) {
+			continue
+		}
+		for _, other := range candidates {
+			if other.Name != m.Name && containsString(other.Manifest.Capabilities, capability) {
+				return true
+			}
+		}
+	}
+	return false
 }
 
 // SplitFunctionPhase splits the @seed/@target suffix off a required function

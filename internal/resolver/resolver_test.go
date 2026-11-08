@@ -147,6 +147,88 @@ func TestResolveTwoDefaultsForSameCapabilityFails(t *testing.T) {
 	}
 }
 
+func autoAddedDNSEnv() *spec.Environment { return specWithCapability("bastion", "bastion-mod") }
+
+func bastionNeedingDNS() modulehost.Installed {
+	return installedModule("bastion-mod",
+		withCapabilities("bastion"),
+		withRequires("target", sdk.RequireEntry{Function: "dns.resolver/v1"}),
+	)
+}
+
+// Regression for #136: a function required by an auto-added module and
+// provided by several modules resolves to the one marked default.
+func TestResolveAutoAddedDependencyUsesDefaultModule(t *testing.T) {
+	installed := []modulehost.Installed{
+		bastionNeedingDNS(),
+		installedModule("powerdns", withCapabilities("dns"), withDefault("dns"), withProvides("dns.resolver/v1")),
+		installedModule("bind", withCapabilities("dns"), withProvides("dns.resolver/v1")),
+	}
+	resolved, err := Resolve(autoAddedDNSEnv(), installed)
+	if err != nil {
+		t.Fatalf("Resolve: %v", err)
+	}
+	if provider, _ := resolved.ProviderFor("dns.resolver/v1", ""); provider != "powerdns" {
+		t.Errorf("provider of dns.resolver/v1 = %q, want powerdns (default module)", provider)
+	}
+}
+
+func TestResolveAutoAddedDependencyWithoutDefaultStillFails(t *testing.T) {
+	installed := []modulehost.Installed{
+		bastionNeedingDNS(),
+		installedModule("powerdns", withCapabilities("dns"), withProvides("dns.resolver/v1")),
+		installedModule("bind", withCapabilities("dns"), withProvides("dns.resolver/v1")),
+	}
+	if _, err := Resolve(autoAddedDNSEnv(), installed); err == nil {
+		t.Fatal("several providers and no default: unexpected success")
+	}
+}
+
+func TestResolveAutoAddedDependencyTwoDefaultsFails(t *testing.T) {
+	installed := []modulehost.Installed{
+		bastionNeedingDNS(),
+		installedModule("powerdns", withCapabilities("dns"), withDefault("dns"), withProvides("dns.resolver/v1")),
+		installedModule("bind", withCapabilities("dns"), withDefault("dns"), withProvides("dns.resolver/v1")),
+	}
+	_, err := Resolve(autoAddedDNSEnv(), installed)
+	if err == nil {
+		t.Fatal("two default providers: unexpected success")
+	}
+	if !strings.Contains(err.Error(), "marked default") {
+		t.Errorf("error %q does not say that several modules are marked default", err)
+	}
+}
+
+// A default for a key the module does not declare as a capability must not
+// make it win over the real default.
+func TestResolveAutoAddedDependencyIgnoresUndeclaredDefault(t *testing.T) {
+	installed := []modulehost.Installed{
+		bastionNeedingDNS(),
+		installedModule("powerdns", withCapabilities("dns"), withDefault("dns"), withProvides("dns.resolver/v1")),
+		installedModule("rogue", withCapabilities("dns"), withDefault("unrelated"), withProvides("dns.resolver/v1")),
+	}
+	resolved, err := Resolve(autoAddedDNSEnv(), installed)
+	if err != nil {
+		t.Fatalf("Resolve: %v", err)
+	}
+	if provider, _ := resolved.ProviderFor("dns.resolver/v1", ""); provider != "powerdns" {
+		t.Errorf("provider of dns.resolver/v1 = %q, want powerdns", provider)
+	}
+}
+
+// A module cannot win a function by declaring a capability of its own and
+// marking it default: nobody else declares it, so nothing is contested.
+func TestResolveAutoAddedDependencyIgnoresInventedCapability(t *testing.T) {
+	installed := []modulehost.Installed{
+		bastionNeedingDNS(),
+		installedModule("powerdns", withCapabilities("dns"), withProvides("dns.resolver/v1")),
+		installedModule("rogue", withCapabilities("x"), withDefault("x"), withProvides("dns.resolver/v1")),
+	}
+	if _, err := Resolve(autoAddedDNSEnv(), installed); err == nil {
+		t.Fatal("invented default capability: unexpected success")
+	}
+}
+
 func TestResolveAutoAddsRequiredFunctionProvider(t *testing.T) {
 	env := specWithCapability("bastion", "bastion-mod")
 	installed := []modulehost.Installed{
