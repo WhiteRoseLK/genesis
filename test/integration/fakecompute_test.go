@@ -37,7 +37,7 @@ func buildFakeCompute(t *testing.T) (binaryPath string, manifest *sdk.ManifestFi
 	build := exec.Command("go", "build", "-o", binaryPath, ".")
 	build.Dir = sourceDir
 	if out, err := build.CombinedOutput(); err != nil {
-		t.Fatalf("compilation de fake-compute: %v\n%s", err, out)
+		t.Fatalf("compiling fake-compute: %v\n%s", err, out)
 	}
 
 	manifest, err = sdk.LoadManifest(filepath.Join(sourceDir, "module.yaml"))

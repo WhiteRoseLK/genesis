@@ -90,7 +90,7 @@ func newModulesInstallCmd() *cobra.Command {
 		build.Dir = sourceDir
 		build.Env = append(os.Environ(), "CGO_ENABLED=0")
 		if out, err := build.CombinedOutput(); err != nil {
-			return fmt.Errorf("compilation de %s: %w\n%s", sourceDir, err, out)
+			return fmt.Errorf("compiling %s: %w\n%s", sourceDir, err, out)
 		}
 
 		if err := copyFile(filepath.Join(sourceDir, "module.yaml"), filepath.Join(destDir, "module.yaml")); err != nil {

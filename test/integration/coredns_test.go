@@ -34,7 +34,7 @@ func buildCoreDNS(t *testing.T) (binaryPath string, manifest *sdk.ManifestFile) 
 	build := exec.Command("go", "build", "-o", binaryPath, ".")
 	build.Dir = sourceDir
 	if out, err := build.CombinedOutput(); err != nil {
-		t.Fatalf("compilation de coredns: %v\n%s", err, out)
+		t.Fatalf("compiling coredns: %v\n%s", err, out)
 	}
 	manifest, err = sdk.LoadManifest(filepath.Join(sourceDir, "module.yaml"))
 	if err != nil {

@@ -49,7 +49,7 @@ func Load(path string) (*Lock, error) {
 func (l *Lock) Save(path string) error {
 	raw, err := yaml.Marshal(l)
 	if err != nil {
-		return fmt.Errorf("encodage de %s: %w", path, err)
+		return fmt.Errorf("encoding %s: %w", path, err)
 	}
 	if err := atomicfile.Write(path, raw, 0o644); err != nil {
 		return fmt.Errorf("writing %s: %w", path, err)

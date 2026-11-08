@@ -237,7 +237,7 @@ func (m *vaultModule) ensureInitializedAndUnsealed(ctx context.Context, api *vau
 	if !initialized {
 		unsealKeys, rootToken, err = api.init(ctx, unsealShares, unsealThreshold)
 		if err != nil {
-			return "", fmt.Errorf("initialisation de vault: %w", err)
+			return "", fmt.Errorf("initialising vault: %w", err)
 		}
 		keysJSON, err := json.Marshal(unsealKeys)
 		if err != nil {
