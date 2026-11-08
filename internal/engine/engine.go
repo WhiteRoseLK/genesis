@@ -1187,12 +1187,13 @@ func (e *Engine) cleanupVerifierVM(
 	}
 }
 
-// CleanVerifierVMs cleans ephemeral verifier VMs from the hypervisor.
+// CleanVerifierVMs cleans ephemeral verifier VMs from the hypervisor. It
+// returns an error when the compute module could not be reached.
 func (e *Engine) CleanVerifierVMs(
 	ctx context.Context,
 	resolved *resolver.Resolved,
 	plan *planner.Plan,
-) {
+) error {
 	st, err := state.Load(e.StateDir)
 	if err != nil {
 		st = state.New()
@@ -1218,13 +1219,13 @@ func (e *Engine) CleanVerifierVMs(
 			if prov.Function == "compute.vm/v1" {
 				client, err := modulehost.Launch(m.Installed.BinaryPath, m.Manifest)
 				if err != nil {
-					return
+					return fmt.Errorf("launching module %s: %w", name, err)
 				}
 				defer client.Close()
 
 				conn, err := client.DispenseFunction("compute.vm/v1")
 				if err != nil {
-					return
+					return fmt.Errorf("connecting to module %s: %w", name, err)
 				}
 				vmClient := computevmv1.NewComputeVMClient(conn)
 				_, _ = vmClient.DeleteVM(ctx, &computevmv1.DeleteVMRequest{Name: sharedVerifierVMName})
@@ -1233,10 +1234,11 @@ func (e *Engine) CleanVerifierVMs(
 					_ = alloc.Release(sharedVerifierVMName)
 					_ = alloc.Release("teleport01-agent-target")
 				}
-				return
+				return nil
 			}
 		}
 	}
+	return nil
 }
 
 func requiresComputeVM(m *resolver.Module) bool {

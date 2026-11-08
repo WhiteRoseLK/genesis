@@ -158,6 +158,8 @@ What `genesis init` does:
 
 `init`, `status`, `secrets` and `clean` accept `-f <spec>`: the state directory is then the `seed.state_dir` of the spec (made absolute), unless `--state-dir` is given. In that case Genesis prints `state directory: <absolute path> (from <spec>)` on stderr, and an unreadable or invalid spec is an error rather than a silent fallback to the default directory.
 
+`genesis clean` always runs its local cleanup (secrets, state), but when a step fails (verifier VMs not cleaned because the modules are not installed or the master key is missing, seed container not stopped, files not removed) it prints the cause and a hint on stderr, does not print `clean complete.` and exits non-zero with `clean incomplete: …`.
+
 ---
 
 ### Step 2: Write an Environment Specification (`spec.yaml`)
