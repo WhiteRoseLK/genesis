@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # Read-only: is this run worth driving? Exit 0 when every check passes.
 #   scripts/doctor.sh <run-id>
+# shellcheck source=common.sh
 source "$(dirname "$0")/common.sh"
 run_paths "${1:-}"
 fail=0

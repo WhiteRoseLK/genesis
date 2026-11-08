@@ -4,6 +4,7 @@
 #   scripts/g.sh <run-id> <genesis arguments...>
 # Set G_CWD to run from another directory (e.g. a worktree for `modules scaffold`).
 # The exit code is genesis's own.
+# shellcheck source=common.sh
 source "$(dirname "$0")/common.sh"
 run_paths "${1:-}"; shift
 [ -x "$RUN/bin/genesis" ] || { echo "no run $RUN_ID: run scripts/launch.sh first" >&2; exit 2; }
