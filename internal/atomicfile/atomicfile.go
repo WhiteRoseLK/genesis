@@ -27,7 +27,7 @@ func Write(path string, data []byte, perm os.FileMode) error {
 	}
 	if err := tmp.Chmod(perm); err != nil {
 		_ = tmp.Close()
-		return fmt.Errorf("permissions de %s: %w", tmpPath, err)
+		return fmt.Errorf("setting permissions on %s: %w", tmpPath, err)
 	}
 	if err := tmp.Close(); err != nil {
 		return fmt.Errorf("closing %s: %w", tmpPath, err)
