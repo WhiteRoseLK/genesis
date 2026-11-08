@@ -38,11 +38,26 @@ type Module struct {
 	Config map[string]any
 }
 
+// CapabilitySource records how the module of a capability was chosen.
+type CapabilitySource string
+
+const (
+	// SourceExplicit: the spec names the module (`module:`).
+	SourceExplicit CapabilitySource = "explicit"
+	// SourceDefault: several modules provide the capability and one is marked
+	// as its default (ADR-135).
+	SourceDefault CapabilitySource = "default"
+	// SourceOnlyProvider: a single installed module provides the capability.
+	SourceOnlyProvider CapabilitySource = "only provider"
+)
+
 // Resolved is the result of the resolution: the set of modules needed, and the
 // capability → module mapping.
 type Resolved struct {
 	Modules          map[string]*Module
 	CapabilityModule map[string]string
+	// CapabilitySource[capability] = how CapabilityModule[capability] was chosen.
+	CapabilitySource map[string]CapabilitySource
 	// FunctionProviders[function][phase] = the providing module for this
 	// function in this phase ("seed" or "target") — the same function may have
 	// different providers per phase (docs/05-bootstrap-lifecycle.md: CoreDNS
@@ -115,6 +130,7 @@ func Resolve(env *spec.Environment, installed []modulehost.Installed) (*Resolved
 	r := &Resolved{
 		Modules:           map[string]*Module{},
 		CapabilityModule:  map[string]string{},
+		CapabilitySource:  map[string]CapabilitySource{},
 		FunctionProviders: map[string]map[string]string{},
 		Network:           env.Network,
 		Seed:              env.Seed,
@@ -130,9 +146,10 @@ func Resolve(env *spec.Environment, installed []modulehost.Installed) (*Resolved
 	for _, capName := range capNames {
 		capability := env.Capabilities[capName]
 		moduleName := capability.Module
+		source := SourceExplicit
 		if moduleName == "" {
 			var err error
-			moduleName, err = defaultModuleFor(capName, installed)
+			moduleName, source, err = defaultModuleFor(capName, installed)
 			if err != nil {
 				return nil, err
 			}
@@ -145,6 +162,7 @@ func Resolve(env *spec.Environment, installed []modulehost.Installed) (*Resolved
 			return nil, err
 		}
 		r.CapabilityModule[capName] = moduleName
+		r.CapabilitySource[capName] = source
 
 		m := r.Modules[moduleName]
 		for k, v := range capability.Config {
@@ -174,7 +192,7 @@ func Resolve(env *spec.Environment, installed []modulehost.Installed) (*Resolved
 	return r, nil
 }
 
-func defaultModuleFor(capability string, installed []modulehost.Installed) (string, error) {
+func defaultModuleFor(capability string, installed []modulehost.Installed) (string, CapabilitySource, error) {
 	var candidates []modulehost.Installed
 	for _, m := range installed {
 		if containsString(m.Manifest.Capabilities, capability) {
@@ -183,9 +201,9 @@ func defaultModuleFor(capability string, installed []modulehost.Installed) (stri
 	}
 	switch len(candidates) {
 	case 0:
-		return "", fmt.Errorf("capability %q: no installed module provides it", capability)
+		return "", "", fmt.Errorf("capability %q: no installed module provides it", capability)
 	case 1:
-		return candidates[0].Manifest.Name, nil
+		return candidates[0].Manifest.Name, SourceOnlyProvider, nil
 	default:
 		var defaults []modulehost.Installed
 		for _, m := range candidates {
@@ -194,10 +212,10 @@ func defaultModuleFor(capability string, installed []modulehost.Installed) (stri
 			}
 		}
 		if len(defaults) == 1 {
-			return defaults[0].Manifest.Name, nil
+			return defaults[0].Manifest.Name, SourceDefault, nil
 		}
 		names := moduleNames(candidates)
-		return "", fmt.Errorf("capability %q: several modules installed (%s), explicit choice required (capabilities.%s.module)", capability, strings.Join(names, ", "), capability)
+		return "", "", fmt.Errorf("capability %q: several modules installed (%s), explicit choice required (capabilities.%s.module)", capability, strings.Join(names, ", "), capability)
 	}
 }
 

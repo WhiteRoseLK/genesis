@@ -244,9 +244,36 @@ func determineModuleSource(m *resolver.Module, resolved *resolver.Resolved) stri
 			caps = append(caps, capName)
 		}
 	}
-	if len(caps) > 0 {
-		sort.Strings(caps)
+	if len(caps) == 0 {
+		return "declared in spec"
+	}
+	sort.Strings(caps)
+	origin := func(c string) string {
+		if s := resolved.CapabilitySource[c]; s != resolver.SourceExplicit {
+			return string(s)
+		}
+		return ""
+	}
+	// Same origin for every capability: it ends the list. Mixed origins: each
+	// non-explicit capability carries its own.
+	same := true
+	for _, c := range caps {
+		if origin(c) != origin(caps[0]) {
+			same = false
+		}
+	}
+	if same {
+		if o := origin(caps[0]); o != "" {
+			return fmt.Sprintf("declared in spec (%s, %s)", strings.Join(caps, ", "), o)
+		}
 		return fmt.Sprintf("declared in spec (%s)", strings.Join(caps, ", "))
 	}
-	return "declared in spec"
+	parts := make([]string, len(caps))
+	for i, c := range caps {
+		parts[i] = c
+		if o := origin(c); o != "" {
+			parts[i] += " [" + o + "]"
+		}
+	}
+	return fmt.Sprintf("declared in spec (%s)", strings.Join(parts, ", "))
 }
