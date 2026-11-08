@@ -141,9 +141,24 @@ func printPlan(cmd *cobra.Command, resolved *resolver.Resolved, p *planner.Plan)
 	fmt.Fprintf(&b, "  • %s : Infrastructure drivers and management providers.\n",
 		colorize("Control", ansiCyan, colorEnabled))
 
+	if sourcesUseSymbols(rows) {
+		b.WriteString("\nLegend: #name = default module, @name = only provider\n")
+	}
+
 	out := cmd.OutOrStdout()
 	_, err := fmt.Fprint(out, b.String())
 	return err
+}
+
+// sourcesUseSymbols reports whether a SOURCE cell (last column) carries an
+// origin symbol, so the legend is printed only when needed.
+func sourcesUseSymbols(rows [][]string) bool {
+	for _, row := range rows {
+		if strings.ContainsAny(row[len(row)-1], "#@") {
+			return true
+		}
+	}
+	return false
 }
 
 func colorize(text, code string, enabled bool) string {
@@ -244,9 +259,22 @@ func determineModuleSource(m *resolver.Module, resolved *resolver.Resolved) stri
 			caps = append(caps, capName)
 		}
 	}
-	if len(caps) > 0 {
-		sort.Strings(caps)
-		return fmt.Sprintf("declared in spec (%s)", strings.Join(caps, ", "))
+	if len(caps) == 0 {
+		return "declared in spec"
 	}
-	return "declared in spec"
+	sort.Strings(caps)
+	// The origin of a non-explicit choice is a symbol in front of the
+	// capability name; printPlan prints the legend.
+	parts := make([]string, len(caps))
+	for i, c := range caps {
+		switch resolved.CapabilitySource[c] {
+		case resolver.SourceDefault:
+			parts[i] = "#" + c
+		case resolver.SourceOnlyProvider:
+			parts[i] = "@" + c
+		default:
+			parts[i] = c
+		}
+	}
+	return fmt.Sprintf("declared in spec (%s)", strings.Join(parts, ", "))
 }
