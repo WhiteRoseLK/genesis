@@ -142,4 +142,4 @@ e2e:
 # digest, run in a container so that nothing has to be installed.
 SHELLCHECK_IMAGE := koalaman/shellcheck:v0.10.0@sha256:2097951f02e735b613f4a34de20c40f937a6c8f18ecb170612c88c34517221fb
 shellcheck:
-	$(CONTAINER_RUNTIME) run --rm -v "$(CURDIR):/mnt:ro" -w /mnt $(SHELLCHECK_IMAGE) -x -P SCRIPTDIR $$(git ls-files '*.sh')
+	git ls-files -z '*.sh' | xargs -0 $(CONTAINER_RUNTIME) run --rm --network none -v "$(CURDIR):/mnt:ro" -w /mnt $(SHELLCHECK_IMAGE) -x -P SCRIPTDIR
