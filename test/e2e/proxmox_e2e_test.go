@@ -38,7 +38,7 @@ func buildModule(t *testing.T, name string) (binaryPath string, manifest *sdk.Ma
 	build := exec.Command("go", "build", "-o", binaryPath, ".")
 	build.Dir = sourceDir
 	if out, err := build.CombinedOutput(); err != nil {
-		t.Fatalf("compilation of %s: %v\n%s", name, err, out)
+		t.Fatalf("compiling %s: %v\n%s", name, err, out)
 	}
 	manifest, err = sdk.LoadManifest(filepath.Join(sourceDir, "module.yaml"))
 	if err != nil {

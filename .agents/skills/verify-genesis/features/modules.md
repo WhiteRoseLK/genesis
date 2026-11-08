@@ -30,6 +30,6 @@ Preconditions:
 ## Gotchas
 
 - `GENESIS_VERIFY_ROOT` is only set in your shell if you exported it; the default is `${TMPDIR:-/tmp}/genesis-verify`.
-- `modules install` reports the French message `compilation de …` on build failure (#115): match on the exit code, not the text.
+- `modules install` reports `compiling …` on build failure: match on the exit code, not the text.
 - The module binary name depends on the OS and architecture of the machine running the run (`module-darwin-arm64` on a Mac).
 - Remove the scaffold worktree before `cleanup.sh`: `rm -rf` of the run leaves a dangling worktree entry otherwise (`git worktree prune` fixes it).
