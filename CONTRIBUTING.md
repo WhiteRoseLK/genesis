@@ -13,7 +13,7 @@ By participating, you agree to abide by the [code of conduct](CODE_OF_CONDUCT.md
 |---|---|
 | `make tools` | Installs the pinned development tools into `.bin/` |
 | `make build` | Builds every module (`CGO_ENABLED=0`, `GOARCH=amd64` or `arm64`) |
-| `make test` | Unit tests of each `go.mod`: no network, no container daemon |
+| `make test` | Unit tests of each `go.mod`: no network, no container daemon. Includes `test/language`, which fails on French string literals in Go sources (ADR-054; allowlist in the test) |
 | `make test-race` | Same tests with the race detector (CGO required for the tests only) |
 | `make test-docker` | Integration tests against real containers (`docker` build tag) |
 | `make pull-images` | Pulls the images pinned in the code ahead of time, with retries (registry rate limits) |
