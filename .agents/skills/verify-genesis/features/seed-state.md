@@ -31,5 +31,5 @@ Preconditions:
 ## Gotchas
 
 - `init` prints the master key on stdout by design. Only `g.sh` transcripts mask it: never run `genesis init` outside `g.sh`, never paste raw output.
-- `secrets` takes the state directory from the spec with `-f`, like `status`, `init` and `clean`; an unreadable spec is an error (#132). A reference is `<module>/<name>` (`pki/root-ca`), not a `secret://` URI.
+- `secrets`, `status`, `init` and `clean` take the state directory from the spec with `-f` unless `--state-dir` is explicit; an unreadable spec is an error (#132, #142), and the absolute directory is printed on stderr as `state directory: <abs> (from <spec>)` (#143). A reference is `<module>/<name>` (`pki/root-ca`), not a `secret://` URI.
 - Module states and generated secrets only exist after an `apply`, which this skill never runs (ADR-129): their journeys belong to a Proxmox test VM, on explicit request.
