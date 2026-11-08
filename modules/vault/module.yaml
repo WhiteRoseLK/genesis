@@ -6,7 +6,7 @@ layer: foundation
 core: ">=0.1.0"
 protocol: 1
 
-capabilities: []
+capabilities: [pki, secrets]
 
 provides:
   - function: pki.issuer/v1
@@ -42,4 +42,6 @@ secrets:
 resources:
   - { role: vault, count: 1, size: medium }
 
-defaults: {}
+defaults:
+  pki: true
+  secrets: true

@@ -6,7 +6,7 @@ layer: foundation
 core: ">=0.1.0"
 protocol: 1
 
-capabilities: []
+capabilities: [dns]
 
 provides:
   - function: dns.zone/v1
@@ -34,4 +34,5 @@ secrets: []
 
 resources: []
 
-defaults: {}
+defaults:
+  dns: true

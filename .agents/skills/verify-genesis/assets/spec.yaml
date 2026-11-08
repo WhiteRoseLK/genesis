@@ -1,5 +1,5 @@
 # Spec used by verify-genesis: fake-compute instead of a hypervisor, so no
-# Proxmox is touched. Modules are explicit: `time: {}` does not resolve (#126).
+# Proxmox is touched. time and dns use their default modules (ADR-135).
 apiVersion: genesis/v1alpha1
 kind: Environment
 metadata:
@@ -15,5 +15,5 @@ seed:
   container_runtime: docker
 capabilities:
   compute: { module: fake-compute }
-  time: { module: chrony }
-  dns: { module: powerdns }
+  time: {}
+  dns: {}

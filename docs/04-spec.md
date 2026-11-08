@@ -82,6 +82,7 @@ capabilities:
 ## Rules
 - **No literal secret**: `*_ref` fields in `env://`, `file://` or `vault://` only.
 - `module` missing → the module marked `defaults.<capability>: true`; if several are installed, an error asks for a choice.
+- Default modules (ADR-135): `time` → `chrony`, `dns` → `powerdns`, `pki` → `vault`, `secrets` → `vault`, `bastion` → `teleport`. `coredns`, `bind` and `step-ca` declare their capability without being the default: select them with `module:`.
 - Two capabilities pointing to the same module share its instance.
 - Two-stage validation: overall structure by the core, then `config` by the module (errors with the full YAML path).
 - Large enough IP pool, no port conflict between co-hosted modules (ports declared in the manifests).

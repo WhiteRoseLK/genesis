@@ -6,6 +6,7 @@ A user checks a spec before applying it: `validate` checks structure, module res
 
 - `validate-ok` accepts the baseline spec.
 - `validate-rejects` rejects an invalid spec with an actionable message.
+- `default-modules` resolves a capability without `module:` to its default module (ADR-135).
 - `plan-order` lists modules in dependency order, with phase and source (declared or automatic).
 
 ## How to get to it (user POV)
@@ -22,11 +23,12 @@ Preconditions:
 
 - **Valid spec.** Run `genesis validate -f spec.yaml`. Stdout: `spec.yaml: valid structure and module resolution.` then `all modules validated successfully.`; exit code `0`.
 - **Plan.** Run `genesis plan -f spec.yaml`. Stdout starts with `Execution plan (8 modules):`; `fake-compute`, `chrony` and `powerdns` are `declared in spec`; `base-os`, `coredns`, `step-ca`, `vault`, `teleport` are `automatic (dependency)`; `coredns` and `step-ca` are in the `Seed (temporary container)` phase; every dependency appears before its dependents.
+- **Default modules.** The baseline gives no `module:` for `time` and `dns`. In the `plan` output, `chrony` reads `declared in spec (time)` and `powerdns` reads `declared in spec (dns)`.
 - **Rejected spec.** `cp spec.yaml spec.ok.yaml`, set `seed.address` to `192.168.1.10` in `spec.yaml`, run `genesis validate -f spec.yaml`. Exit code non-zero, stderr names `seed.address` and `network.cidr`. Restore with `mv spec.ok.yaml spec.yaml` and validate again.
 - **Second view.** `plan` on the restored spec gives the same output as before the edit.
 
 ## Gotchas
 
-- `time: {}` and the other module-less capabilities from the README do not resolve (`no installed module provides it`, #126). The baseline spec names every module on purpose; a journey that tests defaults reports #126.
+- Capabilities without `module:` resolve to their default module (ADR-135), but a module-less `bastion: {}` still fails when a required function has several providers (#136).
 - `validate` prints the structure line even when the module validation that follows fails: read the exit code and the last line.
 - Without `NO_COLOR=1` (set by `g.sh`) the plan contains ANSI escapes.

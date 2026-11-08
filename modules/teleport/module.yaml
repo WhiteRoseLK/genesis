@@ -6,7 +6,7 @@ layer: services
 core: ">=0.1.0"
 protocol: 1
 
-capabilities: []
+capabilities: [bastion]
 
 provides:
   - function: access.ssh/v1
@@ -32,4 +32,5 @@ secrets: []
 resources:
   - { role: teleport, count: 1, size: medium }
 
-defaults: {}
+defaults:
+  bastion: true
