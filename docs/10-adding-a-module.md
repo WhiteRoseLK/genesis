@@ -12,6 +12,7 @@ Goal: prove that the architecture is extensible. **Adding a product changes neit
    - **Idempotence & state**: Persist non-sensitive connection parameters in `StepResult.State` (e.g. VM IPs, container IDs) and restore clients during `Check`. Never write plaintext secrets to state.
 4. Write the `config_schema` (`schema.json`) matching the capability options declared in the manifest.
 5. Pass the SDK **conformance suite**: `go test ./... -run Conformance`. It checks idempotence, that `Handover` can be replayed, that no secret appears in the outputs, and the semantics of each provided function (e.g. an `UpsertRecord` must be visible through `ListRecords`, then resolvable).
+   `go test ./test/integration -run ServeTheirProvides` also launches the built module and checks, through gRPC reflection, that every function declared in `provides` is really served (`TestModulesServeTheirProvides`; a new module under `modules/` is picked up automatically).
 6. `genesis modules install ./modules/<name>`, then reference `module: <name>` in a spec.
 
 ## Example 1 — Replacing PowerDNS with Bind
