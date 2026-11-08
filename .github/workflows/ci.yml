@@ -49,6 +49,14 @@ jobs:
           key: test-archives-${{ runner.os }}-${{ hashFiles('test/integration/teleport_image_test.go') }}
       - run: make test-docker
 
+  shellcheck:
+    name: shellcheck (agent skills and scripts)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - run: make shellcheck
+
   lint:
     name: lint (including import rules)
     runs-on: ubuntu-latest

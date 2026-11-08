@@ -3,6 +3,7 @@
 # container this run created (never one that existed before launch), then the
 # run directory. Evidence is kept.
 #   scripts/cleanup.sh <run-id>
+# shellcheck source=common.sh
 source "$(dirname "$0")/common.sh"
 run_paths "${1:-}"
 [ -d "$RUN" ] || { echo "no run $RUN_ID in $VERIFY_ROOT/runs"; exit 0; }

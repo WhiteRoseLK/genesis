@@ -3,6 +3,7 @@
 # installs every module of modules/ with `genesis modules install`, writes the
 # fake-compute spec and runs `genesis init`. Prints the run id on its last line.
 #   scripts/launch.sh [run-id]
+# shellcheck source=common.sh
 source "$(dirname "$0")/common.sh"
 run_paths "${1:-$(date +%Y%m%d-%H%M%S)}"
 [ ! -e "$RUN" ] || { echo "run $RUN_ID already exists: pick another id or clean it up" >&2; exit 2; }

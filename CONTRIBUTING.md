@@ -18,6 +18,7 @@ By participating, you agree to abide by the [code of conduct](CODE_OF_CONDUCT.md
 | `make test-docker` | Integration tests against real containers (`docker` build tag) |
 | `make pull-images` | Pulls the images pinned in the code ahead of time, with retries (registry rate limits) |
 | `make lint` | `golangci-lint`, including the `depguard` import rules |
+| `make shellcheck` | `shellcheck` (pinned image) on the shell scripts: agent skills and `scripts/` |
 | `make mod-check` | Each `go.mod` is up to date and builds outside `go.work` |
 | `make proto` | Regenerates the protobuf code (`buf generate`): the generated code is committed |
 | `make proto-check` | `buf lint` and generated code up to date (CI also runs `buf breaking` against the base branch) |
