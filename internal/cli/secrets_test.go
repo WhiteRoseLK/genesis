@@ -103,3 +103,27 @@ func TestSecretsRejectsUnreadableSpec(t *testing.T) {
 		t.Fatal("secrets list -f with a missing spec: unexpected success")
 	}
 }
+
+// An explicit --state-dir wins over the state_dir of the spec.
+func TestSecretsExplicitStateDirWinsOverSpec(t *testing.T) {
+	specFile := filepath.Join(t.TempDir(), "spec.yaml")
+	content := `apiVersion: genesis/v1alpha1
+kind: Environment
+metadata: { name: lab }
+network: { cidr: 10.10.0.0/24, gateway: 10.10.0.1, pool: 10.10.0.50-10.10.0.99, domain: lab.internal }
+seed: { address: 10.10.0.10, state_dir: ` + filepath.Join(t.TempDir(), "from-spec") + ` }
+capabilities:
+  test-a: { module: test-a }
+`
+	if err := os.WriteFile(specFile, []byte(content), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	explicit := filepath.Join(t.TempDir(), "explicit")
+	if _, err := runCLI(t, "init", "--state-dir", explicit); err != nil {
+		t.Fatalf("init: %v", err)
+	}
+	// The spec's own directory was never initialised: reading it would fail.
+	if out, err := runCLI(t, "secrets", "list", "-f", specFile, "--state-dir", explicit); err != nil || !strings.Contains(out, "no secret") {
+		t.Errorf("secrets list -f --state-dir = %q, %v; want the explicit directory used", out, err)
+	}
+}
