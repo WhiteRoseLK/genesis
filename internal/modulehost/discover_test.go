@@ -5,8 +5,45 @@ package modulehost
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 )
+
+func TestDiscoverRejectsManifestNameMismatch(t *testing.T) {
+	search := t.TempDir()
+	writeFakeInstalledModule(t, search, "vault", "0.1.0")
+	if err := os.Rename(filepath.Join(search, "vault"), filepath.Join(search, "renamed")); err != nil {
+		t.Fatal(err)
+	}
+
+	_, err := Discover([]string{search})
+	if err == nil {
+		t.Fatal("Discover accepted a directory whose name differs from the manifest name")
+	}
+	for _, want := range []string{filepath.Join(search, "renamed", "0.1.0"), `"renamed"`, `"vault"`, "hint:"} {
+		if !strings.Contains(err.Error(), want) {
+			t.Errorf("error %q lacks %q", err, want)
+		}
+	}
+}
+
+func TestDiscoverRejectsManifestVersionMismatch(t *testing.T) {
+	search := t.TempDir()
+	writeFakeInstalledModule(t, search, "vault", "0.1.0")
+	if err := os.Rename(filepath.Join(search, "vault", "0.1.0"), filepath.Join(search, "vault", "9.9.9")); err != nil {
+		t.Fatal(err)
+	}
+
+	_, err := Discover([]string{search})
+	if err == nil {
+		t.Fatal("Discover accepted a directory whose version differs from the manifest version")
+	}
+	for _, want := range []string{filepath.Join(search, "vault", "9.9.9"), `"9.9.9"`, `"0.1.0"`, "hint:"} {
+		if !strings.Contains(err.Error(), want) {
+			t.Errorf("error %q lacks %q", err, want)
+		}
+	}
+}
 
 func writeFakeInstalledModule(t *testing.T, searchPath, name, version string) {
 	t.Helper()

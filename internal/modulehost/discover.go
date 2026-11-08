@@ -87,9 +87,14 @@ func Discover(searchPaths []string) ([]Installed, error) {
 				if err != nil {
 					return nil, fmt.Errorf("invalid manifest in %s: %w", manifestPath, err)
 				}
+				if manifest.Name != nameEntry.Name() || manifest.Version != versionEntry.Name() {
+					return nil, fmt.Errorf("module installed in %s declares %q version %q in its manifest, but its directory says %q version %q; "+
+						"hint: reinstall it with `genesis modules install`, or move it to <search-path>/%s/%s",
+						dir, manifest.Name, manifest.Version, nameEntry.Name(), versionEntry.Name(), manifest.Name, manifest.Version)
+				}
 				found = append(found, Installed{
-					Name:         nameEntry.Name(),
-					Version:      versionEntry.Name(),
+					Name:         manifest.Name,
+					Version:      manifest.Version,
 					Dir:          dir,
 					ManifestPath: manifestPath,
 					BinaryPath:   filepath.Join(dir, BinaryName()),
