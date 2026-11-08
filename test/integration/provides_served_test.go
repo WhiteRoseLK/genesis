@@ -25,6 +25,11 @@ import (
 	sdk "github.com/WhiteRoseLK/genesis/sdk/go"
 
 	// The generated code registers the function descriptors in protoregistry.
+	// The test binary already pulls these packages in transitively, so the
+	// blank imports are redundant today: they make the dependency explicit and
+	// keep it when internal/ is refactored. Removing one does not fail a test;
+	// TestEveryProtoFunctionIsImported is the check that fails when a function
+	// has no descriptors.
 	_ "github.com/WhiteRoseLK/genesis/sdk/go/gen/functions/access/ssh/v1"
 	_ "github.com/WhiteRoseLK/genesis/sdk/go/gen/functions/compute/vm/v1"
 	_ "github.com/WhiteRoseLK/genesis/sdk/go/gen/functions/core/ansible/v1"
