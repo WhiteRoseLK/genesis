@@ -13,4 +13,4 @@ Consequences: manifests of chrony, powerdns, coredns, bind, step-ca, vault and t
 
 Choosing vault for `pki` makes Vault, which holds the exportable root CA, the default PKI; step-ca remains available with `module: step-ca`. The default modules are listed in `docs/04-spec.md`; `test/integration/defaults_test.go` fails if that list and the manifests diverge.
 
-The origin of each capability's module (explicit, default, only provider) is recorded by the resolver in `Resolved.CapabilitySource` and shown by `genesis plan` (#140); a single candidate is reported as `only provider` even when it is flagged default.
+The origin of each capability's module (explicit, default, only provider) is recorded by the resolver in `Resolved.CapabilitySource` and shown by `genesis plan` as a symbol in front of the capability name (`#name` default, `@name` only provider, bare name explicit; #140); a single candidate is reported as `only provider` even when it is flagged default.

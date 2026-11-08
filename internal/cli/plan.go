@@ -141,9 +141,24 @@ func printPlan(cmd *cobra.Command, resolved *resolver.Resolved, p *planner.Plan)
 	fmt.Fprintf(&b, "  • %s : Infrastructure drivers and management providers.\n",
 		colorize("Control", ansiCyan, colorEnabled))
 
+	if sourcesUseSymbols(rows) {
+		b.WriteString("\nLegend: #name = default module, @name = only provider\n")
+	}
+
 	out := cmd.OutOrStdout()
 	_, err := fmt.Fprint(out, b.String())
 	return err
+}
+
+// sourcesUseSymbols reports whether a SOURCE cell (last column) carries an
+// origin symbol, so the legend is printed only when needed.
+func sourcesUseSymbols(rows [][]string) bool {
+	for _, row := range rows {
+		if strings.ContainsAny(row[len(row)-1], "#@") {
+			return true
+		}
+	}
+	return false
 }
 
 func colorize(text, code string, enabled bool) string {
@@ -248,31 +263,17 @@ func determineModuleSource(m *resolver.Module, resolved *resolver.Resolved) stri
 		return "declared in spec"
 	}
 	sort.Strings(caps)
-	origin := func(c string) string {
-		if s := resolved.CapabilitySource[c]; s != resolver.SourceExplicit {
-			return string(s)
-		}
-		return ""
-	}
-	// Same origin for every capability: it ends the list. Mixed origins: each
-	// non-explicit capability carries its own.
-	same := true
-	for _, c := range caps {
-		if origin(c) != origin(caps[0]) {
-			same = false
-		}
-	}
-	if same {
-		if o := origin(caps[0]); o != "" {
-			return fmt.Sprintf("declared in spec (%s, %s)", strings.Join(caps, ", "), o)
-		}
-		return fmt.Sprintf("declared in spec (%s)", strings.Join(caps, ", "))
-	}
+	// The origin of a non-explicit choice is a symbol in front of the
+	// capability name; printPlan prints the legend.
 	parts := make([]string, len(caps))
 	for i, c := range caps {
-		parts[i] = c
-		if o := origin(c); o != "" {
-			parts[i] += " [" + o + "]"
+		switch resolved.CapabilitySource[c] {
+		case resolver.SourceDefault:
+			parts[i] = "#" + c
+		case resolver.SourceOnlyProvider:
+			parts[i] = "@" + c
+		default:
+			parts[i] = c
 		}
 	}
 	return fmt.Sprintf("declared in spec (%s)", strings.Join(parts, ", "))
