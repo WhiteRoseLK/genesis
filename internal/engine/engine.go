@@ -1188,7 +1188,8 @@ func (e *Engine) cleanupVerifierVM(
 }
 
 // CleanVerifierVMs cleans ephemeral verifier VMs from the hypervisor. It
-// returns an error when the compute module could not be reached.
+// returns an error when the compute module could not be reached or when a VM
+// could not be deleted or its address released.
 func (e *Engine) CleanVerifierVMs(
 	ctx context.Context,
 	resolved *resolver.Resolved,
@@ -1228,17 +1229,30 @@ func (e *Engine) CleanVerifierVMs(
 					return fmt.Errorf("connecting to module %s: %w", name, err)
 				}
 				vmClient := computevmv1.NewComputeVMClient(conn)
-				_, _ = vmClient.DeleteVM(ctx, &computevmv1.DeleteVMRequest{Name: sharedVerifierVMName})
-				_, _ = vmClient.DeleteVM(ctx, &computevmv1.DeleteVMRequest{Name: "teleport01-agent-target"})
-				if alloc != nil {
-					_ = alloc.Release(sharedVerifierVMName)
-					_ = alloc.Release("teleport01-agent-target")
-				}
-				return nil
+				return deleteVerifierVMs(ctx, vmClient, alloc)
 			}
 		}
 	}
 	return nil
+}
+
+// deleteVerifierVMs deletes the ephemeral verifier VMs and releases their
+// addresses. DeleteVM is idempotent (a missing VM is a success), so any error
+// is a real failure: the errors are joined and the remaining deletions are
+// still attempted.
+func deleteVerifierVMs(ctx context.Context, vmClient computevmv1.ComputeVMClient, alloc broker.Allocator) error {
+	var errs []error
+	for _, name := range []string{sharedVerifierVMName, "teleport01-agent-target"} {
+		if _, err := vmClient.DeleteVM(ctx, &computevmv1.DeleteVMRequest{Name: name}); err != nil {
+			errs = append(errs, fmt.Errorf("deleting verifier VM %s: %w", name, err))
+		}
+		if alloc != nil {
+			if err := alloc.Release(name); err != nil {
+				errs = append(errs, fmt.Errorf("releasing the address of verifier VM %s: %w", name, err))
+			}
+		}
+	}
+	return errors.Join(errs...)
 }
 
 func requiresComputeVM(m *resolver.Module) bool {
