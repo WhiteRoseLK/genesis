@@ -42,7 +42,7 @@ secrets:
 resources:
   - { role: vault, count: 1, size: medium }
 
-defaults:                         # default implementation of these capabilities (keys must be in capabilities)
+defaults:                         # default implementation of these capabilities (a key outside capabilities is ignored)
   pki: true
   secrets: true
 ```

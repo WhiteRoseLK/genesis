@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 
@@ -103,13 +104,27 @@ func TestManifestDefaultsAreDeclaredCapabilities(t *testing.T) {
 			if !isDefault {
 				continue
 			}
-			found := false
-			for _, c := range m.Manifest.Capabilities {
-				found = found || c == capability
-			}
-			if !found {
+			if !slices.Contains(m.Manifest.Capabilities, capability) {
 				t.Errorf("module %s is default for %q, which is not in its capabilities %v", m.Name, capability, m.Manifest.Capabilities)
 			}
+		}
+	}
+}
+
+// Regression for #136: the minimal spec (a compute provider and `bastion: {}`)
+// resolves against the real manifests, the dependencies taking their defaults.
+func TestRealManifestsMinimalSpecResolves(t *testing.T) {
+	env := &spec.Environment{Capabilities: map[string]spec.Capability{
+		"compute": {Module: "proxmox"},
+		"bastion": {},
+	}}
+	r, err := resolver.Resolve(env, realManifests(t))
+	if err != nil {
+		t.Fatalf("Resolve: %v", err)
+	}
+	for function, module := range map[string]string{"dns.resolver/v1": "powerdns", "pki.issuer/v1": "vault", "time.ntp/v1": "chrony"} {
+		if provider, _ := r.ProviderFor(function, ""); provider != module {
+			t.Errorf("provider of %s = %q, want %q", function, provider, module)
 		}
 	}
 }
