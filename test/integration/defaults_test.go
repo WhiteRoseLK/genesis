@@ -44,19 +44,10 @@ func realManifests(t *testing.T) []modulehost.Installed {
 	return installed
 }
 
-// assertCapabilityModules resolves the capabilities together against the real
-// manifests and checks the module chosen for each. With explicit, the spec
-// names the module; without, the default applies.
-func assertCapabilityModules(t *testing.T, want map[string]string, explicit bool) {
+// assertResolvesTo resolves the capabilities together against the real
+// manifests and checks the module chosen for each.
+func assertResolvesTo(t *testing.T, env *spec.Environment, want map[string]string) {
 	t.Helper()
-	env := &spec.Environment{Capabilities: map[string]spec.Capability{"compute": {Module: "proxmox"}}}
-	for capability, module := range want {
-		c := spec.Capability{}
-		if explicit {
-			c.Module = module
-		}
-		env.Capabilities[capability] = c
-	}
 	r, err := resolver.Resolve(env, realManifests(t))
 	if err != nil {
 		t.Fatalf("Resolve: %v", err)
@@ -71,12 +62,22 @@ func assertCapabilityModules(t *testing.T, want map[string]string, explicit bool
 // Regression for #126: a capability without `module:` resolves to its default
 // module with the real manifests.
 func TestRealManifestsDefaultModules(t *testing.T) {
-	assertCapabilityModules(t, defaultModules, false)
+	env := &spec.Environment{Capabilities: map[string]spec.Capability{}}
+	for capability := range defaultModules {
+		env.Capabilities[capability] = spec.Capability{}
+	}
+	env.Capabilities["compute"] = spec.Capability{Module: "proxmox"}
+	assertResolvesTo(t, env, defaultModules)
 }
 
 // The non-default providers stay selectable with an explicit module.
 func TestRealManifestsExplicitAlternatives(t *testing.T) {
-	assertCapabilityModules(t, map[string]string{"dns": "coredns", "pki": "step-ca"}, true)
+	want := map[string]string{"compute": "proxmox", "dns": "coredns", "pki": "step-ca"}
+	env := &spec.Environment{Capabilities: map[string]spec.Capability{}}
+	for capability, module := range want {
+		env.Capabilities[capability] = spec.Capability{Module: module}
+	}
+	assertResolvesTo(t, env, want)
 }
 
 // The default modules documented in docs/04-spec.md match the table above.
@@ -91,6 +92,24 @@ func TestDefaultModulesAreDocumented(t *testing.T) {
 		}
 		if want := fmt.Sprintf("`%s` → `%s`", capability, module); !strings.Contains(string(doc), want) {
 			t.Errorf("docs/04-spec.md does not list %s", want)
+		}
+	}
+}
+
+// A module can only be the default of a capability it declares.
+func TestManifestDefaultsAreDeclaredCapabilities(t *testing.T) {
+	for _, m := range realManifests(t) {
+		for capability, isDefault := range m.Manifest.Defaults {
+			if !isDefault {
+				continue
+			}
+			found := false
+			for _, c := range m.Manifest.Capabilities {
+				found = found || c == capability
+			}
+			if !found {
+				t.Errorf("module %s is default for %q, which is not in its capabilities %v", m.Name, capability, m.Manifest.Capabilities)
+			}
 		}
 	}
 }

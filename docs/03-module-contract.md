@@ -42,7 +42,7 @@ secrets:
 resources:
   - { role: vault, count: 1, size: medium }
 
-defaults:                         # is this module the default implementation?
+defaults:                         # default implementation of these capabilities (keys must be in capabilities)
   pki: true
   secrets: true
 ```
