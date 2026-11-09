@@ -11,10 +11,10 @@
 | M6 — chrony, coredns, powerdns | done | [journal](journal.md) |
 | M7 — step-ca, vault | done | [journal](journal.md) |
 | M8 — teleport, seed retirement | done | ADR-017 to 020; SSH repoint deferred ([#16](https://github.com/WhiteRoseLK/genesis/issues/16)) |
-| M9 — Hardening, proof of extensibility | **in progress** | [M9 milestone](https://github.com/WhiteRoseLK/genesis/milestone/1) · issue [#2](https://github.com/WhiteRoseLK/genesis/issues/2) |
+| M9 — Hardening, proof of extensibility | **in progress** (all sub-issues closed; acceptance pending) | [M9 milestone](https://github.com/WhiteRoseLK/genesis/milestone/1) · issue [#2](https://github.com/WhiteRoseLK/genesis/issues/2) |
 
 ## Next step
-M9: see the sub-issues of [#2](https://github.com/WhiteRoseLK/genesis/issues/2) and the [M9 milestone](https://github.com/WhiteRoseLK/genesis/milestone/1).
+M9: all sub-issues of [#2](https://github.com/WhiteRoseLK/genesis/issues/2) are closed, including a real end-to-end `apply` with `powerdns` on a dedicated test Proxmox cluster. The milestone's acceptance criterion still requires the same real-infrastructure run with `bind` ([#165](https://github.com/WhiteRoseLK/genesis/issues/165)), blocked until the dedicated test Proxmox host is back up.
 
 ## Where to find the rest (ADR-049)
 - **Current milestone**: GitHub milestone + parent issue labelled `milestone` + one sub-issue per PR.
