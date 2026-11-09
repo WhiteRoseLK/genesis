@@ -4,18 +4,17 @@
 // must pass before it is considered done (docs/10-adding-a-module.md,
 // docs/03-module-contract.md §4).
 //
-// Skeleton at milestone M3: only the checks that do not depend on the broker
-// are done here (Describe consistent with the manifest, Validate does not
-// crash). The full semantic checks — replayed idempotence, no secret in the
-// outputs, compliance of each provided function with simulated required
-// functions — need the broker and arrive at milestone M4
-// (docs/08-milestones.md).
+// Checks here never need the broker or a built module binary (Describe
+// consistent with the manifest, Validate does not crash, Check is
+// repeatable). Checks that need a running module — every declared function
+// is really served — live in test/integration instead (issue #145).
 package moduletest
 
 import (
 	"context"
 	"testing"
 
+	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/structpb"
 
 	sdk "github.com/WhiteRoseLK/genesis/sdk/go"
@@ -55,5 +54,17 @@ func RunConformance(t *testing.T, impl modulev1.ModuleServer, manifestPath strin
 	}
 	if _, err := impl.Validate(ctx, &modulev1.ValidateRequest{Config: emptyConfig}); err != nil {
 		t.Errorf("Validate with an empty config returned a transport error rather than Diagnostics: %v", err)
+	}
+
+	// Check must be repeatable: the engine's replay logic ("Check before any
+	// action", AGENTS.md) relies on it not flip-flopping for the same input.
+	stepReq := &modulev1.StepRequest{Config: emptyConfig}
+	first, firstErr := impl.Check(ctx, stepReq)
+	second, secondErr := impl.Check(ctx, stepReq)
+	switch {
+	case (firstErr == nil) != (secondErr == nil):
+		t.Errorf("Check is not repeatable: first call error = %v, second call error = %v", firstErr, secondErr)
+	case firstErr == nil && !proto.Equal(first, second):
+		t.Errorf("Check is not repeatable: got %v then %v for the same input", first, second)
 	}
 }
