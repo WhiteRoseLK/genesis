@@ -14,6 +14,7 @@ package moduletest
 
 import (
 	"context"
+	"strings"
 	"testing"
 
 	"google.golang.org/protobuf/types/known/structpb"
@@ -56,4 +57,53 @@ func RunConformance(t *testing.T, impl modulev1.ModuleServer, manifestPath strin
 	if _, err := impl.Validate(ctx, &modulev1.ValidateRequest{Config: emptyConfig}); err != nil {
 		t.Errorf("Validate with an empty config returned a transport error rather than Diagnostics: %v", err)
 	}
+
+	checkNoSecretInOutputs(t, impl)
+}
+
+// secretConfigKeys are the config keys a module is most likely to treat as
+// secrets; each is given its own sentinel value so a leak names its source.
+var secretConfigKeys = []string{"password", "token", "secret", "api_key", "private_key"}
+
+func sentinel(key string) string { return "genesis-conformance-secret-" + key }
+
+// checkNoSecretInOutputs gives Validate and Check a config whose secret-looking
+// values are unmistakable sentinels, and fails if any of them comes back in a
+// diagnostic, a check detail or an error ("no plaintext secret in logs,
+// outputs, errors", AGENTS.md). Only these two RPCs are called: they are the
+// ones that must be safe to run with no side effect.
+func checkNoSecretInOutputs(t *testing.T, impl modulev1.ModuleServer) {
+	t.Helper()
+	ctx := context.Background()
+
+	values := make(map[string]any, len(secretConfigKeys))
+	for _, key := range secretConfigKeys {
+		values[key] = sentinel(key)
+	}
+	config, err := structpb.NewStruct(values)
+	if err != nil {
+		t.Fatalf("building a config with sentinel secrets: %v", err)
+	}
+
+	assertNoSentinel := func(rpc, output string) {
+		for _, key := range secretConfigKeys {
+			if strings.Contains(output, sentinel(key)) {
+				t.Errorf("%s output contains the value of the %q config key: %s", rpc, key, output)
+			}
+		}
+	}
+
+	diags, err := impl.Validate(ctx, &modulev1.ValidateRequest{Config: config})
+	if err != nil {
+		assertNoSentinel("Validate error", err.Error())
+	}
+	for _, d := range diags.GetDiagnostics() {
+		assertNoSentinel("Validate diagnostic", d.GetPath()+" "+d.GetMessage())
+	}
+
+	result, err := impl.Check(ctx, &modulev1.StepRequest{Config: config})
+	if err != nil {
+		assertNoSentinel("Check error", err.Error())
+	}
+	assertNoSentinel("Check detail", result.GetDetail())
 }
